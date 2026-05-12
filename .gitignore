@@ -1,0 +1,6 @@
+.DS_Store
+.task/
+node_modules/
+target/
+dist/
+.tmp/

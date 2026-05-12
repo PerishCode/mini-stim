@@ -1,0 +1,22 @@
+name: guard
+
+on:
+  pull_request: {}
+  push:
+    branches:
+      - main
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - name: Check scaffold
+        run: |
+          set -euo pipefail
+          test -f AGENTS.md
+          test -f README.md
+          test -d apps
+          test -d crates
+          test -d packages
+          test -d docs
