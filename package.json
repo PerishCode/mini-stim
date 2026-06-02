@@ -1,0 +1,21 @@
+{
+  "name": "mini-stim",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.2",
+  "scripts": {
+    "build": "pnpm -r --if-present build",
+    "codegen": "cargo run -p santi-api -- export-openapi > packages/contracts/openapi.json && pnpm exec openapi-typescript packages/contracts/openapi.json -o packages/contracts/src/openapi.ts",
+    "dev": "pnpm dev:client",
+    "dev:client": "pnpm -C apps/client dev",
+    "dev:server": "cargo run -p santi-api -- serve",
+    "format:check": "pnpm exec prettier --check .",
+    "guard": "cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && pnpm codegen && pnpm -r --if-present typecheck && pnpm -r --if-present build"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.10.1",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.8"
+  }
+}
