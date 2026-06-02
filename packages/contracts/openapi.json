@@ -1,0 +1,449 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "santi-api",
+    "description": "",
+    "license": {
+      "name": "MIT",
+      "identifier": "MIT"
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/conversations": {
+      "get": {
+        "tags": [],
+        "operationId": "list_conversations",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConversationSummary"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversation_id}": {
+      "get": {
+        "tags": [],
+        "operationId": "get_conversation",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "tags": [],
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/messages/stream": {
+      "post": {
+        "tags": [],
+        "operationId": "stream_message",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Server-sent stream of StreamEvent JSON payloads"
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ConversationDetail": {
+        "type": "object",
+        "required": [
+          "conversation",
+          "messages"
+        ],
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/ConversationSummary"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessageRecord"
+            }
+          }
+        }
+      },
+      "ConversationSummary": {
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "conversation_id": {
+            "$ref": "#/components/schemas/String"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/String"
+          },
+          "last_message_preview": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/String"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "required": [
+          "ok",
+          "service"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "service": {
+            "type": "string"
+          }
+        }
+      },
+      "MessageRecord": {
+        "type": "object",
+        "required": [
+          "message_id",
+          "conversation_id",
+          "role",
+          "state",
+          "created_at",
+          "updated_at",
+          "text"
+        ],
+        "properties": {
+          "completed_at": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/String"
+              }
+            ]
+          },
+          "conversation_id": {
+            "$ref": "#/components/schemas/String"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/String"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "message_id": {
+            "$ref": "#/components/schemas/String"
+          },
+          "role": {
+            "$ref": "#/components/schemas/MessageRole"
+          },
+          "state": {
+            "$ref": "#/components/schemas/MessageState"
+          },
+          "text": {
+            "type": "string"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/String"
+          }
+        }
+      },
+      "MessageRole": {
+        "type": "string",
+        "enum": [
+          "user",
+          "assistant"
+        ]
+      },
+      "MessageState": {
+        "type": "string",
+        "enum": [
+          "created",
+          "streaming",
+          "completed",
+          "failed"
+        ]
+      },
+      "SendMessageAccepted": {
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "user_message_id",
+          "assistant_message_id",
+          "response_run_id",
+          "user_message",
+          "assistant_message"
+        ],
+        "properties": {
+          "assistant_message": {
+            "$ref": "#/components/schemas/MessageRecord"
+          },
+          "assistant_message_id": {
+            "$ref": "#/components/schemas/String"
+          },
+          "conversation_id": {
+            "$ref": "#/components/schemas/String"
+          },
+          "response_run_id": {
+            "$ref": "#/components/schemas/String"
+          },
+          "user_message": {
+            "$ref": "#/components/schemas/MessageRecord"
+          },
+          "user_message_id": {
+            "$ref": "#/components/schemas/String"
+          }
+        }
+      },
+      "SendMessageRequest": {
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "conversation_id": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/String"
+              }
+            ]
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "StreamEvent": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "accepted",
+              "type"
+            ],
+            "properties": {
+              "accepted": {
+                "$ref": "#/components/schemas/SendMessageAccepted"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "accepted"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "conversation_id",
+              "message_id",
+              "delta",
+              "type"
+            ],
+            "properties": {
+              "conversation_id": {
+                "$ref": "#/components/schemas/String"
+              },
+              "delta": {
+                "type": "string"
+              },
+              "message_id": {
+                "$ref": "#/components/schemas/String"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "text-delta"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "conversation_id",
+              "message",
+              "type"
+            ],
+            "properties": {
+              "conversation_id": {
+                "$ref": "#/components/schemas/String"
+              },
+              "message": {
+                "$ref": "#/components/schemas/MessageRecord"
+              },
+              "provider_response_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "message-completed"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "conversation_id",
+              "message_id",
+              "error",
+              "type"
+            ],
+            "properties": {
+              "conversation_id": {
+                "$ref": "#/components/schemas/String"
+              },
+              "error": {
+                "type": "string"
+              },
+              "message_id": {
+                "$ref": "#/components/schemas/String"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "failed"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "String": {
+        "type": "string"
+      }
+    }
+  }
+}

@@ -1,22 +1,64 @@
 name: guard
 
 on:
-  pull_request: {}
+  pull_request:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: guard-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  guard:
+  rust:
+    name: rust (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --locked --workspace
+
+  web:
+    name: web
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
-      - name: Check scaffold
-        run: |
-          set -euo pipefail
-          test -f AGENTS.md
-          test -f README.md
-          test -d apps
-          test -d crates
-          test -d packages
-          test -d docs
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate contracts
+        run: pnpm codegen
+
+      - name: Typecheck
+        run: pnpm -r --if-present typecheck
+
+      - name: Build
+        run: pnpm -r --if-present build

@@ -2,85 +2,123 @@
 
 ## Purpose
 
-`mini-stim` is the local-first, small-surface prototype for the Agent-Native IM shape behind `stim.io`.
+`mini-stim` is now a small, local-first single-person AI chat prototype.
 
-It should grow the single-human-with-many-agents loop first: local agent identity, session shape, message routing, group conversation behavior, runtime visibility, and operator ergonomics. Once that shape is stable, promote the proven model into the larger `stim.io` production workspace.
+The durable loop is:
+
+```text
+web client -> Rust server -> OpenAI Responses API streaming -> SQLite transcript
+```
+
+The goal is a rigorous minimal model, not a broad agent-native IM architecture.
+Keep directory ownership strict while keeping the product semantics small.
 
 ## Product Boundary
 
 `mini-stim` owns:
 
-- the local single-user multi-agent IM experiment
-- minimal agent/session/message/event semantics needed to dogfood the loop
-- a self-contained `crates/`, `packages/`, and `apps/` layout
-- local lifecycle through the external `sidecar` CLI
-- code-shape checks through the external `flavor` CLI
+- single-person conversations with an OpenAI assistant
+- normalized message and response-run persistence
+- OpenAI Responses API native streaming
+- a Rust server with OpenAPI-exported contracts
+- a web client generated against those contracts
 
 `mini-stim` does not own:
 
-- production `stim.io` module boundaries
-- distributed human-to-human messaging
-- account/auth infrastructure
-- registry services or package/crate publishing infrastructure
-- long-term replacement implementations for `stim`, `stim-server`, `stim-agents`, `stim-crates`, or `stim-packages`
+- multiplayer chat
+- participant/member/target-set modeling
+- agent registries or agent runtime orchestration
+- delivery targets, delivery workers, or retry leases
+- sidecar lifecycle or inspect surfaces
+- Tauri, native macOS projections, or packaged platform launchers
+- legacy OpenAI completions or chat completions compatibility
 
 ## Repository Structure
+
+Use this structure:
 
 ```text
 mini-stim/
 ├── apps/
-│   ├── sidecar/     # future local runtime/orchestration app
-│   └── renderer/    # future local IM workbench
-├── crates/
-│   ├── core/        # future local domain primitives
-│   └── runtime/     # future runtime/service composition
+│   ├── server/
+│   │   └── crates/
+│   │       ├── santi-api/   # Axum HTTP API, OpenAPI export, SSE endpoints
+│   │       └── santi-core/  # domain model, SQLite store, OpenAI adapter
+│   └── client/              # Vite/React web client
 ├── packages/
-│   ├── client/      # future browser/runtime client package
-│   └── components/  # future minimal UI primitives
-├── docs/            # durable design notes
-└── .task/           # local task memory, ignored by git
+│   ├── contracts/           # generated OpenAPI schema/types
+│   └── components/          # reusable UI primitives used by client
+├── docs/
+└── .task/                   # local task memory, ignored by git
 ```
 
-Create these concrete subdirectories only when implementation starts. Until then, keep the top-level buckets simple.
-
-## Relationship To `stim.io`
-
-The local production workspace reference is `~/Projects/stim.io`.
-
-Use it as a source of lessons, vocabulary, and eventual promotion targets. Do not make this repository depend on `stim.io` paths, submodules, unpublished packages, or workspace-local scripts.
-
-Promotion targets should stay explicit:
-
-- Rust primitives that survive the experiment can move to `modules/stim-crates/`.
-- UI/package primitives that survive can move to `modules/stim-packages/`.
-- Local agent orchestration semantics can move to `modules/stim-agents/`.
-- Production IM product and server behavior can move to `modules/stim/` and `modules/stim-server/`.
+Do not recreate old top-level `crates/`, `projections/`, `sidecar.toml`, or
+`apps/render.*` surfaces.
 
 ## Execution Rules
 
 - Keep `.task/` local and ignored by git unless explicitly requested.
-- Prefer one real dogfoodable loop over broad architecture scaffolding.
-- Keep runtime lifecycle manifest-closed through `sidecar`; do not grow a local replacement launcher.
-- Use `flavor` as the code-shape check once code exists; do not vendor flavor rules into this repo.
-- Keep hard cuts acceptable during the prototype. Add compatibility only when a real external surface exists.
-- Keep the repo self-contained. If a concept requires `stim.io` to run, it is not yet mini enough.
+- Prefer one working web chat loop over architecture scaffolding.
+- Server truth lives in `santi-core`; web UI consumes API contracts and must not
+  define durable product semantics.
+- `santi-api` owns HTTP routing, SSE framing, and OpenAPI export.
+- `packages/contracts` must be generated from the Rust OpenAPI source of truth.
+- Do not hand-maintain divergent client/server DTOs.
+- Use OpenAI Responses API streaming only. Do not add legacy completions paths.
+- Keep hard cuts acceptable. Add compatibility only for a real external surface.
+
+## Data Modeling Rules
+
+Keep the simplified model normalized:
+
+- `conversations` owns conversation identity and lifecycle.
+- `messages` owns message envelope, role, lifecycle, ordering, and provider/run
+  references.
+- `message_text_contents` owns text content.
+- `response_runs` owns OpenAI response request lifecycle and provider metadata.
+- `response_stream_deltas` records streaming text deltas in `(run_id, position)`
+  order.
+
+Do not use DB-level foreign keys. Store reference ids deliberately, enforce
+relationship integrity in store transactions, and cover important invariants
+with tests.
+
+Current conventions:
+
+- Use plural noun tables.
+- Use `<entity>_id` identity columns.
+- Use `created_at`, `updated_at`, `completed_at`, `state`, and `error` where
+  lifecycle matters.
+- Use explicit ordered columns such as `conversation_position` and `position`
+  instead of relying on timestamps or UUID sort order.
+- Provider raw payloads should not become the product truth. Persist only the
+  metadata needed for replay, diagnosis, or future API requests.
 
 ## Common Commands
 
-There are no implementation commands yet.
+- `pnpm install`
+- `pnpm codegen`
+- `cargo fmt --all --check`
+- `cargo test --workspace`
+- `pnpm -r --if-present typecheck`
+- `pnpm -r --if-present build`
+- `cargo run -p santi-api -- serve`
+- `pnpm -C apps/client dev`
 
-Expected future gates:
+## Environment
 
-- `flavor check`
-- `sidecar plan --config sidecar.toml --format json`
-- app/package/crate-local guard commands once the directories contain code
+`.env` is local and ignored by git. Required OpenAI settings:
 
-## First Implementation Direction
+```text
+OPENAI_API_KEY=
+OPENAI_MODEL=
+OPENAI_RESPONSES_BASE_URL=https://api.openai.com/v1
+```
 
-Build the smallest local single-user multi-agent IM loop:
+Optional server settings:
 
-1. Define agent participants and local sessions.
-2. Represent one-to-one and group conversations.
-3. Route messages to selected agents.
-4. Expose observable runtime state through `sidecar inspect`.
-5. Keep enough UI to dogfood the loop honestly.
+```text
+SANTI_DB=.tmp/santi.sqlite
+SANTI_PORT=3307
+```
+
