@@ -10,14 +10,14 @@
   "dependencies": {
     "@mini-stim/components": "workspace:*",
     "@mini-stim/contracts": "workspace:*",
-    "@vitejs/plugin-react": "^5.1.1",
-    "vite": "^8.0.8",
-    "typescript": "^5.9.3",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3"
+    "@vitejs/plugin-react": "^6.0.2",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16"
   },
   "devDependencies": {
-    "@types/react": "^19.2.7",
+    "@types/react": "^19.2.16",
     "@types/react-dom": "^19.2.3"
   }
 }

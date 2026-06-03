@@ -5,7 +5,7 @@
   "packageManager": "pnpm@10.33.2",
   "scripts": {
     "build": "pnpm -r --if-present build",
-    "codegen": "cargo run -p santi-api -- export-openapi > packages/contracts/openapi.json && pnpm exec openapi-typescript packages/contracts/openapi.json -o packages/contracts/src/openapi.ts",
+    "codegen": "cargo run -p santi-api -- export-openapi > packages/contracts/openapi.json && pnpm exec orval --config orval.config.ts && pnpm exec prettier --write packages/contracts/src/openapi.ts",
     "dev": "pnpm dev:client",
     "dev:client": "pnpm -C apps/client dev",
     "dev:server": "cargo run -p santi-api -- serve",
@@ -13,9 +13,9 @@
     "guard": "cargo fmt --all --check && flavor check --root . && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && pnpm codegen && pnpm -r --if-present typecheck && pnpm -r --if-present build"
   },
   "devDependencies": {
-    "openapi-typescript": "^7.10.1",
-    "prettier": "^3.6.2",
-    "typescript": "^5.9.3",
-    "vite": "^8.0.8"
+    "prettier": "^3.8.3",
+    "orval": "^8.15.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16"
   }
 }

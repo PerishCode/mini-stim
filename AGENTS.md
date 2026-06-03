@@ -121,6 +121,8 @@ Current conventions:
 OPENAI_API_KEY=
 OPENAI_MODEL=
 OPENAI_RESPONSES_BASE_URL=https://api.openai.com/v1
+OPENAI_REASONING_EFFORT=
+OPENAI_MAX_OUTPUT_TOKENS=
 ```
 
 Optional server settings:
