@@ -48,6 +48,8 @@ Create `.env` from `.env.example` and fill:
 OPENAI_API_KEY=
 OPENAI_MODEL=
 OPENAI_RESPONSES_BASE_URL=https://api.openai.com/v1
+OPENAI_REASONING_EFFORT=
+OPENAI_MAX_OUTPUT_TOKENS=
 ```
 
 Install dependencies:
@@ -89,6 +91,7 @@ The API listens on `http://127.0.0.1:43307` by default.
 Useful commands:
 
 ```sh
+python3 scripts/init.py
 cargo fmt --all --check
 flavor check --root .
 cargo test --workspace

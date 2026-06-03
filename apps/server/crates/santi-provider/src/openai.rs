@@ -4,7 +4,7 @@ use futures_core::Stream;
 use futures_util::StreamExt;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 use std::sync::Arc;
 
 use crate::{ProviderClient, ProviderEvent, ProviderMetadata, ProviderRequest, ProviderStream};
@@ -14,6 +14,8 @@ pub struct OpenAIProviderConfig {
     pub api_key: String,
     pub model: String,
     pub base_url: String,
+    pub reasoning_effort: Option<String>,
+    pub max_output_tokens: Option<u32>,
 }
 
 #[derive(Debug, Clone)]
@@ -48,14 +50,7 @@ impl ProviderClient for OpenAIProvider {
                 self.config.base_url.trim_end_matches('/')
             ))
             .bearer_auth(&self.config.api_key)
-            .json(&json!({
-                "model": request.model,
-                "input": response_input(request.input),
-                "stream": true,
-                "stream_options": {
-                    "include_obfuscation": false
-                }
-            }))
+            .json(&response_body(&self.config, request))
             .send()
             .await
             .map_err(|error| error.to_string())?;
@@ -66,6 +61,34 @@ impl ProviderClient for OpenAIProvider {
         }
         Ok(Box::pin(parse_sse(response.bytes_stream())))
     }
+}
+
+fn response_body(config: &OpenAIProviderConfig, request: ProviderRequest) -> Value {
+    let mut body = Map::from_iter([
+        ("model".to_string(), json!(request.model)),
+        ("input".to_string(), json!(response_input(request.input))),
+        ("stream".to_string(), json!(true)),
+        (
+            "stream_options".to_string(),
+            json!({
+                "include_obfuscation": false
+            }),
+        ),
+    ]);
+
+    if let Some(reasoning_effort) = &config.reasoning_effort {
+        body.insert(
+            "reasoning".to_string(),
+            json!({
+                "effort": reasoning_effort
+            }),
+        );
+    }
+    if let Some(max_output_tokens) = config.max_output_tokens {
+        body.insert("max_output_tokens".to_string(), json!(max_output_tokens));
+    }
+
+    Value::Object(body)
 }
 
 fn response_input(messages: Vec<crate::ProviderMessage>) -> Vec<ResponseInputMessage> {

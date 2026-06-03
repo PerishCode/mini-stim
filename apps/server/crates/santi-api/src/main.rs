@@ -47,6 +47,14 @@ async fn serve() -> Result<(), String> {
         model: env::var("OPENAI_MODEL").map_err(|_| "OPENAI_MODEL is required".to_string())?,
         base_url: env::var("OPENAI_RESPONSES_BASE_URL")
             .unwrap_or_else(|_| "https://api.openai.com/v1".to_string()),
+        reasoning_effort: optional_env("OPENAI_REASONING_EFFORT"),
+        max_output_tokens: optional_env("OPENAI_MAX_OUTPUT_TOKENS")
+            .map(|value| {
+                value
+                    .parse::<u32>()
+                    .map_err(|_| "OPENAI_MAX_OUTPUT_TOKENS must be an unsigned integer".to_string())
+            })
+            .transpose()?,
     }));
     let service = ChatService::open(
         ChatServiceConfig {
@@ -66,6 +74,13 @@ async fn serve() -> Result<(), String> {
     axum::serve(listener, router(service))
         .await
         .map_err(|error| error.to_string())
+}
+
+fn optional_env(name: &str) -> Option<String> {
+    env::var(name)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 fn router(service: ChatService) -> Router {

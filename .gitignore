@@ -3,6 +3,7 @@
 .env.local
 .task/
 .playwright-cli/
+__pycache__/
 node_modules/
 target/
 dist/

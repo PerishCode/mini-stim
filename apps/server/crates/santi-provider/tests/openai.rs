@@ -1,0 +1,123 @@
+use std::{
+    io::{Read, Write},
+    net::TcpListener,
+    sync::mpsc,
+    thread,
+};
+
+use futures_util::StreamExt;
+use santi_provider::{
+    OpenAIProvider, OpenAIProviderConfig, ProviderClient, ProviderEvent, ProviderMessage,
+    ProviderRequest,
+};
+use serde_json::Value;
+
+#[tokio::test]
+async fn optional_params_sent() {
+    let body = capture_body(OpenAIProviderConfig {
+        api_key: "test-key".to_string(),
+        model: "gpt-5.5".to_string(),
+        base_url: String::new(),
+        reasoning_effort: Some("medium".to_string()),
+        max_output_tokens: Some(4096),
+    })
+    .await;
+
+    assert_eq!(body["reasoning"]["effort"], "medium");
+    assert_eq!(body["max_output_tokens"], 4096);
+    assert_eq!(body["stream"], true);
+    assert_eq!(body["stream_options"]["include_obfuscation"], false);
+}
+
+#[tokio::test]
+async fn optional_params_omitted() {
+    let body = capture_body(OpenAIProviderConfig {
+        api_key: "test-key".to_string(),
+        model: "gpt-4.1".to_string(),
+        base_url: String::new(),
+        reasoning_effort: None,
+        max_output_tokens: None,
+    })
+    .await;
+
+    assert!(body.get("reasoning").is_none());
+    assert!(body.get("max_output_tokens").is_none());
+}
+
+async fn capture_body(mut config: OpenAIProviderConfig) -> Value {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
+    config.base_url = format!("http://{}", listener.local_addr().expect("local address"));
+    let (tx, rx) = mpsc::channel();
+    let server = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("accept request");
+        let body = read_body(&mut stream);
+        tx.send(body).expect("send request body");
+        let event = r#"data: {"type":"response.completed","response":{"id":"resp_test"}}"#;
+        let response_body = format!("{event}\n\n");
+        let response = format!(
+            "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ncontent-length: {}\r\n\r\n{}",
+            response_body.len(),
+            response_body
+        );
+        stream
+            .write_all(response.as_bytes())
+            .expect("write response");
+    });
+
+    let provider = OpenAIProvider::new(config);
+    let mut stream = provider
+        .stream_response(ProviderRequest {
+            model: provider.metadata().model,
+            input: vec![ProviderMessage {
+                role: "user".to_string(),
+                content: "hello".to_string(),
+            }],
+        })
+        .await
+        .expect("stream response");
+    assert!(matches!(
+        stream.next().await,
+        Some(Ok(ProviderEvent::Completed { .. }))
+    ));
+
+    let body = rx.recv().expect("receive request body");
+    server.join().expect("server thread");
+    serde_json::from_slice(&body).expect("json request")
+}
+
+fn read_body(stream: &mut impl Read) -> Vec<u8> {
+    let mut request = Vec::new();
+    let mut buffer = [0; 1024];
+    loop {
+        let read = stream.read(&mut buffer).expect("read request");
+        assert!(read > 0, "connection closed before headers");
+        request.extend_from_slice(&buffer[..read]);
+        if request.windows(4).any(|window| window == b"\r\n\r\n") {
+            break;
+        }
+    }
+
+    let header_end = request
+        .windows(4)
+        .position(|window| window == b"\r\n\r\n")
+        .expect("header end")
+        + 4;
+    let headers = String::from_utf8_lossy(&request[..header_end]);
+    let length = headers
+        .lines()
+        .find_map(|line| {
+            line.strip_prefix("content-length:")
+                .or_else(|| line.strip_prefix("Content-Length:"))
+        })
+        .expect("content length")
+        .trim()
+        .parse::<usize>()
+        .expect("content length value");
+
+    while request.len() - header_end < length {
+        let read = stream.read(&mut buffer).expect("read body");
+        assert!(read > 0, "connection closed before body");
+        request.extend_from_slice(&buffer[..read]);
+    }
+    request[header_end..header_end + length].to_vec()
+}
