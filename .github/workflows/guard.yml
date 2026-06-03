@@ -41,7 +41,13 @@ jobs:
         run: python3 scripts/init.py
 
       - name: Repo guard
-        run: pnpm guard:repo
+        run: |
+          flavor check --root . --config flavor.json
+          python3 -m py_compile scripts/init.py
+          python3 scripts/init.py --check
+          hooks=$(git rev-parse --git-path hooks)
+          sh -n "$hooks/pre-commit"
+          sh -n "$hooks/commit-msg"
 
   rust:
     name: rust (${{ matrix.os }})
@@ -82,11 +88,35 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Start API
+        env:
+          OPENAI_API_KEY: ci-placeholder
+          OPENAI_MODEL: ci-placeholder
+          OPENAI_RESPONSES_BASE_URL: https://api.openai.com/v1
+          SANTI_DB: .tmp/ci.sqlite
+          SANTI_PORT: 43307
+        run: |
+          cargo run -p santi-api -- serve &
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:43307/api/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+
       - name: Generate contracts
-        run: pnpm codegen
+        env:
+          SANTI_API_URL: http://127.0.0.1:43307
+        run: |
+          curl -fsS "$SANTI_API_URL/api/openapi.json" -o packages/contracts/openapi.json
+          python3 -m json.tool --indent 2 packages/contracts/openapi.json packages/contracts/openapi.json.tmp
+          mv packages/contracts/openapi.json.tmp packages/contracts/openapi.json
+          pnpm exec orval --config orval.config.ts
+          pnpm exec prettier --write packages/contracts/src/openapi.ts
 
       - name: Typecheck
-        run: pnpm -r --if-present typecheck
+        run: pnpm typecheck
 
       - name: Build
-        run: pnpm -r --if-present build
+        run: pnpm build
