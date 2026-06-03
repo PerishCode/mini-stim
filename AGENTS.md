@@ -7,7 +7,7 @@
 The durable loop is:
 
 ```text
-web client -> Rust server -> OpenAI Responses API streaming -> SQLite transcript
+web client -> Rust server -> provider-abstracted model streaming -> SQLite transcript
 ```
 
 The goal is a rigorous minimal model, not a broad agent-native IM architecture.
@@ -17,9 +17,9 @@ Keep directory ownership strict while keeping the product semantics small.
 
 `mini-stim` owns:
 
-- single-person conversations with an OpenAI assistant
+- single-person conversations with one configured AI assistant
 - normalized message and response-run persistence
-- OpenAI Responses API native streaming
+- provider-abstracted model streaming with an OpenAI Responses implementation
 - a Rust server with OpenAPI-exported contracts
 - a web client generated against those contracts
 
@@ -43,7 +43,8 @@ mini-stim/
 │   ├── server/
 │   │   └── crates/
 │   │       ├── santi-api/   # Axum HTTP API, OpenAPI export, SSE endpoints
-│   │       └── santi-core/  # domain model, SQLite store, OpenAI adapter
+│   │       ├── santi-core/  # domain model, SQLite store, provider-agnostic service layer
+│   │       └── santi-provider/ # provider traits and concrete provider implementations
 │   └── client/              # Vite/React web client
 ├── packages/
 │   ├── contracts/           # generated OpenAPI schema/types
@@ -61,10 +62,13 @@ Do not recreate old top-level `crates/`, `projections/`, `sidecar.toml`, or
 - Prefer one working web chat loop over architecture scaffolding.
 - Server truth lives in `santi-core`; web UI consumes API contracts and must not
   define durable product semantics.
+- Provider integration truth lives behind `santi-provider::ProviderClient`;
+  `santi-core` must stay provider-agnostic.
 - `santi-api` owns HTTP routing, SSE framing, and OpenAPI export.
 - `packages/contracts` must be generated from the Rust OpenAPI source of truth.
 - Do not hand-maintain divergent client/server DTOs.
-- Use OpenAI Responses API streaming only. Do not add legacy completions paths.
+- Use the provider boundary even when only OpenAI is configured. Do not add
+  legacy completions paths.
 - Keep hard cuts acceptable. Add compatibility only for a real external surface.
 
 ## Data Modeling Rules
@@ -75,7 +79,7 @@ Keep the simplified model normalized:
 - `messages` owns message envelope, role, lifecycle, ordering, and provider/run
   references.
 - `message_text_contents` owns text content.
-- `response_runs` owns OpenAI response request lifecycle and provider metadata.
+- `response_runs` owns provider request lifecycle and provider metadata.
 - `response_stream_deltas` records streaming text deltas in `(run_id, position)`
   order.
 
@@ -99,6 +103,7 @@ Current conventions:
 - `pnpm install`
 - `pnpm codegen`
 - `cargo fmt --all --check`
+- `flavor check --root .`
 - `cargo test --workspace`
 - `pnpm -r --if-present typecheck`
 - `pnpm -r --if-present build`
@@ -119,6 +124,5 @@ Optional server settings:
 
 ```text
 SANTI_DB=.tmp/santi.sqlite
-SANTI_PORT=3307
+SANTI_PORT=43307
 ```
-

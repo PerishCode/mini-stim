@@ -1,9 +1,8 @@
 mod model;
-mod openai;
 mod service;
 mod store;
+mod store_rows;
 
 pub use model::*;
-pub use openai::{OpenAiResponsesClient, OpenAiResponsesConfig};
 pub use service::{ChatService, ChatServiceConfig};
 pub use store::ChatStore;

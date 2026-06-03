@@ -1033,6 +1033,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "santi-core",
+ "santi-provider",
  "serde",
  "serde_json",
  "tokio",
@@ -1046,17 +1047,29 @@ version = "0.1.0"
 dependencies = [
  "async-stream",
  "async-trait",
- "bytes",
  "futures-core",
  "futures-util",
- "reqwest",
  "rusqlite",
+ "santi-provider",
  "serde",
- "serde_json",
  "tempfile",
  "tokio",
  "utoipa",
  "uuid",
+]
+
+[[package]]
+name = "santi-provider"
+version = "0.1.0"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "bytes",
+ "futures-core",
+ "futures-util",
+ "reqwest",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

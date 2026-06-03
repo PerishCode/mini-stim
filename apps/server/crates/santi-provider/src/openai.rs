@@ -1,49 +1,46 @@
 use async_stream::try_stream;
+use async_trait::async_trait;
 use futures_core::Stream;
 use futures_util::StreamExt;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use std::sync::Arc;
 
-use crate::{MessageRole, TranscriptMessage};
+use crate::{ProviderClient, ProviderEvent, ProviderMetadata, ProviderRequest, ProviderStream};
 
 #[derive(Debug, Clone)]
-pub struct OpenAiResponsesConfig {
+pub struct OpenAIProviderConfig {
     pub api_key: String,
     pub model: String,
     pub base_url: String,
 }
 
 #[derive(Debug, Clone)]
-pub struct OpenAiResponsesClient {
-    config: OpenAiResponsesConfig,
+pub struct OpenAIProvider {
+    config: OpenAIProviderConfig,
     client: Client,
 }
 
-#[derive(Debug, Clone)]
-pub enum OpenAiStreamEvent {
-    TextDelta(String),
-    Completed { response_id: Option<String> },
-    Failed(String),
-}
-
-impl OpenAiResponsesClient {
-    pub fn new(config: OpenAiResponsesConfig) -> Self {
+impl OpenAIProvider {
+    pub fn new(config: OpenAIProviderConfig) -> Self {
         Self {
             config,
             client: Client::new(),
         }
     }
+}
 
-    pub fn model(&self) -> &str {
-        &self.config.model
+#[async_trait]
+impl ProviderClient for OpenAIProvider {
+    fn metadata(&self) -> ProviderMetadata {
+        ProviderMetadata {
+            provider: Arc::from("openai"),
+            model: self.config.model.clone(),
+        }
     }
 
-    pub async fn stream_response(
-        &self,
-        transcript: Vec<TranscriptMessage>,
-    ) -> Result<impl Stream<Item = Result<OpenAiStreamEvent, String>> + Send + 'static, String>
-    {
+    async fn stream_response(&self, request: ProviderRequest) -> Result<ProviderStream, String> {
         let response = self
             .client
             .post(format!(
@@ -52,8 +49,8 @@ impl OpenAiResponsesClient {
             ))
             .bearer_auth(&self.config.api_key)
             .json(&json!({
-                "model": self.config.model,
-                "input": response_input(transcript),
+                "model": request.model,
+                "input": response_input(request.input),
                 "stream": true,
                 "stream_options": {
                     "include_obfuscation": false
@@ -67,26 +64,23 @@ impl OpenAiResponsesClient {
             let body = response.text().await.unwrap_or_default();
             return Err(format!("openai responses request failed: {status} {body}"));
         }
-        Ok(parse_sse(response.bytes_stream()))
+        Ok(Box::pin(parse_sse(response.bytes_stream())))
     }
 }
 
-fn response_input(transcript: Vec<TranscriptMessage>) -> Vec<ResponseInputMessage> {
-    transcript
+fn response_input(messages: Vec<crate::ProviderMessage>) -> Vec<ResponseInputMessage> {
+    messages
         .into_iter()
         .map(|message| ResponseInputMessage {
-            role: match message.role {
-                MessageRole::User => "user".to_string(),
-                MessageRole::Assistant => "assistant".to_string(),
-            },
-            content: message.text,
+            role: message.role,
+            content: message.content,
         })
         .collect()
 }
 
 fn parse_sse(
     mut bytes: impl Stream<Item = Result<bytes::Bytes, reqwest::Error>> + Unpin + Send + 'static,
-) -> impl Stream<Item = Result<OpenAiStreamEvent, String>> + Send + 'static {
+) -> impl Stream<Item = Result<ProviderEvent, String>> + Send + 'static {
     try_stream! {
         let mut buffer = String::new();
         while let Some(chunk) = bytes.next().await {
@@ -108,20 +102,20 @@ fn parse_sse(
     }
 }
 
-fn parse_event(payload: &str) -> Result<Option<OpenAiStreamEvent>, String> {
-    let value = serde_json::from_str::<OpenAiEvent>(payload).map_err(|error| error.to_string())?;
+fn parse_event(payload: &str) -> Result<Option<ProviderEvent>, String> {
+    let value = serde_json::from_str::<OpenAIEvent>(payload).map_err(|error| error.to_string())?;
     match value.event_type.as_str() {
         "response.output_text.delta" => Ok(value
             .delta
             .filter(|delta| !delta.is_empty())
-            .map(OpenAiStreamEvent::TextDelta)),
-        "response.completed" => Ok(Some(OpenAiStreamEvent::Completed {
-            response_id: value
+            .map(ProviderEvent::TextDelta)),
+        "response.completed" => Ok(Some(ProviderEvent::Completed {
+            provider_response_id: value
                 .response
                 .and_then(|response| response.id)
                 .or(value.response_id),
         })),
-        "error" => Ok(Some(OpenAiStreamEvent::Failed(
+        "error" => Ok(Some(ProviderEvent::Failed(
             value
                 .error
                 .and_then(|error| error.message)
@@ -138,26 +132,26 @@ struct ResponseInputMessage {
 }
 
 #[derive(Debug, Deserialize)]
-struct OpenAiEvent {
+struct OpenAIEvent {
     #[serde(rename = "type")]
     event_type: String,
     #[serde(default)]
     delta: Option<String>,
     #[serde(default)]
-    response: Option<OpenAiResponse>,
+    response: Option<OpenAIResponse>,
     #[serde(default)]
     response_id: Option<String>,
     #[serde(default)]
-    error: Option<OpenAiError>,
+    error: Option<OpenAIError>,
 }
 
 #[derive(Debug, Deserialize)]
-struct OpenAiResponse {
+struct OpenAIResponse {
     id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-struct OpenAiError {
+struct OpenAIError {
     message: Option<String>,
     #[allow(dead_code)]
     raw: Option<Value>,

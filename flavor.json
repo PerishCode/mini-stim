@@ -1,0 +1,25 @@
+{
+  "scan": {
+    "include": [
+      "apps/server/crates/*/src/**/*.rs",
+      "apps/server/crates/*/tests/**/*.rs",
+      "apps/client/src/**/*.ts",
+      "apps/client/src/**/*.tsx",
+      "packages/components/src/**/*.ts",
+      "packages/components/src/**/*.tsx",
+      "packages/contracts/src/index.ts"
+    ],
+    "exclude": [
+      "**/node_modules/**",
+      "**/target/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/.task/**",
+      "**/.tmp/**",
+      "**/.git/**",
+      "**/.playwright-cli/**",
+      "packages/contracts/src/openapi.ts"
+    ]
+  },
+  "overrides": []
+}
