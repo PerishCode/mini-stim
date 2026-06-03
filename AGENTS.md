@@ -44,7 +44,7 @@ mini-stim/
 │   │   └── crates/
 │   │       ├── santi-api/   # Axum HTTP API, OpenAPI export, SSE endpoints
 │   │       ├── santi-core/  # domain model, SQLite store, provider-agnostic service layer
-│   │       └── santi-provider/ # provider traits and concrete provider implementations
+│   │       └── santi-provider/ # provider traits and concrete implementations
 │   └── client/              # Vite/React web client
 ├── packages/
 │   ├── contracts/           # generated OpenAPI schema/types
@@ -69,6 +69,9 @@ Do not recreate old top-level `crates/`, `projections/`, `sidecar.toml`, or
 - Do not hand-maintain divergent client/server DTOs.
 - Use the provider boundary even when only OpenAI is configured. Do not add
   legacy completions paths.
+- If the expected local environment or command is unavailable, report the
+  missing prerequisite directly and stop that path. Do not spend time inventing
+  fallbacks or exploring unrelated environment workarounds unless the user asks.
 - Keep hard cuts acceptable. Add compatibility only for a real external surface.
 
 ## Data Modeling Rules
