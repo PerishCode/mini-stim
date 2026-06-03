@@ -56,14 +56,14 @@ cd "$root"
 echo "==> cargo fmt"
 cargo fmt --all --check
 
+echo "==> repo guard"
+pnpm guard:repo
+
 echo "==> cargo clippy"
 cargo clippy --locked --workspace --all-targets -- -D warnings
 
 echo "==> cargo test"
 cargo test --locked --workspace
-
-echo "==> flavor check"
-flavor check --root .
 
 echo "==> contracts"
 pnpm codegen
@@ -74,8 +74,6 @@ pnpm -r --if-present typecheck
 echo "==> web build"
 pnpm -r --if-present build
 
-echo "==> python syntax"
-python3 -m py_compile scripts/init.py
 """
 
 COMMIT_MSG_HOOK = f"""#!/usr/bin/env sh
@@ -127,12 +125,21 @@ def main() -> int:
         action="store_true",
         help="replace existing non-init hooks after creating a numbered .bak copy",
     )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="verify required tools, entrypoints, and generated hooks without writing files",
+    )
     args = parser.parse_args()
 
     root = repo_root()
     print(f"repository: {root}")
     check_required_tools()
     check_required_paths(root)
+    if args.check:
+        check_hooks(root)
+        print("development environment ready")
+        return 0
     install_hooks(root, force=args.force)
     print("development environment ready")
     return 0
@@ -174,6 +181,22 @@ def install_hooks(root: Path, *, force: bool) -> None:
     hooks_dir.mkdir(parents=True, exist_ok=True)
     install_hook(root, hooks_dir / "pre-commit", PRE_COMMIT_HOOK, force=force)
     install_hook(root, hooks_dir / "commit-msg", COMMIT_MSG_HOOK, force=force)
+
+
+def check_hooks(root: Path) -> None:
+    print("==> checking git hooks")
+    hooks_dir = git_path(root, "hooks")
+    check_hook(root, hooks_dir / "pre-commit", PRE_COMMIT_HOOK)
+    check_hook(root, hooks_dir / "commit-msg", COMMIT_MSG_HOOK)
+
+
+def check_hook(root: Path, path: Path, content: str) -> None:
+    if not path.is_file():
+        raise SystemExit(f"{display_path(root, path)} is missing; run python3 scripts/init.py")
+    actual = path.read_text(encoding="utf-8", errors="replace")
+    if actual != content:
+        raise SystemExit(f"{display_path(root, path)} is stale; run python3 scripts/init.py")
+    print(f"ok: {display_path(root, path)}")
 
 
 def git_path(root: Path, suffix: str) -> Path:
