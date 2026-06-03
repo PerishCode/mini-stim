@@ -56,8 +56,14 @@ cd "$root"
 echo "==> cargo fmt"
 cargo fmt --all --check
 
-echo "==> repo guard"
-pnpm guard:repo
+echo "==> flavor"
+flavor check --root . --config flavor.json
+
+echo "==> hook syntax"
+python3 -m py_compile scripts/init.py
+hooks=$(git rev-parse --git-path hooks)
+sh -n "$hooks/pre-commit"
+sh -n "$hooks/commit-msg"
 
 echo "==> cargo clippy"
 cargo clippy --locked --workspace --all-targets -- -D warnings
@@ -66,13 +72,18 @@ echo "==> cargo test"
 cargo test --locked --workspace
 
 echo "==> contracts"
-pnpm codegen
+api_url=${{SANTI_API_URL:-http://127.0.0.1:43307}}
+curl -fsS "$api_url/api/openapi.json" -o packages/contracts/openapi.json
+python3 -m json.tool --indent 2 packages/contracts/openapi.json packages/contracts/openapi.json.tmp
+mv packages/contracts/openapi.json.tmp packages/contracts/openapi.json
+pnpm exec orval --config orval.config.ts
+pnpm exec prettier --write packages/contracts/src/openapi.ts
 
 echo "==> typecheck"
-pnpm -r --if-present typecheck
+pnpm typecheck
 
 echo "==> web build"
-pnpm -r --if-present build
+pnpm build
 
 """
 

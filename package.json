@@ -4,16 +4,8 @@
   "type": "module",
   "packageManager": "pnpm@10.33.2",
   "scripts": {
-    "build": "pnpm -r --if-present build",
-    "codegen": "cargo run -p santi-api -- export-openapi > packages/contracts/openapi.json && pnpm exec orval --config orval.config.ts && pnpm exec prettier --write packages/contracts/src/openapi.ts",
-    "dev": "pnpm dev:client",
-    "dev:client": "pnpm -C apps/client dev",
-    "dev:server": "cargo run -p santi-api -- serve",
-    "format:check": "pnpm exec prettier --check .",
-    "guard": "pnpm guard:repo && cargo fmt --all --check && cargo clippy --locked --workspace --all-targets -- -D warnings && cargo test --locked --workspace && pnpm codegen && pnpm -r --if-present typecheck && pnpm -r --if-present build",
-    "guard:repo": "pnpm guard:flavor && pnpm guard:hooks",
-    "guard:flavor": "flavor check --root . --config flavor.json",
-    "guard:hooks": "python3 -m py_compile scripts/init.py && python3 scripts/init.py --check && hooks=$(git rev-parse --git-path hooks) && sh -n \"$hooks/pre-commit\" && sh -n \"$hooks/commit-msg\""
+    "typecheck": "pnpm -r --if-present typecheck",
+    "build": "pnpm -r --if-present build"
   },
   "devDependencies": {
     "prettier": "^3.8.3",

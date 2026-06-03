@@ -61,7 +61,12 @@ pnpm install
 Generate contracts from the Rust OpenAPI source of truth:
 
 ```sh
-pnpm codegen
+cargo run -p santi-api -- serve
+curl -fsS "${SANTI_API_URL:-http://127.0.0.1:43307}/api/openapi.json" -o packages/contracts/openapi.json
+python3 -m json.tool --indent 2 packages/contracts/openapi.json packages/contracts/openapi.json.tmp
+mv packages/contracts/openapi.json.tmp packages/contracts/openapi.json
+pnpm exec orval --config orval.config.ts
+pnpm exec prettier --write packages/contracts/src/openapi.ts
 ```
 
 ## Run
@@ -93,15 +98,9 @@ Useful commands:
 ```sh
 python3 scripts/init.py
 cargo fmt --all --check
-flavor check --root .
-cargo test --workspace
-pnpm codegen
-pnpm -r --if-present typecheck
-pnpm -r --if-present build
-```
-
-Full local guard:
-
-```sh
-pnpm guard
+flavor check --root . --config flavor.json
+cargo clippy --locked --workspace --all-targets -- -D warnings
+cargo test --locked --workspace
+pnpm typecheck
+pnpm build
 ```
