@@ -15,6 +15,8 @@ use santi_core::{
     ChatService, ChatServiceConfig, ConversationDetail, ConversationSummary, ErrorResponse,
     SendMessageRequest, StreamEvent,
 };
+use santi_provider::{OpenAIProvider, OpenAIProviderConfig};
+use std::sync::Arc;
 use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,
@@ -39,19 +41,23 @@ async fn main() -> Result<(), String> {
 }
 
 async fn serve() -> Result<(), String> {
-    let service = ChatService::open(ChatServiceConfig {
-        database_path: env::var("SANTI_DB").unwrap_or_else(|_| ".tmp/santi.sqlite".to_string()),
-        openai_api_key: env::var("OPENAI_API_KEY")
+    let provider = Arc::new(OpenAIProvider::new(OpenAIProviderConfig {
+        api_key: env::var("OPENAI_API_KEY")
             .map_err(|_| "OPENAI_API_KEY is required".to_string())?,
-        openai_model: env::var("OPENAI_MODEL")
-            .map_err(|_| "OPENAI_MODEL is required".to_string())?,
-        openai_base_url: env::var("OPENAI_RESPONSES_BASE_URL")
+        model: env::var("OPENAI_MODEL").map_err(|_| "OPENAI_MODEL is required".to_string())?,
+        base_url: env::var("OPENAI_RESPONSES_BASE_URL")
             .unwrap_or_else(|_| "https://api.openai.com/v1".to_string()),
-    })?;
+    }));
+    let service = ChatService::open(
+        ChatServiceConfig {
+            database_path: env::var("SANTI_DB").unwrap_or_else(|_| ".tmp/santi.sqlite".to_string()),
+        },
+        provider,
+    )?;
     let port = env::var("SANTI_PORT")
         .ok()
         .and_then(|value| value.parse::<u16>().ok())
-        .unwrap_or(3307);
+        .unwrap_or(43307);
     let address = SocketAddr::from(([127, 0, 0, 1], port));
     let listener = tokio::net::TcpListener::bind(address)
         .await

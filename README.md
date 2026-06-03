@@ -10,6 +10,7 @@ apps/
     crates/
       santi-api/
       santi-core/
+      santi-provider/
   client/
 packages/
   contracts/
@@ -18,6 +19,10 @@ packages/
 
 The only product loop is web client -> Rust server -> OpenAI Responses API
 streaming -> SQLite transcript.
+
+`santi-core` owns the chat domain and persistence boundary. `santi-provider`
+owns model-provider traits plus the concrete OpenAI provider implementation used
+by `santi-api`.
 
 ## Scope
 
@@ -74,10 +79,10 @@ pnpm -C apps/client dev
 Open:
 
 ```text
-http://127.0.0.1:1420/
+http://127.0.0.1:41420/
 ```
 
-The API listens on `http://127.0.0.1:3307` by default.
+The API listens on `http://127.0.0.1:43307` by default.
 
 ## Development
 
@@ -85,6 +90,7 @@ Useful commands:
 
 ```sh
 cargo fmt --all --check
+flavor check --root .
 cargo test --workspace
 pnpm codegen
 pnpm -r --if-present typecheck
@@ -96,4 +102,3 @@ Full local guard:
 ```sh
 pnpm guard
 ```
-

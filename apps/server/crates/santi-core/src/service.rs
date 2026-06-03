@@ -1,35 +1,29 @@
 use async_stream::stream;
 use futures_core::Stream;
 use futures_util::StreamExt;
+use santi_provider::{ProviderClient, ProviderEvent, ProviderMessage, ProviderRequest};
+use std::sync::Arc;
 
-use crate::{
-    ChatStore, ConversationDetail, ConversationSummary, OpenAiResponsesClient, SendMessageRequest,
-    StreamEvent, openai::OpenAiStreamEvent,
-};
+use crate::{ChatStore, ConversationDetail, ConversationSummary, SendMessageRequest, StreamEvent};
 
 #[derive(Clone)]
 pub struct ChatService {
     store: ChatStore,
-    openai: OpenAiResponsesClient,
+    provider: Arc<dyn ProviderClient>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ChatServiceConfig {
     pub database_path: String,
-    pub openai_api_key: String,
-    pub openai_model: String,
-    pub openai_base_url: String,
 }
 
 impl ChatService {
-    pub fn open(config: ChatServiceConfig) -> Result<Self, String> {
+    pub fn open(
+        config: ChatServiceConfig,
+        provider: Arc<dyn ProviderClient>,
+    ) -> Result<Self, String> {
         let store = ChatStore::open(config.database_path)?;
-        let openai = OpenAiResponsesClient::new(crate::OpenAiResponsesConfig {
-            api_key: config.openai_api_key,
-            model: config.openai_model,
-            base_url: config.openai_base_url,
-        });
-        Ok(Self { store, openai })
+        Ok(Self { store, provider })
     }
 
     pub fn list_conversations(&self) -> Result<Vec<ConversationSummary>, String> {
@@ -48,12 +42,14 @@ impl ChatService {
         request: SendMessageRequest,
     ) -> impl Stream<Item = Result<StreamEvent, String>> + Send + 'static + use<> {
         let store = self.store.clone();
-        let openai = self.openai.clone();
+        let provider = self.provider.clone();
         stream! {
+            let provider_metadata = provider.metadata();
             let accepted = match store.begin_send(
                 request.conversation_id,
                 request.text,
-                openai.model(),
+                &provider_metadata.provider,
+                &provider_metadata.model,
             ) {
                 Ok(accepted) => accepted,
                 Err(error) => {
@@ -72,7 +68,20 @@ impl ChatService {
                     return;
                 }
             };
-            let mut upstream = match openai.stream_response(transcript).await {
+            let provider_request = ProviderRequest {
+                model: provider_metadata.model.clone(),
+                input: transcript
+                    .into_iter()
+                    .map(|message| ProviderMessage {
+                        role: match message.role {
+                            crate::MessageRole::User => "user".to_string(),
+                            crate::MessageRole::Assistant => "assistant".to_string(),
+                        },
+                        content: message.text,
+                    })
+                    .collect(),
+            };
+            let mut upstream = match provider.stream_response(provider_request).await {
                 Ok(upstream) => Box::pin(upstream),
                 Err(error) => {
                     let _ = store.fail_run(
@@ -91,7 +100,7 @@ impl ChatService {
 
             while let Some(event) = upstream.next().await {
                 match event {
-                    Ok(OpenAiStreamEvent::TextDelta(delta)) => {
+                    Ok(ProviderEvent::TextDelta(delta)) => {
                         if let Err(error) = store.append_delta(
                             &accepted.response_run_id,
                             &accepted.assistant_message_id,
@@ -106,24 +115,24 @@ impl ChatService {
                             delta,
                         });
                     }
-                    Ok(OpenAiStreamEvent::Completed { response_id }) => {
+                    Ok(ProviderEvent::Completed { provider_response_id }) => {
                         match store.complete_run(
                             &accepted.response_run_id,
                             &accepted.assistant_message_id,
-                            response_id.as_deref(),
+                            provider_response_id.as_deref(),
                         ) {
                             Ok(message) => {
                                 yield Ok(StreamEvent::MessageCompleted {
                                     conversation_id: accepted.conversation_id.clone(),
                                     message: Box::new(message),
-                                    provider_response_id: response_id,
+                                    provider_response_id,
                                 });
                             }
                             Err(error) => yield Err(error),
                         }
                         return;
                     }
-                    Ok(OpenAiStreamEvent::Failed(error)) | Err(error) => {
+                    Ok(ProviderEvent::Failed(error)) | Err(error) => {
                         let _ = store.fail_run(
                             &accepted.response_run_id,
                             &accepted.assistant_message_id,

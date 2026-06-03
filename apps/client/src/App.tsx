@@ -7,7 +7,7 @@ import type {
   StreamEvent,
 } from "@mini-stim/contracts";
 
-const API_BASE = import.meta.env.VITE_SANTI_API_URL ?? "http://127.0.0.1:3307";
+const API_BASE = import.meta.env.VITE_SANTI_API_URL ?? "http://127.0.0.1:43307";
 
 export function App() {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);

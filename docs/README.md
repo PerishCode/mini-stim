@@ -7,5 +7,6 @@ Use `.task/MAIN.md` for active planning and keep docs focused on settled boundar
 ## Index
 
 - Current durable boundary is documented in `AGENTS.md`: single-person web chat,
-  Rust server, OpenAI Responses API streaming, generated OpenAPI contracts, and
-  normalized local persistence.
+  Rust server, provider-abstracted model streaming with a concrete OpenAI
+  implementation, generated OpenAPI contracts, and normalized local
+  persistence.

@@ -1,12 +1,17 @@
 use santi_core::ChatStore;
 
 #[test]
-fn begin_send_preserves_user_then_assistant_order() {
+fn send_preserves_message_order() {
     let temp = tempfile::tempdir().expect("temp dir");
     let store = ChatStore::open(temp.path().join("chat.sqlite")).expect("open store");
 
     let accepted = store
-        .begin_send(None, "hello ordering".to_string(), "test-model")
+        .begin_send(
+            None,
+            "hello ordering".to_string(),
+            "test-provider",
+            "test-model",
+        )
         .expect("begin send");
     store
         .append_delta(
