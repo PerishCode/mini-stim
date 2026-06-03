@@ -15,6 +15,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  repo:
+    name: repo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install flavor
+        run: |
+          curl -fsSL https://flavor.perish.uk/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/flavor" --version
+
+      - name: Initialize hooks
+        run: python3 scripts/init.py
+
+      - name: Repo guard
+        run: pnpm guard:repo
+
   rust:
     name: rust (${{ matrix.os }})
     strategy:
