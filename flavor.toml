@@ -1,0 +1,27 @@
+[scan]
+include = [
+  "apps/server/cell/src/**/*.rs",
+  "apps/server/soma/crates/*/src/**/*.rs",
+  "apps/server/soma/crates/*/tests/**/*.rs",
+  "apps/client/cell/src/**/*.rs",
+  "apps/client/soma/src/**/*.rs",
+  "apps/client/soma/web/src/**/*.ts",
+  "apps/client/soma/web/src/**/*.tsx",
+  "proto/crates/*/src/**/*.rs",
+  "packages/components/src/**/*.ts",
+  "packages/components/src/**/*.tsx",
+  "packages/contracts/src/index.ts",
+]
+exclude = [
+  "**/node_modules/**",
+  "**/target/**",
+  "**/dist/**",
+  "**/build/**",
+  "**/.task/**",
+  "**/.tmp/**",
+  "**/.git/**",
+  "**/.playwright-cli/**",
+  "packages/contracts/src/openapi.ts",
+]
+
+overrides = []

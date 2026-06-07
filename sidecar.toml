@@ -1,0 +1,21 @@
+[project]
+name = "mini-stim"
+namespace = "mini-stim-dev"
+root = "."
+data_dir = ".tmp/sidecar"
+
+[[sidecars]]
+name = "server"
+command = "cargo"
+args = ["run", "--quiet", "-p", "mini-stim-server-cell", "--"]
+cwd = "."
+mode = "dev"
+inspect_socket = "unix:///tmp/mini-stim-sidecar/{namespace}/server.sock"
+
+[[sidecars]]
+name = "client"
+command = "cargo"
+args = ["run", "--quiet", "-p", "mini-stim-client-cell", "--"]
+cwd = "."
+mode = "dev"
+inspect_socket = "unix:///tmp/mini-stim-sidecar/{namespace}/client.sock"

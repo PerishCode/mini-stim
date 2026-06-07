@@ -10,3 +10,7 @@ Use `.task/MAIN.md` for active planning and keep docs focused on settled boundar
   Rust server, provider-abstracted model streaming with a concrete OpenAI
   implementation, generated OpenAPI contracts, and normalized local
   persistence.
+- The local dev runtime uses sidecar CLI with project-local cells and somas:
+  `cell` is the managed control boundary, `soma` is the sidecar-unaware
+  executable body, `store` is the namespace-local persistent storage root, and
+  `proto/crates/*` locks typed cell protocols.

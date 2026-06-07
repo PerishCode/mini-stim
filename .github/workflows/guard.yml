@@ -42,7 +42,7 @@ jobs:
 
       - name: Repo guard
         run: |
-          flavor check --root . --config flavor.json
+          flavor check --root . --config flavor.toml
           python3 -m py_compile scripts/init.py
           python3 scripts/init.py --check
           hooks=$(git rev-parse --git-path hooks)
@@ -93,10 +93,11 @@ jobs:
           OPENAI_API_KEY: ci-placeholder
           OPENAI_MODEL: ci-placeholder
           OPENAI_RESPONSES_BASE_URL: https://api.openai.com/v1
+          SANTI_HOST: 127.0.0.1
           SANTI_DB: .tmp/ci.sqlite
           SANTI_PORT: 43307
         run: |
-          cargo run -p santi-api -- serve &
+          cargo run -p mini-stim-server-soma -- serve &
           for attempt in $(seq 1 60); do
             if curl -fsS http://127.0.0.1:43307/api/health >/dev/null; then
               exit 0

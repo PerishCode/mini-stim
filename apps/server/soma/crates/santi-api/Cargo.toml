@@ -1,5 +1,5 @@
 [package]
-name = "santi-api"
+name = "mini-stim-server-soma"
 edition.workspace = true
 license.workspace = true
 version.workspace = true

@@ -1,0 +1,9 @@
+[package]
+name = "mini-stim-client-soma"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+dotenvy.workspace = true
+tokio.workspace = true

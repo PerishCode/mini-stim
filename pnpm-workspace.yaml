@@ -1,4 +1,3 @@
 packages:
-  - "apps/client"
+  - "apps/client/soma/web"
   - "packages/*"
-
