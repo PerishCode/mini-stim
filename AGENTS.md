@@ -29,7 +29,7 @@ Keep directory ownership strict while keeping the product semantics small.
 - participant/member/target-set modeling
 - agent registries or agent runtime orchestration
 - delivery targets, delivery workers, or retry leases
-- sidecar lifecycle or inspect surfaces
+- product-specific sidecar semantics beyond the local cell/soma dev runtime
 - Tauri, native macOS projections, or packaged platform launchers
 - legacy OpenAI completions or chat completions compatibility
 
@@ -39,13 +39,24 @@ Use this structure:
 
 ```text
 mini-stim/
+├── proto/
+│   └── crates/
+│       ├── transport/ # sidecar endpoint/bootstrap/inspect frame facade
+│       ├── server/    # server cell typed protocol
+│       └── client/    # client cell typed protocol
 ├── apps/
 │   ├── server/
-│   │   └── crates/
-│   │       ├── santi-api/   # Axum HTTP API, OpenAPI export, SSE endpoints
-│   │       ├── santi-core/  # domain model, SQLite store, provider-agnostic service layer
-│   │       └── santi-provider/ # provider traits and concrete implementations
-│   └── client/              # Vite/React web client
+│   │   ├── cell/      # sidecar-managed control boundary
+│   │   └── soma/
+│   │       └── crates/
+│   │           ├── santi-api/   # Axum HTTP API, OpenAPI export, SSE endpoints
+│   │           ├── santi-core/  # domain model, SQLite store, provider-agnostic service layer
+│   │           └── santi-provider/ # provider traits and concrete implementations
+│   └── client/
+│       ├── cell/      # sidecar-managed control boundary
+│       └── soma/
+│           ├── src/   # Rust soma wrapper for dev mode
+│           └── web/   # Vite/React web client
 ├── packages/
 │   ├── contracts/           # generated OpenAPI schema/types
 │   └── components/          # reusable UI primitives used by client
@@ -53,18 +64,45 @@ mini-stim/
 └── .task/                   # local task memory, ignored by git
 ```
 
-Do not recreate old top-level `crates/`, `projections/`, `sidecar.toml`, or
-`apps/render.*` surfaces.
+Do not recreate old top-level `crates/`, `projections/`, or `apps/render.*`
+surfaces. The root `sidecar.toml` is now the product-neutral local dev control
+plane and must stay limited to cell lifecycle facts.
+
+## Cell/Soma Runtime Rules
+
+- `sidecar CLI` is the external product-neutral control plane.
+- A `cell` is a project-local managed control boundary launched by sidecar CLI.
+- A `soma` is the executable body managed by a cell.
+- `store` is the namespace-local persistent storage root derived by proto
+  bootstrap. It is the upstream for every mutable runtime path owned by the
+  app.
+- `proto/crates/*` owns typed cell protocols and bootstrap/invoke/register
+  facades. Components must not hand-roll sidecar event strings, endpoint
+  parsing, or inspect payload shapes.
+- Cell code may understand sidecar stamps, modes, endpoints, namespace, state
+  roots, and inspect transport through proto helpers.
+- Soma code must remain sidecar-unaware. It consumes argv/env/cwd/files and
+  exposes ordinary HTTP or dev-server TCP behavior.
+- Current implementation scope is dev mode only. Runtime mode may be modeled but
+  must not be half-implemented.
+- Cells derive all mutable app runtime paths from `CellContext.store` and pass
+  concrete paths to somas. No mutable runtime path may be invented outside
+  store.
+- Source/resource paths may be repository-relative. Generated, persisted,
+  diagnostic, log, database, and temp paths must come from store.
+- Inspect socket paths are transport addresses, not persistent app paths. They
+  may use OS IPC locations but must not become storage roots.
 
 ## Execution Rules
 
 - Keep `.task/` local and ignored by git unless explicitly requested.
 - Prefer one working web chat loop over architecture scaffolding.
-- Server truth lives in `santi-core`; web UI consumes API contracts and must not
-  define durable product semantics.
+- Server product truth lives in `santi-core`; web UI consumes API contracts and
+  must not define durable product semantics.
 - Provider integration truth lives behind `santi-provider::ProviderClient`;
   `santi-core` must stay provider-agnostic.
-- `santi-api` owns HTTP routing, SSE framing, and OpenAPI export.
+- The server soma owns HTTP routing, SSE framing, and OpenAPI export through the
+  `mini-stim-server-soma` bin.
 - `packages/contracts` must be generated from the Rust OpenAPI source of truth.
 - Do not hand-maintain divergent client/server DTOs.
 - Use the provider boundary even when only OpenAI is configured. Do not add
@@ -105,13 +143,18 @@ Current conventions:
 
 - `pnpm install`
 - `pnpm codegen`
+- `sidecar doctor`
+- `sidecar plan`
+- `sidecar start`
+- `sidecar status`
+- `sidecar stop`
 - `cargo fmt --all --check`
-- `flavor check --root .`
+- `flavor check --root . --config flavor.toml`
 - `cargo test --workspace`
 - `pnpm -r --if-present typecheck`
 - `pnpm -r --if-present build`
-- `cargo run -p santi-api -- serve`
-- `pnpm -C apps/client dev`
+- `SANTI_DB=.tmp/manual.sqlite cargo run -p mini-stim-server-soma -- serve`
+- `cargo run -p mini-stim-client-soma -- dev`
 
 ## Environment
 
@@ -125,9 +168,10 @@ OPENAI_REASONING_EFFORT=
 OPENAI_MAX_OUTPUT_TOKENS=
 ```
 
-Optional server settings:
+Server soma settings:
 
 ```text
-SANTI_DB=.tmp/santi.sqlite
+SANTI_HOST=127.0.0.1
+SANTI_DB=.tmp/manual.sqlite
 SANTI_PORT=43307
 ```

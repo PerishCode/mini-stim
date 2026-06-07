@@ -58,15 +58,18 @@ async fn serve() -> Result<(), String> {
     }));
     let service = ChatService::open(
         ChatServiceConfig {
-            database_path: env::var("SANTI_DB").unwrap_or_else(|_| ".tmp/santi.sqlite".to_string()),
+            database_path: env::var("SANTI_DB").map_err(|_| "SANTI_DB is required".to_string())?,
         },
         provider,
     )?;
+    let host = env::var("SANTI_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
     let port = env::var("SANTI_PORT")
         .ok()
         .and_then(|value| value.parse::<u16>().ok())
         .unwrap_or(43307);
-    let address = SocketAddr::from(([127, 0, 0, 1], port));
+    let address: SocketAddr = format!("{host}:{port}")
+        .parse()
+        .map_err(|_| "SANTI_HOST/SANTI_PORT did not form a valid socket address".to_string())?;
     let listener = tokio::net::TcpListener::bind(address)
         .await
         .map_err(|error| error.to_string())?;

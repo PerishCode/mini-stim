@@ -21,6 +21,7 @@ REQUIRED_TOOLS = (
     "python3",
     "cargo",
     "pnpm",
+    "sidecar",
     "flavor",
     "sh",
     "sed",
@@ -34,14 +35,20 @@ REQUIRED_PATHS = (
     "README.md",
     ".env.example",
     ".github/workflows/guard.yml",
-    "flavor.json",
+    "flavor.toml",
     "package.json",
     "pnpm-lock.yaml",
     "pnpm-workspace.yaml",
-    "apps/server/crates/santi-api/Cargo.toml",
-    "apps/server/crates/santi-core/Cargo.toml",
-    "apps/server/crates/santi-provider/Cargo.toml",
-    "apps/client/package.json",
+    "proto/crates/transport/Cargo.toml",
+    "proto/crates/server/Cargo.toml",
+    "proto/crates/client/Cargo.toml",
+    "apps/server/cell/Cargo.toml",
+    "apps/server/soma/crates/santi-api/Cargo.toml",
+    "apps/server/soma/crates/santi-core/Cargo.toml",
+    "apps/server/soma/crates/santi-provider/Cargo.toml",
+    "apps/client/cell/Cargo.toml",
+    "apps/client/soma/Cargo.toml",
+    "apps/client/soma/web/package.json",
     "packages/components/package.json",
     "packages/contracts/package.json",
     "scripts/init.py",
@@ -57,7 +64,11 @@ echo "==> cargo fmt"
 cargo fmt --all --check
 
 echo "==> flavor"
-flavor check --root . --config flavor.json
+flavor check --root . --config flavor.toml
+
+echo "==> sidecar"
+sidecar doctor
+sidecar plan --format json >/dev/null
 
 echo "==> hook syntax"
 python3 -m py_compile scripts/init.py
@@ -72,12 +83,15 @@ echo "==> cargo test"
 cargo test --locked --workspace
 
 echo "==> contracts"
-api_url=${{SANTI_API_URL:-http://127.0.0.1:43307}}
+if [ -z "${{SANTI_API_URL:-}}" ]; then
+  echo "SANTI_API_URL must point at a running server soma for contract generation" >&2
+  exit 1
+fi
+api_url=$SANTI_API_URL
 curl -fsS "$api_url/api/openapi.json" -o packages/contracts/openapi.json
 python3 -m json.tool --indent 2 packages/contracts/openapi.json packages/contracts/openapi.json.tmp
 mv packages/contracts/openapi.json.tmp packages/contracts/openapi.json
-pnpm exec orval --config orval.config.ts
-pnpm exec prettier --write packages/contracts/src/openapi.ts
+pnpm -C packages/contracts codegen
 
 echo "==> typecheck"
 pnpm typecheck

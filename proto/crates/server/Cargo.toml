@@ -1,0 +1,10 @@
+[package]
+name = "mini-stim-proto-server"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+mini-stim-proto-transport.workspace = true
+serde.workspace = true

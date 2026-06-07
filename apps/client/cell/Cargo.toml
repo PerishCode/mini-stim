@@ -1,0 +1,12 @@
+[package]
+name = "mini-stim-client-cell"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+mini-stim-proto-client.workspace = true
+mini-stim-proto-transport.workspace = true
+reqwest.workspace = true
+tokio.workspace = true
