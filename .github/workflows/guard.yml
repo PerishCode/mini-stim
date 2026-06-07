@@ -37,6 +37,12 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           "$HOME/.local/bin/flavor" --version
 
+      - name: Install sidecar
+        run: |
+          curl -fsSL https://sidecar.perish.uk/manage.sh | sh -s -- install --channel stable
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/sidecar" --version
+
       - name: Initialize hooks
         run: python3 scripts/init.py
 
@@ -97,6 +103,7 @@ jobs:
           SANTI_DB: .tmp/ci.sqlite
           SANTI_PORT: 43307
         run: |
+          mkdir -p .tmp
           cargo run -p mini-stim-server-soma -- serve &
           for attempt in $(seq 1 60); do
             if curl -fsS http://127.0.0.1:43307/api/health >/dev/null; then
@@ -113,8 +120,7 @@ jobs:
           curl -fsS "$SANTI_API_URL/api/openapi.json" -o packages/contracts/openapi.json
           python3 -m json.tool --indent 2 packages/contracts/openapi.json packages/contracts/openapi.json.tmp
           mv packages/contracts/openapi.json.tmp packages/contracts/openapi.json
-          pnpm exec orval --config orval.config.ts
-          pnpm exec prettier --write packages/contracts/src/openapi.ts
+          pnpm -C packages/contracts codegen
 
       - name: Typecheck
         run: pnpm typecheck
