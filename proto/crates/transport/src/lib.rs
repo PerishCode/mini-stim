@@ -8,6 +8,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
+#[cfg(unix)]
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::{UnixListener, UnixStream},
@@ -214,6 +215,7 @@ pub fn inspect_socket_path(namespace: &str, app: &str) -> PathBuf {
         .join(format!("{app}.sock"))
 }
 
+#[cfg(unix)]
 #[derive(Debug, Deserialize, Serialize)]
 struct EventRequest {
     id: String,
@@ -222,6 +224,7 @@ struct EventRequest {
     verb: String,
 }
 
+#[cfg(unix)]
 #[derive(Debug, Serialize)]
 struct EventResponse {
     id: String,
@@ -229,6 +232,7 @@ struct EventResponse {
     payload: serde_json::Value,
 }
 
+#[cfg(unix)]
 #[derive(Debug, Serialize)]
 struct EventError {
     id: String,
@@ -236,6 +240,7 @@ struct EventError {
     error: EventErrorBody,
 }
 
+#[cfg(unix)]
 #[derive(Debug, Serialize)]
 struct EventErrorBody {
     code: &'static str,
@@ -283,6 +288,11 @@ impl InspectRegistry {
 }
 
 pub async fn serve_inspect(socket_path: &Path, registry: InspectRegistry) -> TransportResult<()> {
+    serve_inspect_impl(socket_path, registry).await
+}
+
+#[cfg(unix)]
+async fn serve_inspect_impl(socket_path: &Path, registry: InspectRegistry) -> TransportResult<()> {
     if let Some(parent) = socket_path.parent() {
         tokio::fs::create_dir_all(parent).await?;
     }
@@ -298,6 +308,17 @@ pub async fn serve_inspect(socket_path: &Path, registry: InspectRegistry) -> Tra
     }
 }
 
+#[cfg(not(unix))]
+async fn serve_inspect_impl(
+    _socket_path: &Path,
+    _registry: InspectRegistry,
+) -> TransportResult<()> {
+    Err(TransportError::Config(
+        "inspect Unix socket transport is only supported on Unix targets".to_string(),
+    ))
+}
+
+#[cfg(unix)]
 async fn handle_connection(
     stream: UnixStream,
     handlers: Arc<HashMap<String, BoxedHandler>>,
@@ -337,6 +358,7 @@ async fn handle_connection(
     Ok(())
 }
 
+#[cfg(unix)]
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind")]
 enum InvokeResponse {
@@ -346,12 +368,26 @@ enum InvokeResponse {
     Error { error: EventErrorBodyResponse },
 }
 
+#[cfg(unix)]
 #[derive(Debug, Deserialize)]
 struct EventErrorBodyResponse {
     message: String,
 }
 
 pub async fn invoke<Request, Response>(
+    socket_path: &Path,
+    verb: &str,
+    payload: Request,
+) -> TransportResult<Response>
+where
+    Request: Serialize,
+    Response: DeserializeOwned,
+{
+    invoke_impl(socket_path, verb, payload).await
+}
+
+#[cfg(unix)]
+async fn invoke_impl<Request, Response>(
     socket_path: &Path,
     verb: &str,
     payload: Request,
@@ -380,4 +416,19 @@ where
         }
         InvokeResponse::Error { error } => Err(TransportError::Remote(error.message)),
     }
+}
+
+#[cfg(not(unix))]
+async fn invoke_impl<Request, Response>(
+    _socket_path: &Path,
+    _verb: &str,
+    _payload: Request,
+) -> TransportResult<Response>
+where
+    Request: Serialize,
+    Response: DeserializeOwned,
+{
+    Err(TransportError::Config(
+        "inspect Unix socket transport is only supported on Unix targets".to_string(),
+    ))
 }
