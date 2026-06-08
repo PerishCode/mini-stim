@@ -152,21 +152,78 @@ h2 {
   white-space: pre-wrap;
 }
 
-.message.user {
+.message.role-account {
   align-self: flex-end;
   background: #20302d;
   color: #ffffff;
 }
 
-.message.assistant {
+.message.role-soul {
   align-self: flex-start;
   background: #ffffff;
+}
+
+.message.role-system {
+  align-self: center;
+  max-width: min(680px, 92%);
+  background: #fff8e8;
+  color: #4f4532;
 }
 
 .message small {
   display: block;
   margin-top: 8px;
   color: #9d2f2f;
+}
+
+.toolBlock {
+  align-self: stretch;
+  max-width: min(820px, 94%);
+  border: 1px solid #bbc8c1;
+  border-radius: 8px;
+  background: #edf4f0;
+  color: #26342e;
+  padding: 10px 12px;
+}
+
+.toolBlock header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.toolBlock header span {
+  font-weight: 650;
+}
+
+.toolBlock header small {
+  color: #4d6658;
+}
+
+.toolBlock pre {
+  max-height: 220px;
+  overflow: auto;
+  margin: 0;
+  border: 1px solid #d3ddd8;
+  border-radius: 6px;
+  background: #f8fbf9;
+  padding: 10px;
+  font-family:
+    "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.toolBlock .toolOutput {
+  margin-top: 8px;
+}
+
+.toolBlock.failed {
+  border-color: #e0a0a0;
+  background: #fff2f2;
 }
 
 .empty {

@@ -307,6 +307,12 @@ pub enum SantiStreamPayload {
         turn_id: String,
         message: SessionMessage,
     },
+    ToolCallCreated {
+        tool_call: ToolCall,
+    },
+    ToolResultCreated {
+        tool_result: ToolResult,
+    },
     TurnStarted {
         turn: Turn,
     },

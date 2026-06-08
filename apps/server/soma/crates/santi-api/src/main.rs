@@ -311,6 +311,8 @@ fn sse_event_name(payload: &SantiStreamPayload) -> &'static str {
         SantiStreamPayload::MessageCreated { .. } => "message_created",
         SantiStreamPayload::MessageDelta { .. } => "message_delta",
         SantiStreamPayload::MessageCompleted { .. } => "message_completed",
+        SantiStreamPayload::ToolCallCreated { .. } => "tool_call_created",
+        SantiStreamPayload::ToolResultCreated { .. } => "tool_result_created",
         SantiStreamPayload::TurnStarted { .. } => "turn_started",
         SantiStreamPayload::TurnFailed { .. } => "turn_failed",
     }

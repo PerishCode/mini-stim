@@ -5,15 +5,16 @@ import {
   useSelectedSessionId,
   useSessionActions,
   useSessionError,
-  useSessionMessages,
   useSessionPending,
+  useSessionTimeline,
   useSessions,
+  type TimelineItem,
 } from "@mini-stim/hooks";
 
 export function App() {
   const sessions = useSessions();
   const selectedSessionId = useSelectedSessionId();
-  const messages = useSessionMessages();
+  const timeline = useSessionTimeline();
   const pending = useSessionPending();
   const sessionError = useSessionError();
   const connection = useMessageConnection();
@@ -94,15 +95,8 @@ export function App() {
           {selectedSessionId ? <span>{connection}</span> : null}
         </header>
         <div className="transcript">
-          {messages.map((message) => (
-            <article
-              key={message.message.id}
-              className={`message ${message.message.actor_type}`}
-            >
-              <div>{message.content_text}</div>
-            </article>
-          ))}
-          {!messages.length ? <div className="empty">Start a session</div> : null}
+          {timeline.map((item) => renderTimelineItem(item))}
+          {!timeline.length ? <div className="empty">Start a session</div> : null}
         </div>
         {visibleError ? <div className="error">{visibleError}</div> : null}
         <Composer value={draft} disabled={busy} onChange={setDraft} onSubmit={send} />
@@ -113,4 +107,57 @@ export function App() {
 
 function sessionLabel(session: { id: string; title?: string | null }) {
   return session.title?.trim() || session.id;
+}
+
+function renderTimelineItem(item: TimelineItem) {
+  if (item.kind === "message") {
+    const role = item.message.message.actor_type;
+    return (
+      <article key={item.id} className={`message role-${role}`}>
+        <div>{item.message.content_text}</div>
+      </article>
+    );
+  }
+
+  if (item.kind === "tool_call") {
+    const result = item.toolResult;
+    const failed = Boolean(result?.error_text);
+    return (
+      <article key={item.id} className={`toolBlock ${failed ? "failed" : ""}`}>
+        <header>
+          <span>{item.toolCall.tool_name}</span>
+          <small>{result ? (failed ? "failed" : "completed") : "running"}</small>
+        </header>
+        <pre>{formatJson(item.toolCall.arguments)}</pre>
+        {result ? (
+          <pre className="toolOutput">
+            {result.error_text ?? formatJson(result.output)}
+          </pre>
+        ) : null}
+      </article>
+    );
+  }
+
+  const failed = Boolean(item.toolResult.error_text);
+  return (
+    <article key={item.id} className={`toolBlock ${failed ? "failed" : ""}`}>
+      <header>
+        <span>tool result</span>
+        <small>{failed ? "failed" : "completed"}</small>
+      </header>
+      <pre className="toolOutput">
+        {item.toolResult.error_text ?? formatJson(item.toolResult.output)}
+      </pre>
+    </article>
+  );
+}
+
+function formatJson(value: unknown) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  return JSON.stringify(value, null, 2);
 }

@@ -18,13 +18,19 @@ import {
   cloneMessageProjection,
   cloneProjection,
   dedupeMessages,
+  dedupeToolCalls,
+  dedupeToolResults,
+  dispatchMessage,
+  dispatchSession,
   expectStatus,
   messageEvent,
   normalizeError,
-  parseStreamEvent,
   sessionEvent,
+  timelineItems,
   transientMessage,
+  validateSessionPayload,
 } from "./events";
+import { openSessionStream } from "./stream";
 import type {
   MessageConnectionState,
   MessageDeltaPayload,
@@ -41,6 +47,9 @@ import type {
   SessionPayloads,
   SessionProjection,
   SessionSubOptions,
+  ToolCall,
+  ToolResult,
+  TimelineItem,
 } from "./types";
 
 export type {
@@ -64,6 +73,9 @@ export type {
   SessionPhase,
   SessionProjection,
   SessionSubOptions,
+  TimelineItem,
+  ToolCall,
+  ToolResult,
 } from "./types";
 
 declare global {
@@ -74,7 +86,6 @@ declare global {
   }
 }
 
-const SESSION_EVENT = "santi:mqueue:session";
 const MESSAGE_EVENT = "santi:mqueue:message";
 
 export function createSantiMqueue(target: Window & SantiWindow = window): SantiMqueue {
@@ -100,6 +111,9 @@ function createMqueueCore(target: Window): SantiMqueue {
   };
   const messageState: MessageProjection = {
     messagesBySessionId: {},
+    timelineBySessionId: {},
+    toolCallsBySessionId: {},
+    toolResultsBySessionId: {},
     connectionBySessionId: {},
   };
   let activeSessionId: string | null = null;
@@ -116,9 +130,9 @@ function createMqueueCore(target: Window): SantiMqueue {
       : [payload: SessionPayloads[Action]]
   ): PubAck {
     const payload = args[0] as SessionPayloads[Action];
-    validate(action, payload);
+    validateSessionPayload(action, payload);
     const intent = sessionEvent(action, "intent", payload, "mqueue");
-    dispatch(target, intent);
+    dispatchSession(target, intent);
     void perform(action, payload, intent);
     return { accepted: true, eventId: intent.eventId };
   }
@@ -137,8 +151,8 @@ function createMqueueCore(target: Window): SantiMqueue {
       }
       handler(event);
     };
-    target.addEventListener(SESSION_EVENT, listener);
-    return () => target.removeEventListener(SESSION_EVENT, listener);
+    target.addEventListener("santi:mqueue:session", listener);
+    return () => target.removeEventListener("santi:mqueue:session", listener);
   }
 
   function snapshot(): SessionProjection {
@@ -182,14 +196,14 @@ function createMqueueCore(target: Window): SantiMqueue {
       } else {
         closeSessionEvents();
       }
-      dispatch(target, sessionEvent(action, "committed", payload, "mqueue"));
+      dispatchSession(target, sessionEvent(action, "committed", payload, "mqueue"));
       emitProjection();
       return;
     }
 
     state.pending += 1;
     state.error = null;
-    dispatch(target, sessionEvent(action, "accepted", payload, "mqueue"));
+    dispatchSession(target, sessionEvent(action, "accepted", payload, "mqueue"));
     emitProjection();
 
     try {
@@ -197,7 +211,7 @@ function createMqueueCore(target: Window): SantiMqueue {
     } catch (cause) {
       const failure = normalizeError(cause);
       state.error = failure;
-      dispatch(
+      dispatchSession(
         target,
         sessionEvent(action, "failed", payload, "http", {
           error: failure,
@@ -218,7 +232,7 @@ function createMqueueCore(target: Window): SantiMqueue {
       case "list": {
         const sessions = expectStatus(await listSessions(), 200) as Session[];
         state.sessions = sessions;
-        dispatch(target, sessionEvent(action, "committed", { sessions }, "http"));
+        dispatchSession(target, sessionEvent(action, "committed", { sessions }, "http"));
         return;
       }
       case "create": {
@@ -230,7 +244,7 @@ function createMqueueCore(target: Window): SantiMqueue {
         state.selectedSessionId = session.id;
         state.messages = state.messagesBySessionId[session.id] ?? [];
         connectSessionEvents(session.id);
-        dispatch(target, sessionEvent(action, "committed", { session }, "http"));
+        dispatchSession(target, sessionEvent(action, "committed", { session }, "http"));
         return;
       }
       case "get": {
@@ -243,9 +257,10 @@ function createMqueueCore(target: Window): SantiMqueue {
         state.selectedSessionId = detail.session.id;
         state.messagesBySessionId[detail.session.id] = dedupeMessages(detail.messages);
         state.messages = detail.messages;
-        messageState.messagesBySessionId[detail.session.id] = state.messages;
+        setMessageProjection(detail.session.id);
         connectSessionEvents(detail.session.id);
-        dispatch(target, sessionEvent(action, "committed", detail, "http"));
+        emitMessageProjection(detail.session.id);
+        dispatchSession(target, sessionEvent(action, "committed", detail, "http"));
         return;
       }
       case "messages": {
@@ -258,9 +273,9 @@ function createMqueueCore(target: Window): SantiMqueue {
         if (state.selectedSessionId === messagesPayload.sessionId) {
           state.messages = state.messagesBySessionId[messagesPayload.sessionId];
         }
-        messageState.messagesBySessionId[messagesPayload.sessionId] =
-          state.messagesBySessionId[messagesPayload.sessionId];
-        dispatch(target, sessionEvent(action, "committed", { messages }, "http"));
+        setMessageProjection(messagesPayload.sessionId);
+        emitMessageProjection(messagesPayload.sessionId);
+        dispatchSession(target, sessionEvent(action, "committed", { messages }, "http"));
         return;
       }
       case "runtime": {
@@ -270,13 +285,15 @@ function createMqueueCore(target: Window): SantiMqueue {
           200,
         ) as SessionRuntimeSnapshot;
         state.runtimeBySessionId[runtimePayload.sessionId] = runtime;
-        dispatch(target, sessionEvent(action, "committed", runtime, "http"));
+        upsertTools(runtimePayload.sessionId, runtime.tool_calls, runtime.tool_results);
+        emitMessageProjection(runtimePayload.sessionId);
+        dispatchSession(target, sessionEvent(action, "committed", runtime, "http"));
         return;
       }
       case "send": {
         const sendPayload = payload as SessionPayloads["send"];
         const response = await sendMessage(sendPayload);
-        dispatch(target, sessionEvent(action, "committed", response, "http"));
+        dispatchSession(target, sessionEvent(action, "committed", response, "http"));
         return;
       }
       case "select":
@@ -313,16 +330,18 @@ function createMqueueCore(target: Window): SantiMqueue {
       response.user_message,
       response.assistant_message,
     ]);
+    upsertTools(response.session.id, response.tool_calls, response.tool_results);
     state.messages = state.messagesBySessionId[response.session.id];
+    emitMessageProjection(response.session.id);
     return response;
   }
 
   function emitProjection() {
-    dispatch(target, sessionEvent("projection", "projection", cloneProjection(state), "mqueue"));
+    dispatchSession(target, sessionEvent("projection", "projection", cloneProjection(state), "mqueue"));
   }
 
   function emitMessageProjection(sessionId: string) {
-    messageState.messagesBySessionId[sessionId] = state.messagesBySessionId[sessionId] ?? [];
+    setMessageProjection(sessionId);
     dispatchMessage(
       target,
       messageEvent("projection", sessionId, cloneMessageProjection(messageState), "mqueue"),
@@ -336,67 +355,49 @@ function createMqueueCore(target: Window): SantiMqueue {
     closeSessionEvents();
     activeSessionId = sessionId;
     setConnection(sessionId, "connecting");
-    eventSource = new EventSource(`/api/v1/sessions/${sessionId}/events`);
-    eventSource.addEventListener("open", () => {
-      setConnection(sessionId, "open");
-    });
-    eventSource.addEventListener("error", () => {
-      setConnection(sessionId, "error");
-    });
-    eventSource.addEventListener("message_created", (raw) => {
-      const stream = parseStreamEvent(raw);
-      if (stream?.payload.type !== "message_created") {
-        return;
-      }
-      upsertMessages(stream.session_id, [stream.payload.message]);
-      dispatchMessage(
-        target,
-        messageEvent("created", stream.session_id, stream.payload, "sse"),
-      );
-      emitProjection();
-      emitMessageProjection(stream.session_id);
-    });
-    eventSource.addEventListener("message_delta", (raw) => {
-      const stream = parseStreamEvent(raw);
-      if (stream?.payload.type !== "message_delta") {
-        return;
-      }
-      applyDelta(stream.session_id, stream.payload);
-      dispatchMessage(
-        target,
-        messageEvent("delta", stream.session_id, stream.payload, "sse"),
-      );
-      emitProjection();
-      emitMessageProjection(stream.session_id);
-    });
-    eventSource.addEventListener("message_completed", (raw) => {
-      const stream = parseStreamEvent(raw);
-      if (stream?.payload.type !== "message_completed") {
-        return;
-      }
-      removeTransient(stream.session_id, stream.payload.turn_id);
-      upsertMessages(stream.session_id, [stream.payload.message]);
-      dispatchMessage(
-        target,
-        messageEvent("completed", stream.session_id, stream.payload, "sse"),
-      );
-      emitProjection();
-      emitMessageProjection(stream.session_id);
-    });
-    eventSource.addEventListener("turn_failed", (raw) => {
-      const stream = parseStreamEvent(raw);
-      if (stream?.payload.type !== "turn_failed") {
-        return;
-      }
-      const failure = { code: "turn_failed", message: stream.payload.error };
-      state.error = failure;
-      dispatchMessage(
-        target,
-        messageEvent("failed", stream.session_id, stream.payload, "sse", {
-          error: failure,
-        }),
-      );
-      emitProjection();
+    eventSource = openSessionStream(sessionId, {
+      open: () => setConnection(sessionId, "open"),
+      error: () => setConnection(sessionId, "error"),
+      messageCreated: (payload) => {
+        upsertMessages(sessionId, [payload.message]);
+        dispatchMessage(target, messageEvent("created", sessionId, payload, "sse"));
+        emitProjection();
+        emitMessageProjection(sessionId);
+      },
+      messageDelta: (payload) => {
+        applyDelta(sessionId, payload);
+        dispatchMessage(target, messageEvent("delta", sessionId, payload, "sse"));
+        emitProjection();
+        emitMessageProjection(sessionId);
+      },
+      messageCompleted: (payload) => {
+        removeTransient(sessionId, payload.turn_id);
+        upsertMessages(sessionId, [payload.message]);
+        dispatchMessage(target, messageEvent("completed", sessionId, payload, "sse"));
+        emitProjection();
+        emitMessageProjection(sessionId);
+      },
+      toolCall: (payload) => {
+        upsertTools(sessionId, [payload.tool_call], []);
+        dispatchMessage(target, messageEvent("tool_call", sessionId, payload, "sse"));
+        emitMessageProjection(sessionId);
+      },
+      toolResult: (payload) => {
+        upsertTools(sessionId, [], [payload.tool_result]);
+        dispatchMessage(target, messageEvent("tool_result", sessionId, payload, "sse"));
+        emitMessageProjection(sessionId);
+      },
+      turnFailed: (payload) => {
+        const failure = { code: "turn_failed", message: payload.error };
+        state.error = failure;
+        dispatchMessage(
+          target,
+          messageEvent("failed", sessionId, payload, "sse", {
+            error: failure,
+          }),
+        );
+        emitProjection();
+      },
     });
   }
 
@@ -435,6 +436,7 @@ function createMqueueCore(target: Window): SantiMqueue {
     if (state.selectedSessionId === sessionId) {
       state.messages = state.messagesBySessionId[sessionId];
     }
+    setMessageProjection(sessionId);
   }
 
   function removeTransient(sessionId: string, turnId: string) {
@@ -452,46 +454,31 @@ function createMqueueCore(target: Window): SantiMqueue {
     if (state.selectedSessionId === sessionId) {
       state.messages = state.messagesBySessionId[sessionId];
     }
-    messageState.messagesBySessionId[sessionId] = state.messagesBySessionId[sessionId];
+    setMessageProjection(sessionId);
   }
-}
 
-function dispatchMessage(target: Window, detail: MessageEvent) {
-  target.dispatchEvent(new CustomEvent(MESSAGE_EVENT, { detail }));
-  target.dispatchEvent(new CustomEvent(detail.type, { detail }));
-}
-
-function validate<Action extends SessionAction>(
-  action: Action,
-  payload: SessionPayloads[Action],
-) {
-  switch (action) {
-    case "get":
-    case "messages":
-    case "runtime":
-      if (!(payload as { sessionId?: unknown })?.sessionId) {
-        throw new Error(`session.${action} requires sessionId`);
-      }
-      return;
-    case "select":
-      if (!payload || !("sessionId" in (payload as object))) {
-        throw new Error("session.select requires sessionId");
-      }
-      return;
-    case "send": {
-      const content = (payload as SessionPayloads["send"] | undefined)?.content;
-      if (!Array.isArray(content) || content.length === 0) {
-        throw new Error("session.send requires content");
-      }
-      return;
-    }
-    case "create":
-    case "list":
-      return;
+  function upsertTools(sessionId: string, calls: ToolCall[], results: ToolResult[]) {
+    messageState.toolCallsBySessionId[sessionId] = dedupeToolCalls([
+      ...(messageState.toolCallsBySessionId[sessionId] ?? []),
+      ...calls,
+    ]);
+    messageState.toolResultsBySessionId[sessionId] = dedupeToolResults([
+      ...(messageState.toolResultsBySessionId[sessionId] ?? []),
+      ...results,
+    ]);
+    setMessageProjection(sessionId);
   }
-}
 
-function dispatch(target: Window, detail: SessionEvent) {
-  target.dispatchEvent(new CustomEvent(SESSION_EVENT, { detail }));
-  target.dispatchEvent(new CustomEvent(detail.type, { detail }));
+  function setMessageProjection(sessionId: string) {
+    const messages = state.messagesBySessionId[sessionId] ?? [];
+    const calls = messageState.toolCallsBySessionId[sessionId] ?? [];
+    const results = messageState.toolResultsBySessionId[sessionId] ?? [];
+    messageState.messagesBySessionId[sessionId] = messages;
+    messageState.timelineBySessionId[sessionId] = timelineItems(
+      sessionId,
+      messages,
+      calls,
+      results,
+    );
+  }
 }

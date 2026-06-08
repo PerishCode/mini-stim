@@ -3,9 +3,17 @@ import type {
   Session,
   SessionMessage,
   SessionRuntimeSnapshot,
+  ToolCall,
+  ToolResult,
 } from "@mini-stim/contracts";
 
-export type { MessagePart, Session, SessionMessage } from "@mini-stim/contracts";
+export type {
+  MessagePart,
+  Session,
+  SessionMessage,
+  ToolCall,
+  ToolResult,
+} from "@mini-stim/contracts";
 
 export type SessionAction =
   | "create"
@@ -57,6 +65,8 @@ export type MessagePhase =
   | "created"
   | "delta"
   | "completed"
+  | "tool_call"
+  | "tool_result"
   | "failed"
   | "projection";
 
@@ -64,8 +74,36 @@ export type MessageConnectionState = "closed" | "connecting" | "open" | "error";
 
 export interface MessageProjection {
   messagesBySessionId: Record<string, SessionMessage[]>;
+  timelineBySessionId: Record<string, TimelineItem[]>;
+  toolCallsBySessionId: Record<string, ToolCall[]>;
+  toolResultsBySessionId: Record<string, ToolResult[]>;
   connectionBySessionId: Record<string, MessageConnectionState>;
 }
+
+export type TimelineItem =
+  | {
+      kind: "message";
+      id: string;
+      sessionId: string;
+      createdAt: string;
+      message: SessionMessage;
+    }
+  | {
+      kind: "tool_call";
+      id: string;
+      sessionId: string;
+      createdAt: string;
+      toolCall: ToolCall;
+      toolResult?: ToolResult;
+    }
+  | {
+      kind: "tool_result";
+      id: string;
+      sessionId: string;
+      createdAt: string;
+      toolResult: ToolResult;
+      toolCall?: ToolCall;
+    };
 
 export interface MessageEvent<Payload = unknown> {
   readonly eventId: string;
@@ -153,6 +191,8 @@ export type StreamPayload =
   | { type: "message_created"; message: SessionMessage }
   | MessageDeltaPayload
   | { type: "message_completed"; turn_id: string; message: SessionMessage }
+  | { type: "tool_call_created"; tool_call: ToolCall }
+  | { type: "tool_result_created"; tool_result: ToolResult }
   | { type: "turn_started"; turn: unknown }
   | { type: "turn_failed"; turn_id: string; error: string };
 

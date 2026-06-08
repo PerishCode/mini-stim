@@ -2,6 +2,8 @@ import type {
   ErrorResponse,
   MessageState,
   SessionMessage,
+  ToolCall,
+  ToolResult,
 } from "@mini-stim/contracts";
 
 import type {
@@ -13,8 +15,10 @@ import type {
   SessionAction,
   SessionEvent,
   SessionPhase,
+  SessionPayloads,
   SessionProjection,
   StreamEvent,
+  TimelineItem,
 } from "./types";
 
 const DEFAULT_ACTOR_ID = "account_local";
@@ -61,6 +65,46 @@ export function messageEvent<Payload>(
     source,
     error: options.error,
   };
+}
+
+export function dispatchMessage(target: Window, detail: MessageEvent) {
+  target.dispatchEvent(new CustomEvent("santi:mqueue:message", { detail }));
+  target.dispatchEvent(new CustomEvent(detail.type, { detail }));
+}
+
+export function dispatchSession(target: Window, detail: SessionEvent) {
+  target.dispatchEvent(new CustomEvent("santi:mqueue:session", { detail }));
+  target.dispatchEvent(new CustomEvent(detail.type, { detail }));
+}
+
+export function validateSessionPayload<Action extends SessionAction>(
+  action: Action,
+  payload: SessionPayloads[Action],
+) {
+  switch (action) {
+    case "get":
+    case "messages":
+    case "runtime":
+      if (!(payload as { sessionId?: unknown })?.sessionId) {
+        throw new Error(`session.${action} requires sessionId`);
+      }
+      return;
+    case "select":
+      if (!payload || !("sessionId" in (payload as object))) {
+        throw new Error("session.select requires sessionId");
+      }
+      return;
+    case "send": {
+      const content = (payload as SessionPayloads["send"] | undefined)?.content;
+      if (!Array.isArray(content) || content.length === 0) {
+        throw new Error("session.send requires content");
+      }
+      return;
+    }
+    case "create":
+    case "list":
+      return;
+  }
 }
 
 export function parseStreamEvent(raw: Event): StreamEvent | null {
@@ -147,7 +191,74 @@ export function cloneMessageProjection(value: MessageProjection): MessageProject
         [...messages],
       ]),
     ),
+    timelineBySessionId: Object.fromEntries(
+      Object.entries(value.timelineBySessionId).map(([sessionId, items]) => [
+        sessionId,
+        [...items],
+      ]),
+    ),
+    toolCallsBySessionId: Object.fromEntries(
+      Object.entries(value.toolCallsBySessionId).map(([sessionId, calls]) => [
+        sessionId,
+        [...calls],
+      ]),
+    ),
+    toolResultsBySessionId: Object.fromEntries(
+      Object.entries(value.toolResultsBySessionId).map(([sessionId, results]) => [
+        sessionId,
+        [...results],
+      ]),
+    ),
   };
+}
+
+export function dedupeToolCalls(calls: ToolCall[]): ToolCall[] {
+  return [...new Map(calls.map((call) => [call.id, call])).values()].sort(
+    (left, right) => left.created_at.localeCompare(right.created_at),
+  );
+}
+
+export function dedupeToolResults(results: ToolResult[]): ToolResult[] {
+  return [...new Map(results.map((result) => [result.id, result])).values()].sort(
+    (left, right) => left.created_at.localeCompare(right.created_at),
+  );
+}
+
+export function timelineItems(
+  sessionId: string,
+  messages: SessionMessage[],
+  calls: ToolCall[],
+  results: ToolResult[],
+): TimelineItem[] {
+  const callsById = new Map(calls.map((call) => [call.id, call]));
+  const resultsByCall = new Map(results.map((result) => [result.tool_call_id, result]));
+  const callItems: TimelineItem[] = calls.map((toolCall) => ({
+    kind: "tool_call",
+    id: toolCall.id,
+    sessionId,
+    createdAt: toolCall.created_at,
+    toolCall,
+    toolResult: resultsByCall.get(toolCall.id),
+  }));
+  const orphanResults: TimelineItem[] = results
+    .filter((result) => !callsById.has(result.tool_call_id))
+    .map((toolResult) => ({
+      kind: "tool_result",
+      id: toolResult.id,
+      sessionId,
+      createdAt: toolResult.created_at,
+      toolResult,
+    }));
+  const messageItems: TimelineItem[] = messages.map((message) => ({
+    kind: "message",
+    id: message.message.id,
+    sessionId,
+    createdAt: message.relation.created_at,
+    message,
+  }));
+  return [...messageItems, ...callItems, ...orphanResults].sort((left, right) =>
+    left.createdAt.localeCompare(right.createdAt),
+  );
 }
 
 export function expectStatus(

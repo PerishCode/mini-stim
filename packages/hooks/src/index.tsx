@@ -19,6 +19,7 @@ import {
   type Session,
   type SessionMessage,
   type SessionProjection,
+  type TimelineItem,
 } from "@mini-stim/mqueue";
 
 export type {
@@ -30,6 +31,7 @@ export type {
   Session,
   SessionMessage,
   SessionProjection,
+  TimelineItem,
 } from "@mini-stim/mqueue";
 
 interface SantiMqueueProviderProps {
@@ -110,6 +112,22 @@ export function useSessionMessages(sessionId?: string | null): SessionMessage[] 
   return projection.messagesBySessionId[resolvedSessionId] ?? [];
 }
 
+export function useSessionTimeline(sessionId?: string | null): TimelineItem[] {
+  const mqueue = useSantiMqueue();
+  const selectedSessionId = useSelectedSessionId();
+  const store = useMemo(() => createMessageStore(mqueue), [mqueue]);
+  const resolvedSessionId = sessionId ?? selectedSessionId;
+  const projection = useSyncExternalStore(
+    store.subscribe,
+    store.getSnapshot,
+    store.getSnapshot,
+  );
+  if (!resolvedSessionId) {
+    return [];
+  }
+  return projection.timelineBySessionId[resolvedSessionId] ?? [];
+}
+
 export function useSessionPending(): number {
   return useSessionProjection().pending;
 }
@@ -170,6 +188,7 @@ export function useSessionActions(): SessionActions {
       selectAndGet: (sessionId: string) => [
         mqueue.session.pub("select", { sessionId }),
         mqueue.session.pub("get", { sessionId }),
+        mqueue.session.pub("runtime", { sessionId }),
       ],
       send: (input: { sessionId?: string | null; content: MessagePart[] }) =>
         mqueue.session.pub("send", input),

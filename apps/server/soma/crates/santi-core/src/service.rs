@@ -268,7 +268,7 @@ impl SantiService {
 
             let mut outputs = Vec::new();
             for call in calls {
-                outputs.push(self.handle_tool_call(soul_session_id, turn_id, call)?);
+                outputs.push(self.handle_tool_call(session_id, soul_session_id, turn_id, call)?);
             }
             function_call_outputs.extend(outputs);
         };
@@ -324,12 +324,20 @@ impl SantiService {
 
     fn handle_tool_call(
         &self,
+        session_id: &str,
         soul_session_id: &str,
         turn_id: &str,
         call: ProviderFunctionCall,
     ) -> Result<FunctionCallOutput, String> {
-        self.store
-            .append_tool_call(turn_id, &call.call_id, &call.name, &call.arguments)?;
+        let tool_call =
+            self.store
+                .append_tool_call(turn_id, &call.call_id, &call.name, &call.arguments)?;
+        self.publish_stream(
+            session_id,
+            SantiStreamPayload::ToolCallCreated {
+                tool_call: tool_call.clone(),
+            },
+        );
         let dispatch = self.dispatch_tool(soul_session_id, &call);
         let (output, error_text) = match dispatch {
             Ok(output) => (Some(output), None),
@@ -338,6 +346,12 @@ impl SantiService {
         let result =
             self.store
                 .append_tool_result(&call.call_id, output.clone(), error_text.clone())?;
+        self.publish_stream(
+            session_id,
+            SantiStreamPayload::ToolResultCreated {
+                tool_result: result.clone(),
+            },
+        );
         Ok(FunctionCallOutput {
             call_id: call.call_id.clone(),
             call,
