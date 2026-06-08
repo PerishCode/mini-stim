@@ -77,6 +77,12 @@ Install dependencies:
 pnpm install
 ```
 
+Initialize repository-local development hooks:
+
+```sh
+runseal :init
+```
+
 Generate contracts from the Rust OpenAPI source of truth:
 
 ```sh
@@ -97,20 +103,20 @@ pnpm -C packages/contracts codegen
 Inspect the dev runtime plan:
 
 ```sh
-sidecar doctor
-sidecar plan
+sidecar doctor --config sidecar.toml
+sidecar plan --config sidecar.toml
 ```
 
 Start the server and client cells:
 
 ```sh
-sidecar start
+sidecar start --config sidecar.toml
 ```
 
 Find the client URL:
 
 ```sh
-sidecar inspect client client.status
+sidecar inspect client client.status --config sidecar.toml
 ```
 
 The cells allocate dev ports dynamically. `server` reports the API URL and
@@ -125,13 +131,15 @@ store.
 Useful commands:
 
 ```sh
-python3 scripts/init.py
+runseal :init
+runseal :init --check
+runseal :pr --dry-run
 cargo fmt --all --check
 flavor check --root . --config flavor.toml
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace
 pnpm typecheck
 pnpm build
-sidecar status
-sidecar stop
+sidecar status --config sidecar.toml
+sidecar stop --config sidecar.toml
 ```
