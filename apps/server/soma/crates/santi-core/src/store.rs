@@ -4,26 +4,46 @@ use std::{
 };
 
 use rusqlite::{Connection, params};
-use uuid::Uuid;
 
-use crate::store_rows::{
-    InsertMessage, conversation_summary, create_conversation, ensure_conversation, insert_message,
-    message_by_id, messages_for_conversation, next_message_position, touch_conversation,
-    upsert_text,
-};
 use crate::{
-    ConversationDetail, ConversationId, ConversationSummary, MessageRecord, SendMessageAccepted,
-    TranscriptMessage, timestamp_now,
+    ActorType, MessageContent, MessageState, Session, SessionMessage, SoulSession,
+    SoulSessionEntry, SoulSessionTargetType, Turn, prefixed_id, timestamp_now,
 };
 
-const CHAT_SCHEMA_VERSION: u32 = 1;
+mod db;
+mod rows;
+mod runtime;
+mod schema;
+
+use db::*;
+use rows::{actor_type_db, map_session_row, message_state_db};
+use schema::SCHEMA;
+
+const SANTI_SCHEMA_VERSION: u32 = 2;
+const DEFAULT_ACCOUNT_ID: &str = "account_local";
+const DEFAULT_SOUL_ID: &str = "soul_default";
 
 #[derive(Clone)]
-pub struct ChatStore {
+pub struct SantiStore {
     conn: Arc<Mutex<Connection>>,
 }
 
-impl ChatStore {
+#[derive(Debug, Clone)]
+pub struct AppendedMessage {
+    pub session_message: SessionMessage,
+}
+
+#[derive(Debug, Clone)]
+pub struct AcquiredSoulSession {
+    pub soul_session: SoulSession,
+}
+
+#[derive(Debug, Clone)]
+pub struct StartedTurn {
+    pub turn: Turn,
+}
+
+impl SantiStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, String> {
         if let Some(parent) = path.as_ref().parent() {
             std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
@@ -33,6 +53,7 @@ impl ChatStore {
             conn: Arc::new(Mutex::new(conn)),
         };
         store.migrate()?;
+        store.seed_defaults()?;
         Ok(store)
     }
 
@@ -41,322 +62,266 @@ impl ChatStore {
         let version = conn
             .query_row("PRAGMA user_version", [], |row| row.get::<_, u32>(0))
             .map_err(|error| error.to_string())?;
-        if version != CHAT_SCHEMA_VERSION {
+        if version != SANTI_SCHEMA_VERSION {
             conn.execute_batch(
                 r#"
                 DROP TABLE IF EXISTS response_stream_deltas;
                 DROP TABLE IF EXISTS response_runs;
                 DROP TABLE IF EXISTS message_text_contents;
-                DROP TABLE IF EXISTS messages;
                 DROP TABLE IF EXISTS conversations;
+                DROP TABLE IF EXISTS r_soul_session_messages;
+                DROP TABLE IF EXISTS compacts;
+                DROP TABLE IF EXISTS tool_results;
+                DROP TABLE IF EXISTS tool_calls;
+                DROP TABLE IF EXISTS turns;
+                DROP TABLE IF EXISTS soul_sessions;
+                DROP TABLE IF EXISTS session_effects;
+                DROP TABLE IF EXISTS message_events;
+                DROP TABLE IF EXISTS r_session_messages;
+                DROP TABLE IF EXISTS messages;
+                DROP TABLE IF EXISTS sessions;
+                DROP TABLE IF EXISTS souls;
+                DROP TABLE IF EXISTS accounts;
                 "#,
             )
             .map_err(|error| error.to_string())?;
         }
-        conn.execute_batch(
-            r#"
-            CREATE TABLE IF NOT EXISTS conversations (
-              conversation_id TEXT PRIMARY KEY,
-              title TEXT,
-              created_at TEXT NOT NULL,
-              updated_at TEXT NOT NULL,
-              last_message_id TEXT
-            );
-
-            CREATE TABLE IF NOT EXISTS messages (
-              message_id TEXT PRIMARY KEY,
-              conversation_id TEXT NOT NULL,
-              conversation_position INTEGER NOT NULL,
-              role TEXT NOT NULL,
-              state TEXT NOT NULL,
-              created_at TEXT NOT NULL,
-              updated_at TEXT NOT NULL,
-              completed_at TEXT,
-              error TEXT,
-              provider_response_id TEXT,
-              response_run_id TEXT
-            );
-
-            CREATE INDEX IF NOT EXISTS messages_conversation_idx
-              ON messages(conversation_id, conversation_position);
-
-            CREATE TABLE IF NOT EXISTS message_text_contents (
-              message_id TEXT PRIMARY KEY,
-              text TEXT NOT NULL,
-              updated_at TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS response_runs (
-              response_run_id TEXT PRIMARY KEY,
-              conversation_id TEXT NOT NULL,
-              user_message_id TEXT NOT NULL,
-              assistant_message_id TEXT NOT NULL,
-              provider TEXT NOT NULL,
-              model TEXT NOT NULL,
-              provider_response_id TEXT,
-              state TEXT NOT NULL,
-              started_at TEXT NOT NULL,
-              completed_at TEXT,
-              error TEXT
-            );
-
-            CREATE TABLE IF NOT EXISTS response_stream_deltas (
-              response_run_id TEXT NOT NULL,
-              position INTEGER NOT NULL,
-              text TEXT NOT NULL,
-              created_at TEXT NOT NULL,
-              PRIMARY KEY (response_run_id, position)
-            );
-            "#,
-        )
-        .map_err(|error| error.to_string())?;
-        conn.pragma_update(None, "user_version", CHAT_SCHEMA_VERSION)
+        conn.execute_batch(SCHEMA)
+            .map_err(|error| error.to_string())?;
+        conn.pragma_update(None, "user_version", SANTI_SCHEMA_VERSION)
             .map_err(|error| error.to_string())?;
         Ok(())
     }
 
-    pub fn list_conversations(&self) -> Result<Vec<ConversationSummary>, String> {
+    fn seed_defaults(&self) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        let now = timestamp_now();
+        conn.execute(
+            r#"
+            INSERT OR IGNORE INTO accounts (id, name, created_at, updated_at)
+            VALUES (?1, 'Local Account', ?2, ?2)
+            "#,
+            params![DEFAULT_ACCOUNT_ID, now],
+        )
+        .map_err(|error| error.to_string())?;
+        conn.execute(
+            r#"
+            INSERT OR IGNORE INTO souls (id, memory, created_at, updated_at)
+            VALUES (?1, '', ?2, ?2)
+            "#,
+            params![DEFAULT_SOUL_ID, now],
+        )
+        .map_err(|error| error.to_string())?;
+        Ok(())
+    }
+
+    pub fn default_account_id(&self) -> &'static str {
+        DEFAULT_ACCOUNT_ID
+    }
+
+    pub fn default_soul_id(&self) -> &'static str {
+        DEFAULT_SOUL_ID
+    }
+
+    pub fn list_sessions(&self) -> Result<Vec<Session>, String> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn
             .prepare(
                 r#"
-                SELECT conversation_id, title, created_at, updated_at
-                FROM conversations
-                ORDER BY updated_at DESC, conversation_id DESC
+                SELECT id, parent_session_id, fork_point, created_at, updated_at
+                FROM sessions
+                ORDER BY updated_at DESC, id DESC
                 "#,
             )
             .map_err(|error| error.to_string())?;
         let rows = stmt
-            .query_map([], |row| {
-                Ok(ConversationSummary {
-                    conversation_id: row.get(0)?,
-                    title: row.get(1)?,
-                    created_at: row.get(2)?,
-                    updated_at: row.get(3)?,
-                    last_message_preview: None,
-                })
-            })
+            .query_map([], map_session_row)
             .map_err(|error| error.to_string())?;
-        let mut conversations = Vec::new();
-        for row in rows {
-            conversations.push(row.map_err(|error| error.to_string())?);
-        }
-        Ok(conversations)
+        collect_rows(rows)
     }
 
-    pub fn conversation_detail(
-        &self,
-        conversation_id: &str,
-    ) -> Result<Option<ConversationDetail>, String> {
+    pub fn create_session(&self) -> Result<Session, String> {
         let conn = self.conn.lock().unwrap();
-        let conversation = conversation_summary(&conn, conversation_id)?;
-        let Some(conversation) = conversation else {
+        let session_id = prefixed_id("sess");
+        let now = timestamp_now();
+        conn.execute(
+            r#"
+            INSERT INTO sessions (id, parent_session_id, fork_point, created_at, updated_at)
+            VALUES (?1, NULL, NULL, ?2, ?2)
+            "#,
+            params![session_id, now],
+        )
+        .map_err(|error| error.to_string())?;
+        session_by_id(&conn, &session_id)?.ok_or_else(|| "created session missing".to_string())
+    }
+
+    pub fn session(&self, session_id: &str) -> Result<Option<Session>, String> {
+        let conn = self.conn.lock().unwrap();
+        session_by_id(&conn, session_id)
+    }
+
+    pub fn session_messages(&self, session_id: &str) -> Result<Vec<SessionMessage>, String> {
+        let conn = self.conn.lock().unwrap();
+        session_messages(&conn, session_id)
+    }
+
+    pub fn runtime_snapshot(
+        &self,
+        session_id: &str,
+    ) -> Result<Option<crate::SessionRuntimeSnapshot>, String> {
+        let conn = self.conn.lock().unwrap();
+        let Some(session) = session_by_id(&conn, session_id)? else {
             return Ok(None);
         };
-        Ok(Some(ConversationDetail {
-            conversation,
-            messages: messages_for_conversation(&conn, conversation_id)?,
+        let soul_session = soul_session_by_pair(&conn, DEFAULT_SOUL_ID, session_id)?;
+        Ok(Some(crate::SessionRuntimeSnapshot {
+            session,
+            soul_session: soul_session.clone(),
+            messages: session_messages(&conn, session_id)?,
+            turns: if let Some(soul_session) = &soul_session {
+                turns_for_soul_session(&conn, &soul_session.id)?
+            } else {
+                Vec::new()
+            },
+            tool_calls: if let Some(soul_session) = &soul_session {
+                soul_tool_calls(&conn, &soul_session.id)?
+            } else {
+                Vec::new()
+            },
+            tool_results: if let Some(soul_session) = &soul_session {
+                soul_tool_results(&conn, &soul_session.id)?
+            } else {
+                Vec::new()
+            },
+            compacts: if let Some(soul_session) = &soul_session {
+                compacts_for_soul_session(&conn, &soul_session.id)?
+            } else {
+                Vec::new()
+            },
+            effects: session_effects(&conn, session_id)?,
         }))
     }
 
-    pub fn begin_send(
+    pub fn append_message(
         &self,
-        request_conversation_id: Option<ConversationId>,
-        text: String,
-        provider: &str,
-        model: &str,
-    ) -> Result<SendMessageAccepted, String> {
+        session_id: &str,
+        actor_type: ActorType,
+        actor_id: &str,
+        content: MessageContent,
+        state: MessageState,
+    ) -> Result<AppendedMessage, String> {
         let mut conn = self.conn.lock().unwrap();
         let tx = conn.transaction().map_err(|error| error.to_string())?;
+        ensure_session(&tx, session_id)?;
+        let message_id = prefixed_id("msg");
         let now = timestamp_now();
-        let conversation_id = match request_conversation_id {
-            Some(conversation_id) => {
-                ensure_conversation(&tx, &conversation_id)?;
-                conversation_id
-            }
-            None => create_conversation(&tx, &now, &text)?,
-        };
-        let user_message_id = format!("msg_{}", Uuid::new_v4());
-        let assistant_message_id = format!("msg_{}", Uuid::new_v4());
-        let response_run_id = format!("run_{}", Uuid::new_v4());
-        let next_position = next_message_position(&tx, &conversation_id)?;
-        insert_message(
-            &tx,
-            InsertMessage {
-                conversation_id: &conversation_id,
-                message_id: &user_message_id,
-                conversation_position: next_position,
-                role: "user",
-                state: "completed",
-                now: &now,
-                completed_at: Some(&now),
-                response_run_id: None,
-            },
-        )?;
-        upsert_text(&tx, &user_message_id, &text, &now)?;
-        insert_message(
-            &tx,
-            InsertMessage {
-                conversation_id: &conversation_id,
-                message_id: &assistant_message_id,
-                conversation_position: next_position + 1,
-                role: "assistant",
-                state: "streaming",
-                now: &now,
-                completed_at: None,
-                response_run_id: Some(&response_run_id),
-            },
-        )?;
-        upsert_text(&tx, &assistant_message_id, "", &now)?;
+        let next_seq = next_session_seq(&tx, session_id)?;
+        let content_json = serde_json::to_string(&content).map_err(|error| error.to_string())?;
         tx.execute(
             r#"
-            INSERT INTO response_runs (
-              response_run_id, conversation_id, user_message_id,
-              assistant_message_id, provider, model, state, started_at
+            INSERT INTO messages (
+              id, actor_type, actor_id, content, state, version, deleted_at, created_at, updated_at
             )
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'streaming', ?7)
+            VALUES (?1, ?2, ?3, ?4, ?5, 1, NULL, ?6, ?6)
             "#,
             params![
-                response_run_id,
-                conversation_id,
-                user_message_id,
-                assistant_message_id,
-                provider,
-                model,
+                message_id,
+                actor_type_db(&actor_type),
+                actor_id,
+                content_json,
+                message_state_db(&state),
                 now
             ],
         )
         .map_err(|error| error.to_string())?;
-        touch_conversation(&tx, &conversation_id, &assistant_message_id, &now)?;
+        tx.execute(
+            r#"
+            INSERT INTO r_session_messages (session_id, message_id, session_seq, created_at)
+            VALUES (?1, ?2, ?3, ?4)
+            "#,
+            params![session_id, message_id, next_seq, now],
+        )
+        .map_err(|error| error.to_string())?;
+        tx.execute(
+            "UPDATE sessions SET updated_at = ?2 WHERE id = ?1",
+            params![session_id, now],
+        )
+        .map_err(|error| error.to_string())?;
         tx.commit().map_err(|error| error.to_string())?;
-        let user_message = message_by_id(&conn, &user_message_id)?
-            .ok_or_else(|| "user message missing".to_string())?;
-        let assistant_message = message_by_id(&conn, &assistant_message_id)?
-            .ok_or_else(|| "assistant message missing".to_string())?;
-        Ok(SendMessageAccepted {
-            conversation_id,
-            user_message_id,
-            assistant_message_id,
-            response_run_id,
-            user_message,
-            assistant_message,
+        Ok(AppendedMessage {
+            session_message: message_by_id(&conn, &message_id)?
+                .ok_or_else(|| "created message missing".to_string())?,
         })
     }
 
-    pub fn transcript(&self, conversation_id: &str) -> Result<Vec<TranscriptMessage>, String> {
-        let conn = self.conn.lock().unwrap();
-        let messages = messages_for_conversation(&conn, conversation_id)?;
-        Ok(messages
-            .into_iter()
-            .filter(|message| !message.text.is_empty())
-            .map(|message| TranscriptMessage {
-                role: message.role,
-                text: message.text,
-            })
-            .collect())
-    }
-
-    pub fn append_delta(
-        &self,
-        response_run_id: &str,
-        assistant_message_id: &str,
-        delta: &str,
-    ) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+    pub fn acquire_soul_session(&self, session_id: &str) -> Result<AcquiredSoulSession, String> {
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction().map_err(|error| error.to_string())?;
+        ensure_session(&tx, session_id)?;
         let now = timestamp_now();
-        let position = conn
-            .query_row(
-                "SELECT COUNT(*) FROM response_stream_deltas WHERE response_run_id = ?1",
-                params![response_run_id],
-                |row| row.get::<_, i64>(0),
+        let existing = soul_session_by_pair(&tx, DEFAULT_SOUL_ID, session_id)?;
+        let soul_session = if let Some(existing) = existing {
+            existing
+        } else {
+            let soul_session_id = prefixed_id("ss");
+            tx.execute(
+                r#"
+                INSERT INTO soul_sessions (
+                  id, soul_id, session_id, session_memory, provider_state, next_seq,
+                  last_seen_session_seq, parent_soul_session_id, fork_point, created_at, updated_at
+                )
+                VALUES (?1, ?2, ?3, '', NULL, 1, 0, NULL, NULL, ?4, ?4)
+                "#,
+                params![soul_session_id, DEFAULT_SOUL_ID, session_id, now],
             )
             .map_err(|error| error.to_string())?;
+            soul_session_by_id(&tx, &soul_session_id)?
+                .ok_or_else(|| "created soul_session missing".to_string())?
+        };
+        tx.commit().map_err(|error| error.to_string())?;
+        Ok(AcquiredSoulSession { soul_session })
+    }
+
+    pub fn append_message_ref(
+        &self,
+        soul_session_id: &str,
+        message_id: &str,
+    ) -> Result<SoulSessionEntry, String> {
+        self.append_soul_session_entry(soul_session_id, SoulSessionTargetType::Message, message_id)
+    }
+
+    pub fn start_turn(
+        &self,
+        soul_session_id: &str,
+        trigger_ref: &str,
+        input_through_session_seq: i64,
+    ) -> Result<StartedTurn, String> {
+        let conn = self.conn.lock().unwrap();
+        let turn_id = prefixed_id("turn");
+        let now = timestamp_now();
         conn.execute(
             r#"
-            INSERT INTO response_stream_deltas (
-              response_run_id, position, text, created_at
+            INSERT INTO turns (
+              id, soul_session_id, trigger_type, trigger_ref, input_through_session_seq,
+              base_soul_session_seq, end_soul_session_seq, status, error_text,
+              created_at, updated_at, finished_at
             )
-            VALUES (?1, ?2, ?3, ?4)
+            SELECT ?1, id, 'session_send', ?3, ?4, next_seq - 1, NULL, 'running',
+                   NULL, ?5, ?5, NULL
+            FROM soul_sessions
+            WHERE id = ?2
             "#,
-            params![response_run_id, position, delta, now],
+            params![
+                turn_id,
+                soul_session_id,
+                trigger_ref,
+                input_through_session_seq,
+                now
+            ],
         )
         .map_err(|error| error.to_string())?;
-        conn.execute(
-            r#"
-            UPDATE message_text_contents
-            SET text = text || ?2, updated_at = ?3
-            WHERE message_id = ?1
-            "#,
-            params![assistant_message_id, delta, now],
-        )
-        .map_err(|error| error.to_string())?;
-        conn.execute(
-            "UPDATE messages SET updated_at = ?2 WHERE message_id = ?1",
-            params![assistant_message_id, now],
-        )
-        .map_err(|error| error.to_string())?;
-        Ok(())
-    }
-
-    pub fn complete_run(
-        &self,
-        response_run_id: &str,
-        assistant_message_id: &str,
-        provider_response_id: Option<&str>,
-    ) -> Result<MessageRecord, String> {
-        let conn = self.conn.lock().unwrap();
-        let now = timestamp_now();
-        conn.execute(
-            r#"
-            UPDATE response_runs
-            SET state = 'completed', provider_response_id = ?2, completed_at = ?3
-            WHERE response_run_id = ?1
-            "#,
-            params![response_run_id, provider_response_id, now],
-        )
-        .map_err(|error| error.to_string())?;
-        conn.execute(
-            r#"
-            UPDATE messages
-            SET state = 'completed',
-                completed_at = ?2,
-                updated_at = ?2,
-                provider_response_id = ?3
-            WHERE message_id = ?1
-            "#,
-            params![assistant_message_id, now, provider_response_id],
-        )
-        .map_err(|error| error.to_string())?;
-        message_by_id(&conn, assistant_message_id)?
-            .ok_or_else(|| "assistant message missing".to_string())
-    }
-
-    pub fn fail_run(
-        &self,
-        response_run_id: &str,
-        assistant_message_id: &str,
-        error: &str,
-    ) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
-        let now = timestamp_now();
-        conn.execute(
-            r#"
-            UPDATE response_runs
-            SET state = 'failed', completed_at = ?2, error = ?3
-            WHERE response_run_id = ?1
-            "#,
-            params![response_run_id, now, error],
-        )
-        .map_err(|error| error.to_string())?;
-        conn.execute(
-            r#"
-            UPDATE messages
-            SET state = 'failed', completed_at = ?2, updated_at = ?2, error = ?3
-            WHERE message_id = ?1
-            "#,
-            params![assistant_message_id, now, error],
-        )
-        .map_err(|error| error.to_string())?;
-        Ok(())
+        Ok(StartedTurn {
+            turn: turn_by_id(&conn, &turn_id)?.ok_or_else(|| "created turn missing".to_string())?,
+        })
     }
 }

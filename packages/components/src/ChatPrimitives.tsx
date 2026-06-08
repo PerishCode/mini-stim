@@ -5,10 +5,11 @@ export function IconButton(props: {
   children: ReactNode;
   disabled?: boolean;
   onClick?: () => void;
+  type?: "button" | "submit";
 }) {
   return (
     <button
-      type="button"
+      type={props.type ?? "button"}
       className="iconButton"
       aria-label={props.label}
       title={props.label}
@@ -41,10 +42,13 @@ export function Composer(props: {
         rows={3}
         onChange={(event) => props.onChange(event.currentTarget.value)}
       />
-      <IconButton label="Send" disabled={props.disabled || !props.value.trim()}>
+      <IconButton
+        type="submit"
+        label="Send"
+        disabled={props.disabled || !props.value.trim()}
+      >
         <span aria-hidden="true">↑</span>
       </IconButton>
     </form>
   );
 }
-

@@ -1,41 +1,69 @@
-use santi_core::ChatStore;
+use rusqlite::Connection;
+use santi_core::{ActorType, MessageContent, MessageState, SantiStore};
 
 #[test]
-fn send_preserves_message_order() {
+fn schema_matches_runtime() {
     let temp = tempfile::tempdir().expect("temp dir");
-    let store = ChatStore::open(temp.path().join("chat.sqlite")).expect("open store");
+    let db = temp.path().join("santi.sqlite");
+    let store = SantiStore::open(&db).expect("open store");
+    drop(store);
 
-    let accepted = store
-        .begin_send(
-            None,
-            "hello ordering".to_string(),
-            "test-provider",
-            "test-model",
-        )
-        .expect("begin send");
-    store
-        .append_delta(
-            &accepted.response_run_id,
-            &accepted.assistant_message_id,
-            "assistant reply",
-        )
-        .expect("append delta");
-    let assistant = store
-        .complete_run(
-            &accepted.response_run_id,
-            &accepted.assistant_message_id,
-            Some("resp_test"),
-        )
-        .expect("complete run");
+    let conn = Connection::open(db).expect("open sqlite");
+    for table in [
+        "accounts",
+        "souls",
+        "sessions",
+        "messages",
+        "r_session_messages",
+        "message_events",
+        "session_effects",
+        "soul_sessions",
+        "turns",
+        "tool_calls",
+        "tool_results",
+        "compacts",
+        "r_soul_session_messages",
+    ] {
+        let exists: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?1",
+                [table],
+                |row| row.get(0),
+            )
+            .expect("table lookup");
+        assert_eq!(exists, 1, "missing table {table}");
+    }
+}
 
-    let detail = store
-        .conversation_detail(&accepted.conversation_id)
-        .expect("load detail")
-        .expect("conversation detail");
+#[test]
+fn appends_relations_in_order() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let store = SantiStore::open(temp.path().join("santi.sqlite")).expect("open store");
+    let session = store.create_session().expect("create session");
+    let user = store
+        .append_message(
+            &session.id,
+            ActorType::Account,
+            store.default_account_id(),
+            MessageContent::text("hello ordering"),
+            MessageState::Fixed,
+        )
+        .expect("append user")
+        .session_message;
+    let soul_session = store
+        .acquire_soul_session(&session.id)
+        .expect("acquire soul session")
+        .soul_session;
+    let entry = store
+        .append_message_ref(&soul_session.id, &user.message.id)
+        .expect("append message ref");
 
-    assert_eq!(detail.messages.len(), 2);
-    assert_eq!(detail.messages[0].message_id, accepted.user_message_id);
-    assert_eq!(detail.messages[0].text, "hello ordering");
-    assert_eq!(detail.messages[1].message_id, assistant.message_id);
-    assert_eq!(detail.messages[1].text, "assistant reply");
+    assert_eq!(user.relation.session_seq, 1);
+    assert_eq!(entry.soul_session_seq, 1);
+    let input = store
+        .assembly_input(&soul_session.id)
+        .expect("assembly input");
+    assert_eq!(input.len(), 1);
+    assert_eq!(input[0].role, "user");
+    assert_eq!(input[0].content, "hello ordering");
 }

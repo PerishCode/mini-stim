@@ -1,22 +1,17 @@
-use std::{env, net::SocketAddr};
+use std::{env, net::SocketAddr, path::PathBuf, sync::Arc};
 
 use axum::{
     Json, Router,
     extract::{Path, State},
     http::StatusCode,
-    response::{
-        IntoResponse,
-        sse::{Event, KeepAlive, Sse},
-    },
+    response::IntoResponse,
     routing::{get, post},
 };
-use futures_util::StreamExt;
 use santi_core::{
-    ChatService, ChatServiceConfig, ConversationDetail, ConversationSummary, ErrorResponse,
-    SendMessageRequest, StreamEvent,
+    CreateSessionResponse, ErrorResponse, HealthResponse, SantiService, SantiServiceConfig,
+    SendSessionRequest, SendSessionResponse, Session, SessionDetail, SessionRuntimeSnapshot,
 };
 use santi_provider::{OpenAIProvider, OpenAIProviderConfig};
-use std::sync::Arc;
 use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,
@@ -56,18 +51,29 @@ async fn serve() -> Result<(), String> {
             })
             .transpose()?,
     }));
-    let service = ChatService::open(
-        ChatServiceConfig {
-            database_path: env::var("SANTI_DB").map_err(|_| "SANTI_DB is required".to_string())?,
+    let database_path = env::var("SANTI_DB").map_err(|_| "SANTI_DB is required".to_string())?;
+    let runtime_root = env::var("SANTI_RUNTIME_ROOT").unwrap_or_else(|_| {
+        db_parent(&database_path)
+            .join("runtime")
+            .display()
+            .to_string()
+    });
+    let execution_root = env::var("SANTI_EXECUTION_ROOT").unwrap_or_else(|_| {
+        db_parent(&database_path)
+            .join("execution")
+            .display()
+            .to_string()
+    });
+    let service = SantiService::open(
+        SantiServiceConfig {
+            database_path,
+            runtime_root,
+            execution_root,
+            bind_addr: Some(bind_addr_string()),
         },
         provider,
     )?;
-    let host = env::var("SANTI_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
-    let port = env::var("SANTI_PORT")
-        .ok()
-        .and_then(|value| value.parse::<u16>().ok())
-        .unwrap_or(43307);
-    let address: SocketAddr = format!("{host}:{port}")
+    let address: SocketAddr = bind_addr_string()
         .parse()
         .map_err(|_| "SANTI_HOST/SANTI_PORT did not form a valid socket address".to_string())?;
     let listener = tokio::net::TcpListener::bind(address)
@@ -79,6 +85,22 @@ async fn serve() -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
+fn db_parent(database_path: &str) -> PathBuf {
+    PathBuf::from(database_path)
+        .parent()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("."))
+}
+
+fn bind_addr_string() -> String {
+    let host = env::var("SANTI_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+    let port = env::var("SANTI_PORT")
+        .ok()
+        .and_then(|value| value.parse::<u16>().ok())
+        .unwrap_or(43307);
+    format!("{host}:{port}")
+}
+
 fn optional_env(name: &str) -> Option<String> {
     env::var(name)
         .ok()
@@ -86,16 +108,18 @@ fn optional_env(name: &str) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
-fn router(service: ChatService) -> Router {
+fn router(service: SantiService) -> Router {
     Router::new()
-        .route("/api/health", get(health))
-        .route("/api/openapi.json", get(openapi))
-        .route("/api/conversations", get(list_conversations))
+        .route("/api/v1/health", get(health))
+        .route("/api/v1/openapi.json", get(openapi))
+        .route("/api/v1/sessions", post(create_session).get(list_sessions))
+        .route("/api/v1/sessions/{session_id}", get(get_session))
+        .route("/api/v1/sessions/{session_id}/messages", get(list_messages))
+        .route("/api/v1/sessions/{session_id}/send", post(send_session))
         .route(
-            "/api/conversations/{conversation_id}",
-            get(get_conversation),
+            "/api/v1/sessions/{session_id}/runtime",
+            get(runtime_snapshot),
         )
-        .route("/api/messages/stream", post(stream_message))
         .layer(TraceLayer::new_for_http())
         .layer(
             CorsLayer::new()
@@ -108,7 +132,7 @@ fn router(service: ChatService) -> Router {
 
 #[utoipa::path(
     get,
-    path = "/api/health",
+    path = "/api/v1/health",
     responses((status = 200, body = HealthResponse))
 )]
 async fn health() -> Json<HealthResponse> {
@@ -119,78 +143,121 @@ async fn health() -> Json<HealthResponse> {
 }
 
 #[utoipa::path(
-    get,
-    path = "/api/conversations",
-    responses(
-        (status = 200, body = [ConversationSummary]),
-        (status = 500, body = ErrorResponse)
-    )
+    post,
+    path = "/api/v1/sessions",
+    responses((status = 200, body = CreateSessionResponse), (status = 500, body = ErrorResponse))
 )]
-async fn list_conversations(
-    State(service): State<ChatService>,
-) -> Result<Json<Vec<ConversationSummary>>, ApiError> {
+async fn create_session(
+    State(service): State<SantiService>,
+) -> Result<Json<CreateSessionResponse>, ApiError> {
     service
-        .list_conversations()
+        .create_session()
         .map(Json)
         .map_err(ApiError::internal)
 }
 
 #[utoipa::path(
     get,
-    path = "/api/conversations/{conversation_id}",
-    params(("conversation_id" = String, Path)),
+    path = "/api/v1/sessions",
+    responses((status = 200, body = [Session]), (status = 500, body = ErrorResponse))
+)]
+async fn list_sessions(
+    State(service): State<SantiService>,
+) -> Result<Json<Vec<Session>>, ApiError> {
+    service
+        .list_sessions()
+        .map(Json)
+        .map_err(ApiError::internal)
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/sessions/{session_id}",
+    params(("session_id" = String, Path)),
     responses(
-        (status = 200, body = ConversationDetail),
+        (status = 200, body = SessionDetail),
         (status = 404, body = ErrorResponse),
         (status = 500, body = ErrorResponse)
     )
 )]
-async fn get_conversation(
-    State(service): State<ChatService>,
-    Path(conversation_id): Path<String>,
-) -> Result<Json<ConversationDetail>, ApiError> {
+async fn get_session(
+    State(service): State<SantiService>,
+    Path(session_id): Path<String>,
+) -> Result<Json<SessionDetail>, ApiError> {
     service
-        .conversation(&conversation_id)
+        .session(&session_id)
         .map_err(ApiError::internal)?
         .map(Json)
-        .ok_or_else(|| ApiError::not_found("conversation not found"))
+        .ok_or_else(|| ApiError::not_found("session not found"))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/sessions/{session_id}/messages",
+    params(("session_id" = String, Path)),
+    responses(
+        (status = 200, body = [santi_core::SessionMessage]),
+        (status = 404, body = ErrorResponse),
+        (status = 500, body = ErrorResponse)
+    )
+)]
+async fn list_messages(
+    State(service): State<SantiService>,
+    Path(session_id): Path<String>,
+) -> Result<Json<Vec<santi_core::SessionMessage>>, ApiError> {
+    service
+        .session(&session_id)
+        .map_err(ApiError::internal)?
+        .map(|detail| Json(detail.messages))
+        .ok_or_else(|| ApiError::not_found("session not found"))
 }
 
 #[utoipa::path(
     post,
-    path = "/api/messages/stream",
-    request_body = SendMessageRequest,
+    path = "/api/v1/sessions/{session_id}/send",
+    params(("session_id" = String, Path)),
+    request_body = SendSessionRequest,
     responses(
-        (status = 200, description = "Server-sent stream of StreamEvent JSON payloads"),
+        (status = 200, body = SendSessionResponse),
+        (status = 404, body = ErrorResponse),
         (status = 500, body = ErrorResponse)
     )
 )]
-async fn stream_message(
-    State(service): State<ChatService>,
-    Json(request): Json<SendMessageRequest>,
-) -> Sse<impl futures_core::Stream<Item = Result<Event, axum::Error>>> {
-    let stream = service.send_message(request).map(|event| {
-        let event = match event {
-            Ok(event) => event,
-            Err(error) => StreamEvent::Failed {
-                conversation_id: "".to_string(),
-                message_id: "".to_string(),
-                error,
-            },
-        };
-        Event::default().json_data(event).map_err(axum::Error::new)
-    });
-    Sse::new(stream).keep_alive(KeepAlive::default())
+async fn send_session(
+    State(service): State<SantiService>,
+    Path(session_id): Path<String>,
+    Json(request): Json<SendSessionRequest>,
+) -> Result<Json<SendSessionResponse>, ApiError> {
+    service
+        .send_session(&session_id, request)
+        .await
+        .map(Json)
+        .map_err(ApiError::internal)
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/sessions/{session_id}/runtime",
+    params(("session_id" = String, Path)),
+    responses(
+        (status = 200, body = SessionRuntimeSnapshot),
+        (status = 404, body = ErrorResponse),
+        (status = 500, body = ErrorResponse)
+    )
+)]
+async fn runtime_snapshot(
+    State(service): State<SantiService>,
+    Path(session_id): Path<String>,
+) -> Result<Json<SessionRuntimeSnapshot>, ApiError> {
+    service
+        .runtime_snapshot(&session_id)
+        .map_err(ApiError::internal)?
+        .map(Json)
+        .ok_or_else(|| ApiError::not_found("session not found"))
 }
 
 async fn openapi() -> Json<utoipa::openapi::OpenApi> {
     Json(ApiDoc::openapi())
-}
-
-#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
-struct HealthResponse {
-    ok: bool,
-    service: String,
 }
 
 struct ApiError {
@@ -232,17 +299,39 @@ impl IntoResponse for ApiError {
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(health, list_conversations, get_conversation, stream_message),
+    paths(
+        health,
+        create_session,
+        list_sessions,
+        get_session,
+        list_messages,
+        send_session,
+        runtime_snapshot
+    ),
     components(schemas(
-        ConversationDetail,
-        ConversationSummary,
+        CreateSessionResponse,
         ErrorResponse,
         HealthResponse,
-        santi_core::MessageRecord,
-        santi_core::MessageRole,
+        SendSessionRequest,
+        SendSessionResponse,
+        Session,
+        SessionDetail,
+        SessionRuntimeSnapshot,
+        santi_core::ActorType,
+        santi_core::Compact,
+        santi_core::Message,
+        santi_core::MessageContent,
+        santi_core::MessagePart,
         santi_core::MessageState,
-        SendMessageRequest,
-        StreamEvent
+        santi_core::SessionEffect,
+        santi_core::SessionMessage,
+        santi_core::SessionMessageRef,
+        santi_core::SoulSession,
+        santi_core::ToolCall,
+        santi_core::ToolResult,
+        santi_core::Turn,
+        santi_core::TurnStatus,
+        santi_core::TurnTriggerType
     ))
 )]
 struct ApiDoc;

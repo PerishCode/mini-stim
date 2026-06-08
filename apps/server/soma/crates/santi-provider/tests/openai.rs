@@ -7,8 +7,8 @@ use std::{
 
 use futures_util::StreamExt;
 use santi_provider::{
-    OpenAIProvider, OpenAIProviderConfig, ProviderClient, ProviderEvent, ProviderMessage,
-    ProviderRequest,
+    OpenAIProvider, OpenAIProviderConfig, ProviderClient, ProviderEvent, ProviderFunctionTool,
+    ProviderMessage, ProviderRequest, ProviderTool,
 };
 use serde_json::Value;
 
@@ -27,6 +27,9 @@ async fn optional_params_sent() {
     assert_eq!(body["max_output_tokens"], 4096);
     assert_eq!(body["stream"], true);
     assert_eq!(body["stream_options"]["include_obfuscation"], false);
+    assert_eq!(body["instructions"], "system guidance");
+    assert_eq!(body["input"][0]["content"][0]["type"], "input_text");
+    assert_eq!(body["tools"][0]["name"], "shell");
 }
 
 #[tokio::test]
@@ -68,10 +71,18 @@ async fn capture_body(mut config: OpenAIProviderConfig) -> Value {
     let mut stream = provider
         .stream_response(ProviderRequest {
             model: provider.metadata().model,
+            instructions: Some("system guidance".to_string()),
             input: vec![ProviderMessage {
                 role: "user".to_string(),
                 content: "hello".to_string(),
             }],
+            tools: Some(vec![ProviderTool::Function(ProviderFunctionTool {
+                name: "shell".to_string(),
+                description: "run shell".to_string(),
+                parameters: serde_json::json!({ "type": "object" }),
+            })]),
+            previous_response_id: None,
+            function_call_outputs: None,
         })
         .await
         .expect("stream response");

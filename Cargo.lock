@@ -1330,6 +1330,7 @@ dependencies = [
  "rusqlite",
  "santi-provider",
  "serde",
+ "serde_json",
  "tempfile",
  "tokio",
  "utoipa",

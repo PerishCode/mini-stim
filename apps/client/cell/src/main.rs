@@ -93,7 +93,7 @@ fn spawn_client_soma(
         .env("MINI_STIM_CLIENT_HOST", "127.0.0.1")
         .env("MINI_STIM_CLIENT_PORT", port.to_string())
         .env("MINI_STIM_CLIENT_WEB_ROOT", "apps/client/soma/web")
-        .env("VITE_SANTI_API_URL", server_url)
+        .env("SANTI_API_ENDPOINT", server_url)
         .env("MINI_STIM_CELL_MODE", "dev")
         .env("MINI_STIM_CELL_NAMESPACE", &context.namespace)
         .stdout(Stdio::from(log))

@@ -3,11 +3,14 @@ use async_trait::async_trait;
 use futures_core::Stream;
 use futures_util::StreamExt;
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::{Map, Value, json};
 use std::sync::Arc;
 
-use crate::{ProviderClient, ProviderEvent, ProviderMetadata, ProviderRequest, ProviderStream};
+use crate::{
+    FunctionCallOutput, ProviderClient, ProviderEvent, ProviderFunctionCall, ProviderMetadata,
+    ProviderRequest, ProviderStream, ProviderTool,
+};
 
 #[derive(Debug, Clone)]
 pub struct OpenAIProviderConfig {
@@ -66,8 +69,9 @@ impl ProviderClient for OpenAIProvider {
 fn response_body(config: &OpenAIProviderConfig, request: ProviderRequest) -> Value {
     let mut body = Map::from_iter([
         ("model".to_string(), json!(request.model)),
-        ("input".to_string(), json!(response_input(request.input))),
+        ("input".to_string(), response_input(&request)),
         ("stream".to_string(), json!(true)),
+        ("store".to_string(), json!(false)),
         (
             "stream_options".to_string(),
             json!({
@@ -76,6 +80,21 @@ fn response_body(config: &OpenAIProviderConfig, request: ProviderRequest) -> Val
         ),
     ]);
 
+    if let Some(instructions) = request
+        .instructions
+        .filter(|instructions| !instructions.trim().is_empty())
+    {
+        body.insert("instructions".to_string(), json!(instructions));
+    }
+    if let Some(tools) = request.tools {
+        body.insert("tools".to_string(), json!(map_tools(tools)));
+    }
+    if let Some(previous_response_id) = request.previous_response_id {
+        body.insert(
+            "previous_response_id".to_string(),
+            json!(previous_response_id),
+        );
+    }
     if let Some(reasoning_effort) = &config.reasoning_effort {
         body.insert(
             "reasoning".to_string(),
@@ -91,12 +110,58 @@ fn response_body(config: &OpenAIProviderConfig, request: ProviderRequest) -> Val
     Value::Object(body)
 }
 
-fn response_input(messages: Vec<crate::ProviderMessage>) -> Vec<ResponseInputMessage> {
-    messages
+fn response_input(request: &ProviderRequest) -> Value {
+    if let Some(outputs) = &request.function_call_outputs {
+        return json!(map_function_call_outputs(outputs));
+    }
+
+    json!(
+        request
+            .input
+            .iter()
+            .map(|message| {
+                let content_type = if message.role == "assistant" {
+                    "output_text"
+                } else {
+                    "input_text"
+                };
+                json!({
+                    "role": message.role,
+                    "content": [
+                        {
+                            "type": content_type,
+                            "text": message.content,
+                        }
+                    ],
+                })
+            })
+            .collect::<Vec<_>>()
+    )
+}
+
+fn map_tools(tools: Vec<ProviderTool>) -> Vec<Value> {
+    tools
         .into_iter()
-        .map(|message| ResponseInputMessage {
-            role: message.role,
-            content: message.content,
+        .map(|tool| match tool {
+            ProviderTool::Function(tool) => json!({
+                "type": "function",
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": tool.parameters,
+            }),
+        })
+        .collect()
+}
+
+fn map_function_call_outputs(outputs: &[FunctionCallOutput]) -> Vec<Value> {
+    outputs
+        .iter()
+        .map(|output| {
+            json!({
+                "type": "function_call_output",
+                "call_id": output.call_id,
+                "output": output.output,
+            })
         })
         .collect()
 }
@@ -106,6 +171,7 @@ fn parse_sse(
 ) -> impl Stream<Item = Result<ProviderEvent, String>> + Send + 'static {
     try_stream! {
         let mut buffer = String::new();
+        let mut current_response_id: Option<String> = None;
         while let Some(chunk) = bytes.next().await {
             let chunk = chunk.map_err(|error| error.to_string())?;
             buffer.push_str(&String::from_utf8_lossy(&chunk));
@@ -116,7 +182,7 @@ fn parse_sse(
                     if payload == "[DONE]" {
                         continue;
                     }
-                    if let Some(event) = parse_event(payload)? {
+                    for event in parse_event(payload, &mut current_response_id)? {
                         yield event;
                     }
                 }
@@ -125,33 +191,97 @@ fn parse_sse(
     }
 }
 
-fn parse_event(payload: &str) -> Result<Option<ProviderEvent>, String> {
+fn parse_event(
+    payload: &str,
+    current_response_id: &mut Option<String>,
+) -> Result<Vec<ProviderEvent>, String> {
     let value = serde_json::from_str::<OpenAIEvent>(payload).map_err(|error| error.to_string())?;
     match value.event_type.as_str() {
+        "response.created" | "response.in_progress" => {
+            if let Some(response_id) = response_id_from_value(&value.raw) {
+                *current_response_id = Some(response_id);
+            }
+            Ok(Vec::new())
+        }
         "response.output_text.delta" => Ok(value
             .delta
             .filter(|delta| !delta.is_empty())
-            .map(ProviderEvent::TextDelta)),
-        "response.completed" => Ok(Some(ProviderEvent::Completed {
+            .map(|delta| vec![ProviderEvent::TextDelta(delta)])
+            .unwrap_or_default()),
+        "response.output_text.done" => Ok(Vec::new()),
+        "response.output_item.done" => parse_output_item_done(value.raw, current_response_id),
+        "response.completed" => Ok(vec![ProviderEvent::Completed {
             provider_response_id: value
                 .response
                 .and_then(|response| response.id)
                 .or(value.response_id),
-        })),
-        "error" => Ok(Some(ProviderEvent::Failed(
+        }]),
+        "error" => Ok(vec![ProviderEvent::Failed(
             value
                 .error
                 .and_then(|error| error.message)
                 .unwrap_or_else(|| "openai stream error".to_string()),
-        ))),
-        _ => Ok(None),
+        )]),
+        _ => Ok(Vec::new()),
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
-struct ResponseInputMessage {
-    role: String,
-    content: String,
+fn parse_output_item_done(
+    raw: Value,
+    current_response_id: &Option<String>,
+) -> Result<Vec<ProviderEvent>, String> {
+    let Some(item) = raw.get("item") else {
+        return Ok(Vec::new());
+    };
+    if item.get("type").and_then(Value::as_str) != Some("function_call") {
+        return Ok(Vec::new());
+    }
+    let response_id = current_response_id
+        .clone()
+        .or_else(|| response_id_from_value(&raw))
+        .ok_or_else(|| "missing response id for function call".to_string())?;
+    let call_id = item
+        .get("call_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "missing function_call call_id".to_string())?
+        .to_string();
+    let name = item
+        .get("name")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "missing function_call name".to_string())?
+        .to_string();
+    let arguments_raw = item
+        .get("arguments")
+        .and_then(Value::as_str)
+        .unwrap_or("{}")
+        .to_string();
+    let arguments = serde_json::from_str::<Value>(&arguments_raw)
+        .map_err(|error| format!("invalid function_call arguments: {error}"))?;
+
+    Ok(vec![ProviderEvent::FunctionCallRequested(
+        ProviderFunctionCall {
+            response_id,
+            item_id: item.get("id").and_then(Value::as_str).map(str::to_string),
+            call_id,
+            name,
+            arguments_raw,
+            arguments,
+        },
+    )])
+}
+
+fn response_id_from_value(value: &Value) -> Option<String> {
+    value
+        .get("response")
+        .and_then(|response| response.get("id"))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .or_else(|| {
+            value
+                .get("response_id")
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        })
 }
 
 #[derive(Debug, Deserialize)]
@@ -166,6 +296,8 @@ struct OpenAIEvent {
     response_id: Option<String>,
     #[serde(default)]
     error: Option<OpenAIError>,
+    #[serde(flatten)]
+    raw: Value,
 }
 
 #[derive(Debug, Deserialize)]
