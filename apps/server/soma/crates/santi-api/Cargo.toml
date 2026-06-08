@@ -5,6 +5,7 @@ license.workspace = true
 version.workspace = true
 
 [dependencies]
+async-stream.workspace = true
 axum.workspace = true
 dotenvy.workspace = true
 futures-core.workspace = true

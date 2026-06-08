@@ -1,15 +1,20 @@
-use std::{env, net::SocketAddr, path::PathBuf, sync::Arc};
+use std::{convert::Infallible, env, net::SocketAddr, path::PathBuf, sync::Arc};
 
 use axum::{
     Json, Router,
     extract::{Path, State},
     http::StatusCode,
-    response::IntoResponse,
+    response::{
+        IntoResponse, Sse,
+        sse::{Event, KeepAlive},
+    },
     routing::{get, post},
 };
+use futures_core::Stream;
 use santi_core::{
     CreateSessionResponse, ErrorResponse, HealthResponse, SantiService, SantiServiceConfig,
-    SendSessionRequest, SendSessionResponse, Session, SessionDetail, SessionRuntimeSnapshot,
+    SantiStreamEvent, SantiStreamPayload, SendSessionRequest, SendSessionResponse, Session,
+    SessionDetail, SessionRuntimeSnapshot, prefixed_id, timestamp_now,
 };
 use santi_provider::{OpenAIProvider, OpenAIProviderConfig};
 use tower_http::{
@@ -115,6 +120,7 @@ fn router(service: SantiService) -> Router {
         .route("/api/v1/sessions", post(create_session).get(list_sessions))
         .route("/api/v1/sessions/{session_id}", get(get_session))
         .route("/api/v1/sessions/{session_id}/messages", get(list_messages))
+        .route("/api/v1/sessions/{session_id}/events", get(session_events))
         .route("/api/v1/sessions/{session_id}/send", post(send_session))
         .route(
             "/api/v1/sessions/{session_id}/runtime",
@@ -212,6 +218,38 @@ async fn list_messages(
         .ok_or_else(|| ApiError::not_found("session not found"))
 }
 
+async fn session_events(
+    State(service): State<SantiService>,
+    Path(session_id): Path<String>,
+) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, ApiError> {
+    let session = service
+        .session(&session_id)
+        .map_err(ApiError::internal)?
+        .ok_or_else(|| ApiError::not_found("session not found"))?;
+    drop(session);
+
+    let mut receiver = service.subscribe_stream();
+    let open_session_id = session_id.clone();
+    let stream = async_stream::stream! {
+        yield Ok(sse_event(SantiStreamEvent {
+            event_id: prefixed_id("stream"),
+            session_id: open_session_id,
+            created_at: timestamp_now(),
+            payload: SantiStreamPayload::StreamOpen,
+        }));
+
+        loop {
+            match receiver.recv().await {
+                Ok(event) if event.session_id == session_id => yield Ok(sse_event(event)),
+                Ok(_) => {}
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+            }
+        }
+    };
+    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
+}
+
 #[utoipa::path(
     post,
     path = "/api/v1/sessions/{session_id}/send",
@@ -258,6 +296,24 @@ async fn runtime_snapshot(
 
 async fn openapi() -> Json<utoipa::openapi::OpenApi> {
     Json(ApiDoc::openapi())
+}
+
+fn sse_event(event: SantiStreamEvent) -> Event {
+    Event::default()
+        .id(event.event_id.clone())
+        .event(sse_event_name(&event.payload))
+        .data(serde_json::to_string(&event).unwrap_or_else(|_| "{}".to_string()))
+}
+
+fn sse_event_name(payload: &SantiStreamPayload) -> &'static str {
+    match payload {
+        SantiStreamPayload::StreamOpen => "stream_open",
+        SantiStreamPayload::MessageCreated { .. } => "message_created",
+        SantiStreamPayload::MessageDelta { .. } => "message_delta",
+        SantiStreamPayload::MessageCompleted { .. } => "message_completed",
+        SantiStreamPayload::TurnStarted { .. } => "turn_started",
+        SantiStreamPayload::TurnFailed { .. } => "turn_failed",
+    }
 }
 
 struct ApiError {

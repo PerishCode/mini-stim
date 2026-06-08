@@ -282,6 +282,40 @@ pub struct SendSessionResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct SantiStreamEvent {
+    pub event_id: String,
+    pub session_id: String,
+    pub created_at: Timestamp,
+    pub payload: SantiStreamPayload,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum SantiStreamPayload {
+    StreamOpen,
+    MessageCreated {
+        message: SessionMessage,
+    },
+    MessageDelta {
+        message_id: String,
+        turn_id: String,
+        role: ActorType,
+        text: String,
+    },
+    MessageCompleted {
+        turn_id: String,
+        message: SessionMessage,
+    },
+    TurnStarted {
+        turn: Turn,
+    },
+    TurnFailed {
+        turn_id: String,
+        error: String,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SessionRuntimeSnapshot {
     pub session: Session,
     pub soul_session: Option<SoulSession>,

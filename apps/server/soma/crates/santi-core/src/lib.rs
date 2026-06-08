@@ -1,5 +1,6 @@
 mod model;
 mod service;
+mod service_prompt;
 mod store;
 
 pub use model::*;

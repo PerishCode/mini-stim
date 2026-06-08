@@ -1,15 +1,20 @@
 use futures_util::StreamExt;
 use santi_provider::{
-    FunctionCallOutput, ProviderClient, ProviderEvent, ProviderFunctionCall, ProviderFunctionTool,
-    ProviderMessage, ProviderRequest, ProviderTool,
+    FunctionCallOutput, ProviderClient, ProviderEvent, ProviderFunctionCall, ProviderMessage,
+    ProviderRequest,
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::{path::PathBuf, process::Command, sync::Arc};
+use tokio::sync::broadcast;
 
+use crate::service_prompt::{
+    provider_tools, render_self_assessment_instructions, tooling_instructions,
+};
 use crate::{
-    ActorType, CreateSessionResponse, MessageContent, MessageState, SantiStore, SendSessionRequest,
-    SendSessionResponse, Session, SessionDetail, SessionRuntimeSnapshot,
+    ActorType, CreateSessionResponse, MessageContent, MessageState, SantiStore, SantiStreamEvent,
+    SantiStreamPayload, SendSessionRequest, SendSessionResponse, Session, SessionDetail,
+    SessionRuntimeSnapshot, prefixed_id, timestamp_now,
 };
 
 #[derive(Clone)]
@@ -17,6 +22,7 @@ pub struct SantiService {
     store: SantiStore,
     provider: Arc<dyn ProviderClient>,
     config: SantiServiceConfig,
+    stream_events: broadcast::Sender<SantiStreamEvent>,
 }
 
 #[derive(Debug, Clone)]
@@ -37,7 +43,12 @@ impl SantiService {
             store,
             provider,
             config,
+            stream_events: broadcast::channel(1024).0,
         })
+    }
+
+    pub fn subscribe_stream(&self) -> broadcast::Receiver<SantiStreamEvent> {
+        self.stream_events.subscribe()
     }
 
     pub fn create_session(&self) -> Result<CreateSessionResponse, String> {
@@ -92,6 +103,12 @@ impl SantiService {
         let soul_session = self.store.acquire_soul_session(session_id)?.soul_session;
         self.store
             .append_message_ref(&soul_session.id, &user_message.message.id)?;
+        self.publish_stream(
+            session_id,
+            SantiStreamPayload::MessageCreated {
+                message: user_message.clone(),
+            },
+        );
         let turn = self
             .store
             .start_turn(
@@ -100,6 +117,10 @@ impl SantiService {
                 user_message.relation.session_seq,
             )?
             .turn;
+        self.publish_stream(
+            session_id,
+            SantiStreamPayload::TurnStarted { turn: turn.clone() },
+        );
 
         let send_result = self
             .run_provider_turn(session_id, &soul_session.id, &turn.id)
@@ -109,6 +130,13 @@ impl SantiService {
             Ok(value) => value,
             Err(error) => {
                 let _ = self.store.fail_turn(&turn.id, &error);
+                self.publish_stream(
+                    session_id,
+                    SantiStreamPayload::TurnFailed {
+                        turn_id: turn.id.clone(),
+                        error: error.clone(),
+                    },
+                );
                 return Err(error);
             }
         };
@@ -116,6 +144,13 @@ impl SantiService {
         if assistant_text.trim().is_empty() {
             let error = "provider completed without assistant output".to_string();
             let _ = self.store.fail_turn(&turn.id, &error);
+            self.publish_stream(
+                session_id,
+                SantiStreamPayload::TurnFailed {
+                    turn_id: turn.id.clone(),
+                    error: error.clone(),
+                },
+            );
             return Err(error);
         }
 
@@ -136,6 +171,13 @@ impl SantiService {
             assistant_message.relation.session_seq,
             provider_response_id,
         )?;
+        self.publish_stream(
+            session_id,
+            SantiStreamPayload::MessageCompleted {
+                turn_id: turn.id.clone(),
+                message: assistant_message.clone(),
+            },
+        );
 
         let session = self
             .store
@@ -195,7 +237,18 @@ impl SantiService {
 
             while let Some(event) = stream.next().await {
                 match event? {
-                    ProviderEvent::TextDelta(delta) => assistant_text.push_str(&delta),
+                    ProviderEvent::TextDelta(delta) => {
+                        assistant_text.push_str(&delta);
+                        self.publish_stream(
+                            session_id,
+                            SantiStreamPayload::MessageDelta {
+                                message_id: format!("stream_{turn_id}"),
+                                turn_id: turn_id.to_string(),
+                                role: ActorType::Soul,
+                                text: delta,
+                            },
+                        );
+                    }
                     ProviderEvent::FunctionCallRequested(call) => {
                         previous_response_id = Some(call.response_id.clone());
                         calls.push(call);
@@ -259,6 +312,15 @@ impl SantiService {
             ]
             .join("\n\n"),
         )
+    }
+
+    fn publish_stream(&self, session_id: &str, payload: SantiStreamPayload) {
+        let _ = self.stream_events.send(SantiStreamEvent {
+            event_id: prefixed_id("stream"),
+            session_id: session_id.to_string(),
+            created_at: timestamp_now(),
+            payload,
+        });
     }
 
     fn handle_tool_call(
@@ -393,88 +455,4 @@ fn default_shell_name() -> &'static str {
 
 fn parse_tool_args<T: for<'de> Deserialize<'de>>(value: &Value) -> Result<T, String> {
     serde_json::from_value(value.clone()).map_err(|error| error.to_string())
-}
-
-fn render_self_assessment_instructions() -> String {
-    [
-        "<santi-self-assessment>",
-        "When asked to assess your own runtime or product capability:",
-        "- Ground the answer in visible facts from the santi-meta block, the santi-runtime block, the tool list, and the current conversation.",
-        "- When tool results are available, label tool-confirmed facts separately from runtime/context-only facts and unknowns.",
-        "- Treat missing facts as unknown; do not infer service health, permissions, durable product-ledger state, or external process state unless visible or tool-confirmed.",
-        "- Keep the next action tied to the integrated stim -> santi product loop.",
-        "</santi-self-assessment>",
-    ]
-    .join("\n")
-}
-
-fn tooling_instructions() -> String {
-    [
-        "<santi-tools>",
-        "Available tools:",
-        "- write_soul_memory(text: string): replace the current soul_memory core index text.",
-        "- write_session_memory(text: string): replace the current session_memory core index text.",
-        "- shell(command: string, cwd?: string): run a shell command inside the current execution workspace. Unix-like systems use bash by default; Windows uses pwsh by default.",
-        "Rules:",
-        "- soul_memory and session_memory are replace-whole core indexes, not append-only note stores.",
-        "- Do not claim memory has been updated unless the tool call has completed.",
-        "- Use shell when the user asks you to inspect or run something in the local workspace.",
-        "</santi-tools>",
-    ]
-    .join("\n")
-}
-
-fn provider_tools() -> Vec<ProviderTool> {
-    vec![
-        ProviderTool::Function(ProviderFunctionTool {
-            name: "write_soul_memory".to_string(),
-            description: "Replace the current soul_memory core index text.".to_string(),
-            parameters: json!({
-                "type": "object",
-                "properties": {
-                    "text": {
-                        "type": "string",
-                        "description": "The full replacement text for the current soul_memory core index."
-                    }
-                },
-                "required": ["text"],
-                "additionalProperties": false
-            }),
-        }),
-        ProviderTool::Function(ProviderFunctionTool {
-            name: "write_session_memory".to_string(),
-            description: "Replace the current session_memory core index text.".to_string(),
-            parameters: json!({
-                "type": "object",
-                "properties": {
-                    "text": {
-                        "type": "string",
-                        "description": "The full replacement text for the current session_memory core index."
-                    }
-                },
-                "required": ["text"],
-                "additionalProperties": false
-            }),
-        }),
-        ProviderTool::Function(ProviderFunctionTool {
-            name: "shell".to_string(),
-            description: "Run a shell command inside the current execution workspace. Unix-like systems use bash by default; Windows uses pwsh by default."
-                .to_string(),
-            parameters: json!({
-                "type": "object",
-                "properties": {
-                    "command": {
-                        "type": "string",
-                        "description": "The shell command to execute."
-                    },
-                    "cwd": {
-                        "type": "string",
-                        "description": "Optional working directory."
-                    }
-                },
-                "required": ["command"],
-                "additionalProperties": false
-            }),
-        }),
-    ]
 }
