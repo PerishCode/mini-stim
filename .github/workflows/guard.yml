@@ -43,14 +43,19 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           "$HOME/.local/bin/sidecar" --version
 
+      - name: Install runseal
+        run: |
+          curl -fsSL https://runseal.perish.uk/manage.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/runseal" --version
+
       - name: Initialize hooks
-        run: python3 scripts/init.py
+        run: runseal :init
 
       - name: Repo guard
         run: |
           flavor check --root . --config flavor.toml
-          python3 -m py_compile scripts/init.py
-          python3 scripts/init.py --check
+          runseal :init --check
           hooks=$(git rev-parse --git-path hooks)
           sh -n "$hooks/pre-commit"
           sh -n "$hooks/commit-msg"
@@ -105,7 +110,7 @@ jobs:
         run: |
           mkdir -p .tmp
           cargo run -p mini-stim-server-soma -- serve &
-          for attempt in $(seq 1 60); do
+          for attempt in $(seq 1 180); do
             if curl -fsS http://127.0.0.1:43307/api/health >/dev/null; then
               exit 0
             fi

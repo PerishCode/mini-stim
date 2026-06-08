@@ -142,12 +142,15 @@ Current conventions:
 ## Common Commands
 
 - `pnpm install`
+- `runseal :init`
+- `runseal :init --check`
+- `runseal :pr --dry-run`
 - `pnpm codegen`
-- `sidecar doctor`
-- `sidecar plan`
-- `sidecar start`
-- `sidecar status`
-- `sidecar stop`
+- `sidecar doctor --config sidecar.toml`
+- `sidecar plan --config sidecar.toml`
+- `sidecar start --config sidecar.toml`
+- `sidecar status --config sidecar.toml`
+- `sidecar stop --config sidecar.toml`
 - `cargo fmt --all --check`
 - `flavor check --root . --config flavor.toml`
 - `cargo test --workspace`
