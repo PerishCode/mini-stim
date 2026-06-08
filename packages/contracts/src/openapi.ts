@@ -30,6 +30,8 @@ export interface Session {
   id: string;
   /** @nullable */
   parent_session_id?: string | null;
+  /** @nullable */
+  title?: string | null;
   updated_at: String;
 }
 

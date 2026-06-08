@@ -67,3 +67,37 @@ fn appends_relations_in_order() {
     assert_eq!(input[0].role, "user");
     assert_eq!(input[0].content, "hello ordering");
 }
+
+#[test]
+fn titles_from_first_message() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let store = SantiStore::open(temp.path().join("santi.sqlite")).expect("open store");
+    let session = store.create_session().expect("create session");
+    assert_eq!(session.title, None);
+    let title = "first visible session title with enough detail to remain durable";
+
+    store
+        .append_message(
+            &session.id,
+            ActorType::Account,
+            store.default_account_id(),
+            MessageContent::text(format!("  {title}  ")),
+            MessageState::Fixed,
+        )
+        .expect("append first message");
+    store
+        .append_message(
+            &session.id,
+            ActorType::Account,
+            store.default_account_id(),
+            MessageContent::text("should not replace title"),
+            MessageState::Fixed,
+        )
+        .expect("append second message");
+
+    let session = store
+        .session(&session.id)
+        .expect("load session")
+        .expect("session exists");
+    assert_eq!(session.title.as_deref(), Some(title));
+}

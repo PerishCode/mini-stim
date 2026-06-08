@@ -19,7 +19,7 @@ use db::*;
 use rows::{actor_type_db, map_session_row, message_state_db};
 use schema::SCHEMA;
 
-const SANTI_SCHEMA_VERSION: u32 = 2;
+const SANTI_SCHEMA_VERSION: u32 = 3;
 const DEFAULT_ACCOUNT_ID: &str = "account_local";
 const DEFAULT_SOUL_ID: &str = "soul_default";
 
@@ -128,7 +128,7 @@ impl SantiStore {
         let mut stmt = conn
             .prepare(
                 r#"
-                SELECT id, parent_session_id, fork_point, created_at, updated_at
+                SELECT id, title, parent_session_id, fork_point, created_at, updated_at
                 FROM sessions
                 ORDER BY updated_at DESC, id DESC
                 "#,
@@ -146,8 +146,8 @@ impl SantiStore {
         let now = timestamp_now();
         conn.execute(
             r#"
-            INSERT INTO sessions (id, parent_session_id, fork_point, created_at, updated_at)
-            VALUES (?1, NULL, NULL, ?2, ?2)
+            INSERT INTO sessions (id, title, parent_session_id, fork_point, created_at, updated_at)
+            VALUES (?1, NULL, NULL, NULL, ?2, ?2)
             "#,
             params![session_id, now],
         )
@@ -242,11 +242,24 @@ impl SantiStore {
             params![session_id, message_id, next_seq, now],
         )
         .map_err(|error| error.to_string())?;
-        tx.execute(
-            "UPDATE sessions SET updated_at = ?2 WHERE id = ?1",
-            params![session_id, now],
-        )
-        .map_err(|error| error.to_string())?;
+        let title = if actor_type == ActorType::Account && next_seq == 1 {
+            session_title(&content)
+        } else {
+            None
+        };
+        if let Some(title) = title {
+            tx.execute(
+                "UPDATE sessions SET title = COALESCE(title, ?2), updated_at = ?3 WHERE id = ?1",
+                params![session_id, title, now],
+            )
+            .map_err(|error| error.to_string())?;
+        } else {
+            tx.execute(
+                "UPDATE sessions SET updated_at = ?2 WHERE id = ?1",
+                params![session_id, now],
+            )
+            .map_err(|error| error.to_string())?;
+        }
         tx.commit().map_err(|error| error.to_string())?;
         Ok(AppendedMessage {
             session_message: message_by_id(&conn, &message_id)?
@@ -324,4 +337,17 @@ impl SantiStore {
             turn: turn_by_id(&conn, &turn_id)?.ok_or_else(|| "created turn missing".to_string())?,
         })
     }
+}
+
+fn session_title(content: &MessageContent) -> Option<String> {
+    let title = content
+        .content_text()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    let trimmed = title.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    Some(trimmed.to_string())
 }

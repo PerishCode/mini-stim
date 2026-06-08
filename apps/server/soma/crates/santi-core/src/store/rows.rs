@@ -10,10 +10,11 @@ use crate::{
 pub(super) fn map_session_row(row: &Row<'_>) -> rusqlite::Result<Session> {
     Ok(Session {
         id: row.get(0)?,
-        parent_session_id: row.get(1)?,
-        fork_point: row.get(2)?,
-        created_at: row.get(3)?,
-        updated_at: row.get(4)?,
+        title: row.get(1)?,
+        parent_session_id: row.get(2)?,
+        fork_point: row.get(3)?,
+        created_at: row.get(4)?,
+        updated_at: row.get(5)?,
     })
 }
 

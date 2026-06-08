@@ -19,6 +19,7 @@ pub struct ErrorResponse {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Session {
     pub id: String,
+    pub title: Option<String>,
     pub parent_session_id: Option<String>,
     pub fork_point: Option<i64>,
     pub created_at: Timestamp,

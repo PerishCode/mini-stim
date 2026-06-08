@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS souls (
 
 CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
+    title TEXT,
     parent_session_id TEXT,
     fork_point INTEGER,
     created_at TEXT NOT NULL,

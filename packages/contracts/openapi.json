@@ -572,6 +572,12 @@
               "null"
             ]
           },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "updated_at": {
             "$ref": "#/components/schemas/String"
           }

@@ -23,10 +23,10 @@ export function App() {
 
   const busy = pending > 0;
   const visibleError = error ?? sessionError?.message ?? null;
-  const selectedTitle = useMemo(
-    () => selectedSessionId ?? "New session",
-    [selectedSessionId],
-  );
+  const selectedTitle = useMemo(() => {
+    const selected = sessions.find((session) => session.id === selectedSessionId);
+    return selected ? sessionLabel(selected) : "New session";
+  }, [selectedSessionId, sessions]);
 
   function createNewSession() {
     setError(null);
@@ -81,7 +81,7 @@ export function App() {
               className={session.id === selectedSessionId ? "selected" : ""}
               onClick={() => selectSession(session.id)}
             >
-              <span>{session.id}</span>
+              <span>{sessionLabel(session)}</span>
               <small>{session.updated_at}</small>
             </button>
           ))}
@@ -109,4 +109,8 @@ export function App() {
       </section>
     </main>
   );
+}
+
+function sessionLabel(session: { id: string; title?: string | null }) {
+  return session.title?.trim() || session.id;
 }

@@ -78,7 +78,7 @@ pub(super) fn session_by_id(
 ) -> Result<Option<Session>, String> {
     conn.query_row(
         r#"
-        SELECT id, parent_session_id, fork_point, created_at, updated_at
+        SELECT id, title, parent_session_id, fork_point, created_at, updated_at
         FROM sessions
         WHERE id = ?1
         LIMIT 1
