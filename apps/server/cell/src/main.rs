@@ -1,28 +1,8 @@
-use std::{
-    fs::OpenOptions,
-    net::TcpListener,
-    path::Path,
-    process::Stdio,
-    sync::Arc,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::{fs::OpenOptions, net::TcpListener, path::Path, process::Stdio, time::Duration};
 
-use async_trait::async_trait;
-use mini_stim_proto_server::{CellState, ServerCell, ServerCellStatus, TransportResult, bootstrap};
+use mini_stim_proto_server::bootstrap;
 use mini_stim_proto_transport::{CellContext, CellMode, TransportError};
-use tokio::{process::Command, sync::Mutex, time::sleep};
-
-#[derive(Clone)]
-struct ServerCellState {
-    status: Arc<Mutex<ServerCellStatus>>,
-}
-
-#[async_trait]
-impl ServerCell for ServerCellState {
-    async fn status(&self) -> TransportResult<ServerCellStatus> {
-        Ok(self.status.lock().await.clone())
-    }
-}
+use tokio::{process::Command, time::sleep};
 
 #[tokio::main]
 async fn main() -> Result<(), TransportError> {
@@ -32,80 +12,37 @@ async fn main() -> Result<(), TransportError> {
     let log_path = store.join("logs").join("soma.log");
     tokio::fs::create_dir_all(log_path.parent().expect("log path has parent")).await?;
 
-    let status = Arc::new(Mutex::new(ServerCellStatus {
-        error: None,
-        mode: context.mode.clone(),
-        pid: None,
-        state: CellState::Starting,
-        updated_at: now_stamp(),
-        url: None,
-    }));
-    let inspect_state = ServerCellState {
-        status: Arc::clone(&status),
-    };
-    let inspect_task = tokio::spawn(async move { runtime.register(inspect_state).await });
-
     let port = allocate_port()?;
     let url = format!("http://127.0.0.1:{port}");
     let db_path = store.join("santi.sqlite");
     if let Some(parent) = db_path.parent() {
         tokio::fs::create_dir_all(parent).await?;
     }
-    let child = Arc::new(Mutex::new(spawn_server_soma(
-        &context, &port, &db_path, &log_path,
-    )?));
-    {
-        let mut current = status.lock().await;
-        current.pid = child.lock().await.id();
-        current.url = Some(url.clone());
-        current.updated_at = now_stamp();
-    }
+    let mut child = spawn_server_soma(&context, &port, &db_path, &log_path)?;
+    let pid = child.id();
 
     match wait_for_health(&format!("{url}/api/health"), Duration::from_secs(45)).await {
-        Ok(()) => {
-            let mut current = status.lock().await;
-            current.state = CellState::Running;
-            current.updated_at = now_stamp();
-        }
+        Ok(()) => print_ready("server", &url, &context.endpoint, pid),
         Err(error) => {
-            let mut current = status.lock().await;
-            current.error = Some(error.to_string());
-            current.state = CellState::Failed;
-            current.updated_at = now_stamp();
+            let _ = child.start_kill();
+            let _ = child.wait().await;
+            return Err(error);
         }
     }
 
     tokio::select! {
-        result = watch_child(Arc::clone(&child)) => {
-            let mut current = status.lock().await;
-            current.state = match result {
-                Ok(status) if status.success() => CellState::Stopped,
+        result = child.wait() => {
+            match result {
+                Ok(status) if status.success() => {}
                 Ok(status) => {
-                    current.error = Some(format!("server soma exited with {status}"));
-                    CellState::Failed
+                    return Err(TransportError::Config(format!("server soma exited with {status}")));
                 }
-                Err(error) => {
-                    current.error = Some(error.to_string());
-                    CellState::Failed
-                }
-            };
-            current.updated_at = now_stamp();
+                Err(error) => return Err(TransportError::Io(error)),
+            }
         }
         _ = shutdown_signal() => {
-            let mut child = child.lock().await;
             let _ = child.start_kill();
             let _ = child.wait().await;
-            let mut current = status.lock().await;
-            current.state = CellState::Stopped;
-            current.updated_at = now_stamp();
-        }
-        result = inspect_task => {
-            if let Ok(Err(error)) = result {
-                let mut current = status.lock().await;
-                current.error = Some(error.to_string());
-                current.state = CellState::Failed;
-                current.updated_at = now_stamp();
-            }
         }
     }
 
@@ -143,20 +80,16 @@ fn spawn_server_soma(
     command.spawn().map_err(TransportError::Io)
 }
 
-async fn watch_child(
-    child: Arc<Mutex<tokio::process::Child>>,
-) -> Result<std::process::ExitStatus, std::io::Error> {
-    loop {
-        if let Some(status) = child.lock().await.try_wait()? {
-            return Ok(status);
-        }
-        sleep(Duration::from_millis(200)).await;
-    }
-}
-
 fn allocate_port() -> Result<u16, TransportError> {
     let listener = TcpListener::bind(("127.0.0.1", 0))?;
     Ok(listener.local_addr()?.port())
+}
+
+fn print_ready(role: &str, endpoint: &str, runtime_endpoint: &str, pid: Option<u32>) {
+    let instance_id = pid.map(|value| value.to_string()).unwrap_or_default();
+    println!(
+        "{{\"role\":\"{role}\",\"endpoint\":\"{endpoint}\",\"runtime_endpoint\":\"{runtime_endpoint}\",\"instance_id\":\"{instance_id}\"}}"
+    );
 }
 
 async fn wait_for_health(url: &str, timeout: Duration) -> Result<(), TransportError> {
@@ -196,12 +129,4 @@ async fn shutdown_signal() {
     {
         let _ = tokio::signal::ctrl_c().await;
     }
-}
-
-fn now_stamp() -> String {
-    let seconds = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-    format!("unix:{seconds}")
 }
