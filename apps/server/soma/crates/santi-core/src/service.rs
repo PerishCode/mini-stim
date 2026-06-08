@@ -206,30 +206,30 @@ impl SantiService {
         turn_id: &str,
     ) -> Result<(String, Option<String>), String> {
         let mut assistant_text = String::new();
-        let mut previous_response_id = None;
-        let mut function_call_outputs = None;
+        let mut function_call_outputs = Vec::new();
 
         let final_response_id = loop {
-            let input = if previous_response_id.is_some() {
-                Vec::new()
-            } else {
-                self.store
-                    .assembly_input(soul_session_id)?
-                    .into_iter()
-                    .map(|message| ProviderMessage {
-                        role: message.role,
-                        content: message.content,
-                    })
-                    .collect()
-            };
+            let input = self
+                .store
+                .assembly_input(soul_session_id)?
+                .into_iter()
+                .map(|message| ProviderMessage {
+                    role: message.role,
+                    content: message.content,
+                })
+                .collect();
             let metadata = self.provider.metadata();
             let request = ProviderRequest {
                 model: metadata.model,
                 instructions: Some(self.runtime_instructions(session_id, soul_session_id)?),
                 input,
                 tools: Some(provider_tools()),
-                previous_response_id: previous_response_id.clone(),
-                function_call_outputs: function_call_outputs.take(),
+                previous_response_id: None,
+                function_call_outputs: if function_call_outputs.is_empty() {
+                    None
+                } else {
+                    Some(function_call_outputs.clone())
+                },
             };
             let mut stream = self.provider.stream_response(request).await?;
             let mut calls = Vec::new();
@@ -250,7 +250,6 @@ impl SantiService {
                         );
                     }
                     ProviderEvent::FunctionCallRequested(call) => {
-                        previous_response_id = Some(call.response_id.clone());
                         calls.push(call);
                     }
                     ProviderEvent::Completed {
@@ -271,7 +270,7 @@ impl SantiService {
             for call in calls {
                 outputs.push(self.handle_tool_call(soul_session_id, turn_id, call)?);
             }
-            function_call_outputs = Some(outputs);
+            function_call_outputs.extend(outputs);
         };
 
         Ok((assistant_text, final_response_id))
@@ -340,7 +339,8 @@ impl SantiService {
             self.store
                 .append_tool_result(&call.call_id, output.clone(), error_text.clone())?;
         Ok(FunctionCallOutput {
-            call_id: call.call_id,
+            call_id: call.call_id.clone(),
+            call,
             output: serde_json::to_string(&json!({
                 "ok": error_text.is_none(),
                 "output": result.output,

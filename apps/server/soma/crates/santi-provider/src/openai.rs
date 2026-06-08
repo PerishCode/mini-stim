@@ -154,16 +154,15 @@ fn map_tools(tools: Vec<ProviderTool>) -> Vec<Value> {
 }
 
 fn map_function_call_outputs(outputs: &[FunctionCallOutput]) -> Vec<Value> {
-    outputs
-        .iter()
-        .map(|output| {
-            json!({
+    outputs.iter().fold(Vec::new(), |mut items, output| {
+        items.push(output.call.item.clone());
+        items.push(json!({
                 "type": "function_call_output",
                 "call_id": output.call_id,
                 "output": output.output,
-            })
-        })
-        .collect()
+        }));
+        items
+    })
 }
 
 fn parse_sse(
@@ -198,7 +197,7 @@ fn parse_event(
     let value = serde_json::from_str::<OpenAIEvent>(payload).map_err(|error| error.to_string())?;
     match value.event_type.as_str() {
         "response.created" | "response.in_progress" => {
-            if let Some(response_id) = response_id_from_value(&value.raw) {
+            if let Some(response_id) = value.response_id() {
                 *current_response_id = Some(response_id);
             }
             Ok(Vec::new())
@@ -211,10 +210,7 @@ fn parse_event(
         "response.output_text.done" => Ok(Vec::new()),
         "response.output_item.done" => parse_output_item_done(value.raw, current_response_id),
         "response.completed" => Ok(vec![ProviderEvent::Completed {
-            provider_response_id: value
-                .response
-                .and_then(|response| response.id)
-                .or(value.response_id),
+            provider_response_id: value.response_id(),
         }]),
         "error" => Ok(vec![ProviderEvent::Failed(
             value
@@ -262,6 +258,7 @@ fn parse_output_item_done(
         ProviderFunctionCall {
             response_id,
             item_id: item.get("id").and_then(Value::as_str).map(str::to_string),
+            item: item.clone(),
             call_id,
             name,
             arguments_raw,
@@ -298,6 +295,16 @@ struct OpenAIEvent {
     error: Option<OpenAIError>,
     #[serde(flatten)]
     raw: Value,
+}
+
+impl OpenAIEvent {
+    fn response_id(&self) -> Option<String> {
+        self.response
+            .as_ref()
+            .and_then(|response| response.id.clone())
+            .or_else(|| self.response_id.clone())
+            .or_else(|| response_id_from_value(&self.raw))
+    }
 }
 
 #[derive(Debug, Deserialize)]

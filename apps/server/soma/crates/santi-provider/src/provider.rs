@@ -34,6 +34,7 @@ pub struct ProviderFunctionTool {
 
 #[derive(Debug, Clone)]
 pub struct FunctionCallOutput {
+    pub call: ProviderFunctionCall,
     pub call_id: String,
     pub output: String,
 }
@@ -42,6 +43,7 @@ pub struct FunctionCallOutput {
 pub struct ProviderFunctionCall {
     pub response_id: String,
     pub item_id: Option<String>,
+    pub item: Value,
     pub call_id: String,
     pub name: String,
     pub arguments_raw: String,

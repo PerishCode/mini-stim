@@ -34,6 +34,13 @@ impl ProviderClient for FakeProvider {
                 Ok(ProviderEvent::FunctionCallRequested(ProviderFunctionCall {
                     response_id: "resp_tool".to_string(),
                     item_id: Some("item_tool".to_string()),
+                    item: json!({
+                        "type": "function_call",
+                        "id": "item_tool",
+                        "call_id": "call_shell",
+                        "name": "shell",
+                        "arguments": r#"{"command":"printf tool-ok"}"#,
+                    }),
                     call_id: "call_shell".to_string(),
                     name: "shell".to_string(),
                     arguments_raw: r#"{"command":"printf tool-ok"}"#.to_string(),
@@ -163,6 +170,6 @@ async fn dispatches_tools() {
 
     let requests = provider.requests.lock().unwrap();
     assert_eq!(requests.len(), 2);
-    assert!(requests[1].previous_response_id.is_some());
+    assert!(requests[1].previous_response_id.is_none());
     assert!(requests[1].function_call_outputs.is_some());
 }
