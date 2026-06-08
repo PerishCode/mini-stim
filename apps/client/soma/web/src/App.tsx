@@ -1,61 +1,67 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Composer } from "@mini-stim/components";
-import type {
-  ConversationDetail,
-  ConversationSummary,
-  MessageRecord,
-  StreamEvent,
-} from "@mini-stim/contracts";
-
-const API_BASE = import.meta.env.VITE_SANTI_API_URL ?? "http://127.0.0.1:43307";
+import {
+  useMessageConnection,
+  useSelectedSessionId,
+  useSessionActions,
+  useSessionError,
+  useSessionPending,
+  useSessionTimeline,
+  useSessions,
+  type TimelineItem,
+} from "@mini-stim/hooks";
 
 export function App() {
-  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<MessageRecord[]>([]);
+  const sessions = useSessions();
+  const selectedSessionId = useSelectedSessionId();
+  const timeline = useSessionTimeline();
+  const pending = useSessionPending();
+  const sessionError = useSessionError();
+  const connection = useMessageConnection();
+  const actions = useSessionActions();
   const [draft, setDraft] = useState("");
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    void refreshConversations(setConversations);
-  }, []);
-
-  useEffect(() => {
-    if (!selectedId) {
-      setMessages([]);
-      return;
-    }
-    void loadConversation(selectedId, setMessages, setError);
-  }, [selectedId]);
-
+  const busy = pending > 0;
+  const visibleError = error ?? sessionError?.message ?? null;
   const selectedTitle = useMemo(() => {
-    return (
-      conversations.find((conversation) => conversation.conversation_id === selectedId)
-        ?.title ?? "New conversation"
-    );
-  }, [conversations, selectedId]);
+    const selected = sessions.find((session) => session.id === selectedSessionId);
+    return selected ? sessionLabel(selected) : "New session";
+  }, [selectedSessionId, sessions]);
 
-  async function send() {
+  function createNewSession() {
+    setError(null);
+    try {
+      actions.create();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    }
+  }
+
+  function selectSession(sessionId: string) {
+    setError(null);
+    try {
+      actions.selectAndGet(sessionId);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    }
+  }
+
+  function send() {
     const text = draft.trim();
     if (!text || busy) {
       return;
     }
-    setBusy(true);
     setError(null);
     setDraft("");
     try {
-      await streamMessage(
-        { conversation_id: selectedId, text },
-        (event) => {
-          applyStreamEvent(event, setSelectedId, setMessages);
-        },
-      );
-      await refreshConversations(setConversations);
+      actions.send({
+        sessionId: selectedSessionId,
+        content: [{ type: "text", text }],
+      });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
-    } finally {
-      setBusy(false);
+      setDraft(text);
     }
   }
 
@@ -64,24 +70,20 @@ export function App() {
       <aside className="rail">
         <div className="railHeader">
           <h1>mini-stim</h1>
-          <button type="button" onClick={() => setSelectedId(null)}>
+          <button type="button" onClick={createNewSession} disabled={busy}>
             New
           </button>
         </div>
         <nav className="conversationList">
-          {conversations.map((conversation) => (
+          {sessions.map((session) => (
             <button
               type="button"
-              key={conversation.conversation_id}
-              className={
-                conversation.conversation_id === selectedId ? "selected" : ""
-              }
-              onClick={() => setSelectedId(conversation.conversation_id)}
+              key={session.id}
+              className={session.id === selectedSessionId ? "selected" : ""}
+              onClick={() => selectSession(session.id)}
             >
-              <span>{conversation.title ?? "Untitled"}</span>
-              {conversation.last_message_preview ? (
-                <small>{conversation.last_message_preview}</small>
-              ) : null}
+              <span>{sessionLabel(session)}</span>
+              <small>{session.updated_at}</small>
             </button>
           ))}
         </nav>
@@ -89,120 +91,73 @@ export function App() {
       <section className="chat">
         <header className="chatHeader">
           <h2>{selectedTitle}</h2>
-          {busy ? <span>Streaming</span> : null}
+          {busy ? <span>Sending</span> : null}
+          {selectedSessionId ? <span>{connection}</span> : null}
         </header>
         <div className="transcript">
-          {messages.map((message) => (
-            <article key={message.message_id} className={`message ${message.role}`}>
-              <div>{message.text}</div>
-              {message.state === "failed" && message.error ? (
-                <small>{message.error}</small>
-              ) : null}
-            </article>
-          ))}
-          {!messages.length ? <div className="empty">Start a conversation</div> : null}
+          {timeline.map((item) => renderTimelineItem(item))}
+          {!timeline.length ? <div className="empty">Start a session</div> : null}
         </div>
-        {error ? <div className="error">{error}</div> : null}
+        {visibleError ? <div className="error">{visibleError}</div> : null}
         <Composer value={draft} disabled={busy} onChange={setDraft} onSubmit={send} />
       </section>
     </main>
   );
 }
 
-async function refreshConversations(
-  setConversations: (items: ConversationSummary[]) => void,
-) {
-  const response = await fetch(`${API_BASE}/api/conversations`);
-  if (!response.ok) {
-    throw new Error(`conversation list failed: ${response.status}`);
-  }
-  setConversations((await response.json()) as ConversationSummary[]);
+function sessionLabel(session: { id: string; title?: string | null }) {
+  return session.title?.trim() || session.id;
 }
 
-async function loadConversation(
-  conversationId: string,
-  setMessages: (items: MessageRecord[]) => void,
-  setError: (error: string | null) => void,
-) {
-  const response = await fetch(`${API_BASE}/api/conversations/${conversationId}`);
-  if (!response.ok) {
-    setError(`conversation load failed: ${response.status}`);
-    return;
+function renderTimelineItem(item: TimelineItem) {
+  if (item.kind === "message") {
+    const role = item.message.message.actor_type;
+    return (
+      <article key={item.id} className={`message role-${role}`}>
+        <div>{item.message.content_text}</div>
+      </article>
+    );
   }
-  const detail = (await response.json()) as ConversationDetail;
-  setMessages(detail.messages);
+
+  if (item.kind === "tool_call") {
+    const result = item.toolResult;
+    const failed = Boolean(result?.error_text);
+    return (
+      <article key={item.id} className={`toolBlock ${failed ? "failed" : ""}`}>
+        <header>
+          <span>{item.toolCall.tool_name}</span>
+          <small>{result ? (failed ? "failed" : "completed") : "running"}</small>
+        </header>
+        <pre>{formatJson(item.toolCall.arguments)}</pre>
+        {result ? (
+          <pre className="toolOutput">
+            {result.error_text ?? formatJson(result.output)}
+          </pre>
+        ) : null}
+      </article>
+    );
+  }
+
+  const failed = Boolean(item.toolResult.error_text);
+  return (
+    <article key={item.id} className={`toolBlock ${failed ? "failed" : ""}`}>
+      <header>
+        <span>tool result</span>
+        <small>{failed ? "failed" : "completed"}</small>
+      </header>
+      <pre className="toolOutput">
+        {item.toolResult.error_text ?? formatJson(item.toolResult.output)}
+      </pre>
+    </article>
+  );
 }
 
-async function streamMessage(
-  request: { conversation_id: string | null; text: string },
-  onEvent: (event: StreamEvent) => void,
-) {
-  const response = await fetch(`${API_BASE}/api/messages/stream`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(request),
-  });
-  if (!response.ok || !response.body) {
-    throw new Error(`message stream failed: ${response.status}`);
+function formatJson(value: unknown) {
+  if (value === null || value === undefined) {
+    return "";
   }
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  while (true) {
-    const read = await reader.read();
-    if (read.done) {
-      break;
-    }
-    buffer += decoder.decode(read.value, { stream: true });
-    let index = buffer.indexOf("\n");
-    while (index >= 0) {
-      const line = buffer.slice(0, index).trimEnd();
-      buffer = buffer.slice(index + 1);
-      const payload = line.startsWith("data: ") ? line.slice(6) : null;
-      if (payload) {
-        onEvent(JSON.parse(payload) as StreamEvent);
-      }
-      index = buffer.indexOf("\n");
-    }
+  if (typeof value === "string") {
+    return value;
   }
-}
-
-function applyStreamEvent(
-  event: StreamEvent,
-  setSelectedId: (id: string) => void,
-  setMessages: React.Dispatch<React.SetStateAction<MessageRecord[]>>,
-) {
-  if (event.type === "accepted") {
-    setSelectedId(event.accepted.conversation_id);
-    setMessages((messages) => [
-      ...messages,
-      event.accepted.user_message,
-      event.accepted.assistant_message,
-    ]);
-  }
-  if (event.type === "text-delta") {
-    setMessages((messages) =>
-      messages.map((message) =>
-        message.message_id === event.message_id
-          ? { ...message, text: message.text + event.delta }
-          : message,
-      ),
-    );
-  }
-  if (event.type === "message-completed") {
-    setMessages((messages) =>
-      messages.map((message) =>
-        message.message_id === event.message.message_id ? event.message : message,
-      ),
-    );
-  }
-  if (event.type === "failed") {
-    setMessages((messages) =>
-      messages.map((message) =>
-        message.message_id === event.message_id
-          ? { ...message, state: "failed", error: event.error }
-          : message,
-      ),
-    );
-  }
+  return JSON.stringify(value, null, 2);
 }

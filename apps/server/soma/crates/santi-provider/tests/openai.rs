@@ -7,8 +7,8 @@ use std::{
 
 use futures_util::StreamExt;
 use santi_provider::{
-    OpenAIProvider, OpenAIProviderConfig, ProviderClient, ProviderEvent, ProviderMessage,
-    ProviderRequest,
+    OpenAIProvider, OpenAIProviderConfig, ProviderClient, ProviderEvent, ProviderFunctionTool,
+    ProviderMessage, ProviderRequest, ProviderTool,
 };
 use serde_json::Value;
 
@@ -26,7 +26,11 @@ async fn optional_params_sent() {
     assert_eq!(body["reasoning"]["effort"], "medium");
     assert_eq!(body["max_output_tokens"], 4096);
     assert_eq!(body["stream"], true);
+    assert_eq!(body["store"], false);
     assert_eq!(body["stream_options"]["include_obfuscation"], false);
+    assert_eq!(body["instructions"], "system guidance");
+    assert_eq!(body["input"][0]["content"][0]["type"], "input_text");
+    assert_eq!(body["tools"][0]["name"], "shell");
 }
 
 #[tokio::test]
@@ -42,6 +46,38 @@ async fn optional_params_omitted() {
 
     assert!(body.get("reasoning").is_none());
     assert!(body.get("max_output_tokens").is_none());
+    assert_eq!(body["store"], false);
+}
+
+#[tokio::test]
+async fn plain_requests_unstored() {
+    let body = capture_body_without_tools(OpenAIProviderConfig {
+        api_key: "test-key".to_string(),
+        model: "gpt-4.1".to_string(),
+        base_url: String::new(),
+        reasoning_effort: None,
+        max_output_tokens: None,
+    })
+    .await;
+
+    assert_eq!(body["store"], false);
+}
+
+#[tokio::test]
+async fn parses_call_response_id() {
+    let events = capture_events(vec![
+        r#"data: {"type":"response.created","response":{"id":"resp_tool"}}"#,
+        r#"data: {"type":"response.output_item.done","item":{"type":"function_call","id":"item_shell","call_id":"call_shell","name":"shell","arguments":"{\"cmd\":\"pwd\"}"}}"#,
+    ])
+    .await;
+
+    assert!(matches!(
+        events.as_slice(),
+        [ProviderEvent::FunctionCallRequested(call)]
+            if call.response_id == "resp_tool"
+                && call.call_id == "call_shell"
+                && call.name == "shell"
+    ));
 }
 
 async fn capture_body(mut config: OpenAIProviderConfig) -> Value {
@@ -68,10 +104,18 @@ async fn capture_body(mut config: OpenAIProviderConfig) -> Value {
     let mut stream = provider
         .stream_response(ProviderRequest {
             model: provider.metadata().model,
+            instructions: Some("system guidance".to_string()),
             input: vec![ProviderMessage {
                 role: "user".to_string(),
                 content: "hello".to_string(),
             }],
+            tools: Some(vec![ProviderTool::Function(ProviderFunctionTool {
+                name: "shell".to_string(),
+                description: "run shell".to_string(),
+                parameters: serde_json::json!({ "type": "object" }),
+            })]),
+            previous_response_id: None,
+            function_call_outputs: None,
         })
         .await
         .expect("stream response");
@@ -83,6 +127,97 @@ async fn capture_body(mut config: OpenAIProviderConfig) -> Value {
     let body = rx.recv().expect("receive request body");
     server.join().expect("server thread");
     serde_json::from_slice(&body).expect("json request")
+}
+
+async fn capture_body_without_tools(mut config: OpenAIProviderConfig) -> Value {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
+    config.base_url = format!("http://{}", listener.local_addr().expect("local address"));
+    let (tx, rx) = mpsc::channel();
+    let server = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("accept request");
+        let body = read_body(&mut stream);
+        tx.send(body).expect("send request body");
+        let event = r#"data: {"type":"response.completed","response":{"id":"resp_test"}}"#;
+        let response_body = format!("{event}\n\n");
+        let response = format!(
+            "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ncontent-length: {}\r\n\r\n{}",
+            response_body.len(),
+            response_body
+        );
+        stream
+            .write_all(response.as_bytes())
+            .expect("write response");
+    });
+
+    let provider = OpenAIProvider::new(config);
+    let mut stream = provider
+        .stream_response(ProviderRequest {
+            model: provider.metadata().model,
+            instructions: Some("system guidance".to_string()),
+            input: vec![ProviderMessage {
+                role: "user".to_string(),
+                content: "hello".to_string(),
+            }],
+            tools: None,
+            previous_response_id: None,
+            function_call_outputs: None,
+        })
+        .await
+        .expect("stream response");
+    assert!(matches!(
+        stream.next().await,
+        Some(Ok(ProviderEvent::Completed { .. }))
+    ));
+
+    let body = rx.recv().expect("receive request body");
+    server.join().expect("server thread");
+    serde_json::from_slice(&body).expect("json request")
+}
+
+async fn capture_events(lines: Vec<&'static str>) -> Vec<ProviderEvent> {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
+    let config = OpenAIProviderConfig {
+        api_key: "test-key".to_string(),
+        model: "gpt-5.5".to_string(),
+        base_url: format!("http://{}", listener.local_addr().expect("local address")),
+        reasoning_effort: None,
+        max_output_tokens: None,
+    };
+    let server = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("accept request");
+        let _ = read_body(&mut stream);
+        let response_body = format!("{}\n\n", lines.join("\n\n"));
+        let response = format!(
+            "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ncontent-length: {}\r\n\r\n{}",
+            response_body.len(),
+            response_body
+        );
+        stream
+            .write_all(response.as_bytes())
+            .expect("write response");
+    });
+
+    let provider = OpenAIProvider::new(config);
+    let mut stream = provider
+        .stream_response(ProviderRequest {
+            model: provider.metadata().model,
+            instructions: None,
+            input: vec![ProviderMessage {
+                role: "user".to_string(),
+                content: "hello".to_string(),
+            }],
+            tools: None,
+            previous_response_id: None,
+            function_call_outputs: None,
+        })
+        .await
+        .expect("stream response");
+    let mut events = Vec::new();
+    while let Some(event) = stream.next().await {
+        events.push(event.expect("provider event"));
+    }
+    server.join().expect("server thread");
+    events
 }
 
 fn read_body(stream: &mut impl Read) -> Vec<u8> {

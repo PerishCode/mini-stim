@@ -1,8 +1,8 @@
 mod model;
 mod service;
+mod service_prompt;
 mod store;
-mod store_rows;
 
 pub use model::*;
-pub use service::{ChatService, ChatServiceConfig};
-pub use store::ChatStore;
+pub use service::{SantiService, SantiServiceConfig};
+pub use store::SantiStore;

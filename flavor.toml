@@ -11,6 +11,9 @@ include = [
   "packages/components/src/**/*.ts",
   "packages/components/src/**/*.tsx",
   "packages/contracts/src/index.ts",
+  "packages/hooks/src/**/*.ts",
+  "packages/hooks/src/**/*.tsx",
+  "packages/mqueue/src/**/*.ts",
 ]
 exclude = [
   "**/node_modules/**",

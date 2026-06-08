@@ -21,7 +21,7 @@ async fn main() -> Result<(), TransportError> {
     let mut child = spawn_server_soma(&context, &port, &db_path, &log_path)?;
     let pid = child.id();
 
-    match wait_for_health(&format!("{url}/api/health"), Duration::from_secs(45)).await {
+    match wait_for_health(&format!("{url}/api/v1/health"), Duration::from_secs(45)).await {
         Ok(()) => print_ready("server", &url, &context.endpoint, pid),
         Err(error) => {
             let _ = child.start_kill();

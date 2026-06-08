@@ -10,10 +10,28 @@
     "version": "0.1.0"
   },
   "paths": {
-    "/api/conversations": {
+    "/api/v1/health": {
       "get": {
         "tags": [],
-        "operationId": "list_conversations",
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions": {
+      "get": {
+        "tags": [],
+        "operationId": "list_sessions",
         "responses": {
           "200": {
             "description": "",
@@ -22,8 +40,34 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/ConversationSummary"
+                    "$ref": "#/components/schemas/Session"
                   }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [],
+        "operationId": "create_session",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateSessionResponse"
                 }
               }
             }
@@ -41,13 +85,13 @@
         }
       }
     },
-    "/api/conversations/{conversation_id}": {
+    "/api/v1/sessions/{session_id}": {
       "get": {
         "tags": [],
-        "operationId": "get_conversation",
+        "operationId": "get_session",
         "parameters": [
           {
-            "name": "conversation_id",
+            "name": "session_id",
             "in": "path",
             "required": true,
             "schema": {
@@ -61,7 +105,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ConversationDetail"
+                  "$ref": "#/components/schemas/SessionDetail"
                 }
               }
             }
@@ -89,17 +133,50 @@
         }
       }
     },
-    "/api/health": {
+    "/api/v1/sessions/{session_id}/messages": {
       "get": {
         "tags": [],
-        "operationId": "health",
+        "operationId": "list_messages",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HealthResponse"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SessionMessage"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -107,15 +184,73 @@
         }
       }
     },
-    "/api/messages/stream": {
+    "/api/v1/sessions/{session_id}/runtime": {
+      "get": {
+        "tags": [],
+        "operationId": "runtime_snapshot",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionRuntimeSnapshot"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{session_id}/send": {
       "post": {
         "tags": [],
-        "operationId": "stream_message",
+        "operationId": "send_session",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SendMessageRequest"
+                "$ref": "#/components/schemas/SendSessionRequest"
               }
             }
           },
@@ -123,7 +258,24 @@
         },
         "responses": {
           "200": {
-            "description": "Server-sent stream of StreamEvent JSON payloads"
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SendSessionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           },
           "500": {
             "description": "",
@@ -141,52 +293,55 @@
   },
   "components": {
     "schemas": {
-      "ConversationDetail": {
-        "type": "object",
-        "required": [
-          "conversation",
-          "messages"
-        ],
-        "properties": {
-          "conversation": {
-            "$ref": "#/components/schemas/ConversationSummary"
-          },
-          "messages": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MessageRecord"
-            }
-          }
-        }
+      "ActorType": {
+        "type": "string",
+        "enum": [
+          "account",
+          "soul",
+          "system"
+        ]
       },
-      "ConversationSummary": {
+      "Compact": {
         "type": "object",
         "required": [
-          "conversation_id",
-          "created_at",
-          "updated_at"
+          "id",
+          "turn_id",
+          "summary",
+          "start_session_seq",
+          "end_session_seq",
+          "created_at"
         ],
         "properties": {
-          "conversation_id": {
-            "$ref": "#/components/schemas/String"
-          },
           "created_at": {
             "$ref": "#/components/schemas/String"
           },
-          "last_message_preview": {
-            "type": [
-              "string",
-              "null"
-            ]
+          "end_session_seq": {
+            "type": "integer",
+            "format": "int64"
           },
-          "title": {
-            "type": [
-              "string",
-              "null"
-            ]
+          "id": {
+            "type": "string"
           },
-          "updated_at": {
-            "$ref": "#/components/schemas/String"
+          "start_session_seq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "turn_id": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateSessionResponse": {
+        "type": "object",
+        "required": [
+          "session"
+        ],
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/Session"
           }
         }
       },
@@ -220,19 +375,32 @@
           }
         }
       },
-      "MessageRecord": {
+      "Message": {
         "type": "object",
         "required": [
-          "message_id",
-          "conversation_id",
-          "role",
+          "id",
+          "actor_type",
+          "actor_id",
+          "content",
           "state",
+          "version",
           "created_at",
-          "updated_at",
-          "text"
+          "updated_at"
         ],
         "properties": {
-          "completed_at": {
+          "actor_id": {
+            "type": "string"
+          },
+          "actor_type": {
+            "$ref": "#/components/schemas/ActorType"
+          },
+          "content": {
+            "$ref": "#/components/schemas/MessageContent"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/String"
+          },
+          "deleted_at": {
             "oneOf": [
               {
                 "type": "null"
@@ -242,28 +410,245 @@
               }
             ]
           },
-          "conversation_id": {
+          "id": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/MessageState"
+          },
+          "updated_at": {
             "$ref": "#/components/schemas/String"
           },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "MessageContent": {
+        "type": "object",
+        "required": [
+          "parts"
+        ],
+        "properties": {
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessagePart"
+            }
+          }
+        }
+      },
+      "MessagePart": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "text",
+              "type"
+            ],
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "mime_type",
+              "data_base64",
+              "type"
+            ],
+            "properties": {
+              "data_base64": {
+                "type": "string"
+              },
+              "mime_type": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "image"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "MessageState": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "fixed"
+        ]
+      },
+      "SendSessionRequest": {
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessagePart"
+            }
+          }
+        }
+      },
+      "SendSessionResponse": {
+        "type": "object",
+        "required": [
+          "session",
+          "soul_session",
+          "turn",
+          "user_message",
+          "assistant_message",
+          "tool_calls",
+          "tool_results"
+        ],
+        "properties": {
+          "assistant_message": {
+            "$ref": "#/components/schemas/SessionMessage"
+          },
+          "session": {
+            "$ref": "#/components/schemas/Session"
+          },
+          "soul_session": {
+            "$ref": "#/components/schemas/SoulSession"
+          },
+          "tool_calls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolCall"
+            }
+          },
+          "tool_results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolResult"
+            }
+          },
+          "turn": {
+            "$ref": "#/components/schemas/Turn"
+          },
+          "user_message": {
+            "$ref": "#/components/schemas/SessionMessage"
+          }
+        }
+      },
+      "Session": {
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
           "created_at": {
             "$ref": "#/components/schemas/String"
           },
-          "error": {
+          "fork_point": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "id": {
+            "type": "string"
+          },
+          "parent_session_id": {
             "type": [
               "string",
               "null"
             ]
           },
-          "message_id": {
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/String"
+          }
+        }
+      },
+      "SessionDetail": {
+        "type": "object",
+        "required": [
+          "session",
+          "messages"
+        ],
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SessionMessage"
+            }
+          },
+          "session": {
+            "$ref": "#/components/schemas/Session"
+          }
+        }
+      },
+      "SessionEffect": {
+        "type": "object",
+        "required": [
+          "id",
+          "session_id",
+          "effect_type",
+          "idempotency_key",
+          "status",
+          "source_hook_id",
+          "source_turn_id",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
             "$ref": "#/components/schemas/String"
           },
-          "role": {
-            "$ref": "#/components/schemas/MessageRole"
+          "effect_type": {
+            "type": "string"
           },
-          "state": {
-            "$ref": "#/components/schemas/MessageState"
+          "error_text": {
+            "type": [
+              "string",
+              "null"
+            ]
           },
-          "text": {
+          "id": {
+            "type": "string"
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "result_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "source_hook_id": {
+            "type": "string"
+          },
+          "source_turn_id": {
+            "type": "string"
+          },
+          "status": {
             "type": "string"
           },
           "updated_at": {
@@ -271,60 +656,255 @@
           }
         }
       },
-      "MessageRole": {
-        "type": "string",
-        "enum": [
-          "user",
-          "assistant"
-        ]
-      },
-      "MessageState": {
-        "type": "string",
-        "enum": [
-          "created",
-          "streaming",
-          "completed",
-          "failed"
-        ]
-      },
-      "SendMessageAccepted": {
+      "SessionMessage": {
         "type": "object",
         "required": [
-          "conversation_id",
-          "user_message_id",
-          "assistant_message_id",
-          "response_run_id",
-          "user_message",
-          "assistant_message"
+          "relation",
+          "message",
+          "content_text"
         ],
         "properties": {
-          "assistant_message": {
-            "$ref": "#/components/schemas/MessageRecord"
+          "content_text": {
+            "type": "string"
           },
-          "assistant_message_id": {
+          "message": {
+            "$ref": "#/components/schemas/Message"
+          },
+          "relation": {
+            "$ref": "#/components/schemas/SessionMessageRef"
+          }
+        }
+      },
+      "SessionMessageRef": {
+        "type": "object",
+        "required": [
+          "session_id",
+          "message_id",
+          "session_seq",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
             "$ref": "#/components/schemas/String"
           },
-          "conversation_id": {
+          "message_id": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "session_seq": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "SessionRuntimeSnapshot": {
+        "type": "object",
+        "required": [
+          "session",
+          "messages",
+          "turns",
+          "tool_calls",
+          "tool_results",
+          "compacts",
+          "effects"
+        ],
+        "properties": {
+          "compacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Compact"
+            }
+          },
+          "effects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SessionEffect"
+            }
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SessionMessage"
+            }
+          },
+          "session": {
+            "$ref": "#/components/schemas/Session"
+          },
+          "soul_session": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SoulSession"
+              }
+            ]
+          },
+          "tool_calls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolCall"
+            }
+          },
+          "tool_results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolResult"
+            }
+          },
+          "turns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Turn"
+            }
+          }
+        }
+      },
+      "SoulSession": {
+        "type": "object",
+        "required": [
+          "id",
+          "soul_id",
+          "session_id",
+          "session_memory",
+          "next_seq",
+          "last_seen_session_seq",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
             "$ref": "#/components/schemas/String"
           },
-          "response_run_id": {
-            "$ref": "#/components/schemas/String"
+          "fork_point": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
           },
-          "user_message": {
-            "$ref": "#/components/schemas/MessageRecord"
+          "id": {
+            "type": "string"
           },
-          "user_message_id": {
+          "last_seen_session_seq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "next_seq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "parent_soul_session_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider_state": {},
+          "session_id": {
+            "type": "string"
+          },
+          "session_memory": {
+            "type": "string"
+          },
+          "soul_id": {
+            "type": "string"
+          },
+          "updated_at": {
             "$ref": "#/components/schemas/String"
           }
         }
       },
-      "SendMessageRequest": {
+      "String": {
+        "type": "string"
+      },
+      "ToolCall": {
         "type": "object",
         "required": [
-          "text"
+          "id",
+          "turn_id",
+          "tool_name",
+          "arguments",
+          "created_at"
         ],
         "properties": {
-          "conversation_id": {
+          "arguments": {},
+          "created_at": {
+            "$ref": "#/components/schemas/String"
+          },
+          "id": {
+            "type": "string"
+          },
+          "tool_name": {
+            "type": "string"
+          },
+          "turn_id": {
+            "type": "string"
+          }
+        }
+      },
+      "ToolResult": {
+        "type": "object",
+        "required": [
+          "id",
+          "tool_call_id",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "$ref": "#/components/schemas/String"
+          },
+          "error_text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "output": {},
+          "tool_call_id": {
+            "type": "string"
+          }
+        }
+      },
+      "Turn": {
+        "type": "object",
+        "required": [
+          "id",
+          "soul_session_id",
+          "trigger_type",
+          "input_through_session_seq",
+          "base_soul_session_seq",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "base_soul_session_seq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/String"
+          },
+          "end_soul_session_seq": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "error_text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finished_at": {
             "oneOf": [
               {
                 "type": "null"
@@ -334,115 +914,47 @@
               }
             ]
           },
-          "text": {
+          "id": {
             "type": "string"
+          },
+          "input_through_session_seq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "soul_session_id": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TurnStatus"
+          },
+          "trigger_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trigger_type": {
+            "$ref": "#/components/schemas/TurnTriggerType"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/String"
           }
         }
       },
-      "StreamEvent": {
-        "oneOf": [
-          {
-            "type": "object",
-            "required": [
-              "accepted",
-              "type"
-            ],
-            "properties": {
-              "accepted": {
-                "$ref": "#/components/schemas/SendMessageAccepted"
-              },
-              "type": {
-                "type": "string",
-                "enum": [
-                  "accepted"
-                ]
-              }
-            }
-          },
-          {
-            "type": "object",
-            "required": [
-              "conversation_id",
-              "message_id",
-              "delta",
-              "type"
-            ],
-            "properties": {
-              "conversation_id": {
-                "$ref": "#/components/schemas/String"
-              },
-              "delta": {
-                "type": "string"
-              },
-              "message_id": {
-                "$ref": "#/components/schemas/String"
-              },
-              "type": {
-                "type": "string",
-                "enum": [
-                  "text-delta"
-                ]
-              }
-            }
-          },
-          {
-            "type": "object",
-            "required": [
-              "conversation_id",
-              "message",
-              "type"
-            ],
-            "properties": {
-              "conversation_id": {
-                "$ref": "#/components/schemas/String"
-              },
-              "message": {
-                "$ref": "#/components/schemas/MessageRecord"
-              },
-              "provider_response_id": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "type": {
-                "type": "string",
-                "enum": [
-                  "message-completed"
-                ]
-              }
-            }
-          },
-          {
-            "type": "object",
-            "required": [
-              "conversation_id",
-              "message_id",
-              "error",
-              "type"
-            ],
-            "properties": {
-              "conversation_id": {
-                "$ref": "#/components/schemas/String"
-              },
-              "error": {
-                "type": "string"
-              },
-              "message_id": {
-                "$ref": "#/components/schemas/String"
-              },
-              "type": {
-                "type": "string",
-                "enum": [
-                  "failed"
-                ]
-              }
-            }
-          }
+      "TurnStatus": {
+        "type": "string",
+        "enum": [
+          "running",
+          "completed",
+          "failed"
         ]
       },
-      "String": {
-        "type": "string"
+      "TurnTriggerType": {
+        "type": "string",
+        "enum": [
+          "session_send",
+          "system"
+        ]
       }
     }
   }

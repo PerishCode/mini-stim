@@ -12,6 +12,7 @@ futures-util.workspace = true
 rusqlite.workspace = true
 santi-provider.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 tokio.workspace = true
 utoipa.workspace = true
 uuid.workspace = true

@@ -4,50 +4,39 @@
  * mini-stim-server-soma
  * OpenAPI spec version: 0.1.0
  */
+export type ActorType = (typeof ActorType)[keyof typeof ActorType];
+
+export const ActorType = {
+  account: "account",
+  soul: "soul",
+  system: "system",
+} as const;
+
 export type String = string;
 
-export interface ConversationSummary {
-  conversation_id: String;
+export interface Compact {
+  created_at: String;
+  end_session_seq: number;
+  id: string;
+  start_session_seq: number;
+  summary: string;
+  turn_id: string;
+}
+
+export interface Session {
   created_at: String;
   /** @nullable */
-  last_message_preview?: string | null;
+  fork_point?: number | null;
+  id: string;
+  /** @nullable */
+  parent_session_id?: string | null;
   /** @nullable */
   title?: string | null;
   updated_at: String;
 }
 
-export type MessageRole = (typeof MessageRole)[keyof typeof MessageRole];
-
-export const MessageRole = {
-  user: "user",
-  assistant: "assistant",
-} as const;
-
-export type MessageState = (typeof MessageState)[keyof typeof MessageState];
-
-export const MessageState = {
-  created: "created",
-  streaming: "streaming",
-  completed: "completed",
-  failed: "failed",
-} as const;
-
-export interface MessageRecord {
-  completed_at?: null | String;
-  conversation_id: String;
-  created_at: String;
-  /** @nullable */
-  error?: string | null;
-  message_id: String;
-  role: MessageRole;
-  state: MessageState;
-  text: string;
-  updated_at: String;
-}
-
-export interface ConversationDetail {
-  conversation: ConversationSummary;
-  messages: MessageRecord[];
+export interface CreateSessionResponse {
+  session: Session;
 }
 
 export interface ErrorResponse {
@@ -60,139 +49,165 @@ export interface HealthResponse {
   service: string;
 }
 
-export interface SendMessageAccepted {
-  assistant_message: MessageRecord;
-  assistant_message_id: String;
-  conversation_id: String;
-  response_run_id: String;
-  user_message: MessageRecord;
-  user_message_id: String;
-}
-
-export interface SendMessageRequest {
-  conversation_id?: null | String;
-  text: string;
-}
-
-export type StreamEvent =
+export type MessagePart =
   | {
-      accepted: SendMessageAccepted;
-      type: "accepted";
+      text: string;
+      type: "text";
     }
   | {
-      conversation_id: String;
-      delta: string;
-      message_id: String;
-      type: "text-delta";
-    }
-  | {
-      conversation_id: String;
-      message: MessageRecord;
-      /** @nullable */
-      provider_response_id?: string | null;
-      type: "message-completed";
-    }
-  | {
-      conversation_id: String;
-      error: string;
-      message_id: String;
-      type: "failed";
+      data_base64: string;
+      mime_type: string;
+      type: "image";
     };
 
-export type listConversationsResponse200 = {
-  data: ConversationSummary[];
-  status: 200;
-};
+export interface MessageContent {
+  parts: MessagePart[];
+}
 
-export type listConversationsResponse500 = {
-  data: ErrorResponse;
-  status: 500;
-};
+export type MessageState = (typeof MessageState)[keyof typeof MessageState];
 
-export type listConversationsResponseSuccess = listConversationsResponse200 & {
-  headers: Headers;
-};
-export type listConversationsResponseError = listConversationsResponse500 & {
-  headers: Headers;
-};
+export const MessageState = {
+  pending: "pending",
+  fixed: "fixed",
+} as const;
 
-export type listConversationsResponse =
-  | listConversationsResponseSuccess
-  | listConversationsResponseError;
+export interface Message {
+  actor_id: string;
+  actor_type: ActorType;
+  content: MessageContent;
+  created_at: String;
+  deleted_at?: null | String;
+  id: string;
+  state: MessageState;
+  updated_at: String;
+  version: number;
+}
 
-export const getListConversationsUrl = () => {
-  return `/api/conversations`;
-};
+export interface SendSessionRequest {
+  content: MessagePart[];
+}
 
-export const listConversations = async (
-  options?: RequestInit,
-): Promise<listConversationsResponse> => {
-  const res = await fetch(getListConversationsUrl(), {
-    ...options,
-    method: "GET",
-  });
+export interface SessionMessageRef {
+  created_at: String;
+  message_id: string;
+  session_id: string;
+  session_seq: number;
+}
 
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+export interface SessionMessage {
+  content_text: string;
+  message: Message;
+  relation: SessionMessageRef;
+}
 
-  const data: listConversationsResponse["data"] = body ? JSON.parse(body) : {};
-  return {
-    data,
-    status: res.status,
-    headers: res.headers,
-  } as listConversationsResponse;
-};
+export interface SoulSession {
+  created_at: String;
+  /** @nullable */
+  fork_point?: number | null;
+  id: string;
+  last_seen_session_seq: number;
+  next_seq: number;
+  /** @nullable */
+  parent_soul_session_id?: string | null;
+  provider_state?: unknown;
+  session_id: string;
+  session_memory: string;
+  soul_id: string;
+  updated_at: String;
+}
 
-export type getConversationResponse200 = {
-  data: ConversationDetail;
-  status: 200;
-};
+export interface ToolCall {
+  arguments: unknown;
+  created_at: String;
+  id: string;
+  tool_name: string;
+  turn_id: string;
+}
 
-export type getConversationResponse404 = {
-  data: ErrorResponse;
-  status: 404;
-};
+export interface ToolResult {
+  created_at: String;
+  /** @nullable */
+  error_text?: string | null;
+  id: string;
+  output?: unknown;
+  tool_call_id: string;
+}
 
-export type getConversationResponse500 = {
-  data: ErrorResponse;
-  status: 500;
-};
+export type TurnStatus = (typeof TurnStatus)[keyof typeof TurnStatus];
 
-export type getConversationResponseSuccess = getConversationResponse200 & {
-  headers: Headers;
-};
-export type getConversationResponseError = (
-  | getConversationResponse404
-  | getConversationResponse500
-) & {
-  headers: Headers;
-};
+export const TurnStatus = {
+  running: "running",
+  completed: "completed",
+  failed: "failed",
+} as const;
 
-export type getConversationResponse =
-  | getConversationResponseSuccess
-  | getConversationResponseError;
+export type TurnTriggerType =
+  (typeof TurnTriggerType)[keyof typeof TurnTriggerType];
 
-export const getGetConversationUrl = (conversationId: string) => {
-  return `/api/conversations/${conversationId}`;
-};
+export const TurnTriggerType = {
+  session_send: "session_send",
+  system: "system",
+} as const;
 
-export const getConversation = async (
-  conversationId: string,
-  options?: RequestInit,
-): Promise<getConversationResponse> => {
-  const res = await fetch(getGetConversationUrl(conversationId), {
-    ...options,
-    method: "GET",
-  });
+export interface Turn {
+  base_soul_session_seq: number;
+  created_at: String;
+  /** @nullable */
+  end_soul_session_seq?: number | null;
+  /** @nullable */
+  error_text?: string | null;
+  finished_at?: null | String;
+  id: string;
+  input_through_session_seq: number;
+  soul_session_id: string;
+  status: TurnStatus;
+  /** @nullable */
+  trigger_ref?: string | null;
+  trigger_type: TurnTriggerType;
+  updated_at: String;
+}
 
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+export interface SendSessionResponse {
+  assistant_message: SessionMessage;
+  session: Session;
+  soul_session: SoulSession;
+  tool_calls: ToolCall[];
+  tool_results: ToolResult[];
+  turn: Turn;
+  user_message: SessionMessage;
+}
 
-  const data: getConversationResponse["data"] = body ? JSON.parse(body) : {};
-  return {
-    data,
-    status: res.status,
-    headers: res.headers,
-  } as getConversationResponse;
-};
+export interface SessionDetail {
+  messages: SessionMessage[];
+  session: Session;
+}
+
+export interface SessionEffect {
+  created_at: String;
+  effect_type: string;
+  /** @nullable */
+  error_text?: string | null;
+  id: string;
+  idempotency_key: string;
+  /** @nullable */
+  result_ref?: string | null;
+  session_id: string;
+  source_hook_id: string;
+  source_turn_id: string;
+  status: string;
+  updated_at: String;
+}
+
+export interface SessionRuntimeSnapshot {
+  compacts: Compact[];
+  effects: SessionEffect[];
+  messages: SessionMessage[];
+  session: Session;
+  soul_session?: null | SoulSession;
+  tool_calls: ToolCall[];
+  tool_results: ToolResult[];
+  turns: Turn[];
+}
 
 export type healthResponse200 = {
   data: HealthResponse;
@@ -205,7 +220,7 @@ export type healthResponseSuccess = healthResponse200 & {
 export type healthResponse = healthResponseSuccess;
 
 export const getHealthUrl = () => {
-  return `/api/health`;
+  return `/api/v1/health`;
 };
 
 export const health = async (
@@ -222,50 +237,299 @@ export const health = async (
   return { data, status: res.status, headers: res.headers } as healthResponse;
 };
 
-export type streamMessageResponse200 = {
-  data: void;
+export type listSessionsResponse200 = {
+  data: Session[];
   status: 200;
 };
 
-export type streamMessageResponse500 = {
+export type listSessionsResponse500 = {
   data: ErrorResponse;
   status: 500;
 };
 
-export type streamMessageResponseSuccess = streamMessageResponse200 & {
+export type listSessionsResponseSuccess = listSessionsResponse200 & {
   headers: Headers;
 };
-export type streamMessageResponseError = streamMessageResponse500 & {
+export type listSessionsResponseError = listSessionsResponse500 & {
   headers: Headers;
 };
 
-export type streamMessageResponse =
-  | streamMessageResponseSuccess
-  | streamMessageResponseError;
+export type listSessionsResponse =
+  | listSessionsResponseSuccess
+  | listSessionsResponseError;
 
-export const getStreamMessageUrl = () => {
-  return `/api/messages/stream`;
+export const getListSessionsUrl = () => {
+  return `/api/v1/sessions`;
 };
 
-export const streamMessage = async (
-  sendMessageRequest: SendMessageRequest,
+export const listSessions = async (
   options?: RequestInit,
-): Promise<streamMessageResponse> => {
-  const res = await fetch(getStreamMessageUrl(), {
+): Promise<listSessionsResponse> => {
+  const res = await fetch(getListSessionsUrl(), {
     ...options,
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(sendMessageRequest),
+    method: "GET",
   });
 
   const body = [204, 205, 304].includes(res.status) ? null : await res.text();
 
-  const data: streamMessageResponse["data"] = body
-    ? JSON.parse(body)
-    : undefined;
+  const data: listSessionsResponse["data"] = body ? JSON.parse(body) : {};
   return {
     data,
     status: res.status,
     headers: res.headers,
-  } as streamMessageResponse;
+  } as listSessionsResponse;
+};
+
+export type createSessionResponse200 = {
+  data: CreateSessionResponse;
+  status: 200;
+};
+
+export type createSessionResponse500 = {
+  data: ErrorResponse;
+  status: 500;
+};
+
+export type createSessionResponseSuccess = createSessionResponse200 & {
+  headers: Headers;
+};
+export type createSessionResponseError = createSessionResponse500 & {
+  headers: Headers;
+};
+
+export type createSessionResponse =
+  | createSessionResponseSuccess
+  | createSessionResponseError;
+
+export const getCreateSessionUrl = () => {
+  return `/api/v1/sessions`;
+};
+
+export const createSession = async (
+  options?: RequestInit,
+): Promise<createSessionResponse> => {
+  const res = await fetch(getCreateSessionUrl(), {
+    ...options,
+    method: "POST",
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createSessionResponse["data"] = body ? JSON.parse(body) : {};
+  return {
+    data,
+    status: res.status,
+    headers: res.headers,
+  } as createSessionResponse;
+};
+
+export type getSessionResponse200 = {
+  data: SessionDetail;
+  status: 200;
+};
+
+export type getSessionResponse404 = {
+  data: ErrorResponse;
+  status: 404;
+};
+
+export type getSessionResponse500 = {
+  data: ErrorResponse;
+  status: 500;
+};
+
+export type getSessionResponseSuccess = getSessionResponse200 & {
+  headers: Headers;
+};
+export type getSessionResponseError = (
+  | getSessionResponse404
+  | getSessionResponse500
+) & {
+  headers: Headers;
+};
+
+export type getSessionResponse =
+  | getSessionResponseSuccess
+  | getSessionResponseError;
+
+export const getGetSessionUrl = (sessionId: string) => {
+  return `/api/v1/sessions/${sessionId}`;
+};
+
+export const getSession = async (
+  sessionId: string,
+  options?: RequestInit,
+): Promise<getSessionResponse> => {
+  const res = await fetch(getGetSessionUrl(sessionId), {
+    ...options,
+    method: "GET",
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getSessionResponse["data"] = body ? JSON.parse(body) : {};
+  return {
+    data,
+    status: res.status,
+    headers: res.headers,
+  } as getSessionResponse;
+};
+
+export type listMessagesResponse200 = {
+  data: SessionMessage[];
+  status: 200;
+};
+
+export type listMessagesResponse404 = {
+  data: ErrorResponse;
+  status: 404;
+};
+
+export type listMessagesResponse500 = {
+  data: ErrorResponse;
+  status: 500;
+};
+
+export type listMessagesResponseSuccess = listMessagesResponse200 & {
+  headers: Headers;
+};
+export type listMessagesResponseError = (
+  | listMessagesResponse404
+  | listMessagesResponse500
+) & {
+  headers: Headers;
+};
+
+export type listMessagesResponse =
+  | listMessagesResponseSuccess
+  | listMessagesResponseError;
+
+export const getListMessagesUrl = (sessionId: string) => {
+  return `/api/v1/sessions/${sessionId}/messages`;
+};
+
+export const listMessages = async (
+  sessionId: string,
+  options?: RequestInit,
+): Promise<listMessagesResponse> => {
+  const res = await fetch(getListMessagesUrl(sessionId), {
+    ...options,
+    method: "GET",
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listMessagesResponse["data"] = body ? JSON.parse(body) : {};
+  return {
+    data,
+    status: res.status,
+    headers: res.headers,
+  } as listMessagesResponse;
+};
+
+export type runtimeSnapshotResponse200 = {
+  data: SessionRuntimeSnapshot;
+  status: 200;
+};
+
+export type runtimeSnapshotResponse404 = {
+  data: ErrorResponse;
+  status: 404;
+};
+
+export type runtimeSnapshotResponse500 = {
+  data: ErrorResponse;
+  status: 500;
+};
+
+export type runtimeSnapshotResponseSuccess = runtimeSnapshotResponse200 & {
+  headers: Headers;
+};
+export type runtimeSnapshotResponseError = (
+  | runtimeSnapshotResponse404
+  | runtimeSnapshotResponse500
+) & {
+  headers: Headers;
+};
+
+export type runtimeSnapshotResponse =
+  | runtimeSnapshotResponseSuccess
+  | runtimeSnapshotResponseError;
+
+export const getRuntimeSnapshotUrl = (sessionId: string) => {
+  return `/api/v1/sessions/${sessionId}/runtime`;
+};
+
+export const runtimeSnapshot = async (
+  sessionId: string,
+  options?: RequestInit,
+): Promise<runtimeSnapshotResponse> => {
+  const res = await fetch(getRuntimeSnapshotUrl(sessionId), {
+    ...options,
+    method: "GET",
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: runtimeSnapshotResponse["data"] = body ? JSON.parse(body) : {};
+  return {
+    data,
+    status: res.status,
+    headers: res.headers,
+  } as runtimeSnapshotResponse;
+};
+
+export type sendSessionResponse200 = {
+  data: SendSessionResponse;
+  status: 200;
+};
+
+export type sendSessionResponse404 = {
+  data: ErrorResponse;
+  status: 404;
+};
+
+export type sendSessionResponse500 = {
+  data: ErrorResponse;
+  status: 500;
+};
+
+export type sendSessionResponseSuccess = sendSessionResponse200 & {
+  headers: Headers;
+};
+export type sendSessionResponseError = (
+  | sendSessionResponse404
+  | sendSessionResponse500
+) & {
+  headers: Headers;
+};
+
+export type sendSessionResponse =
+  | sendSessionResponseSuccess
+  | sendSessionResponseError;
+
+export const getSendSessionUrl = (sessionId: string) => {
+  return `/api/v1/sessions/${sessionId}/send`;
+};
+
+export const sendSession = async (
+  sessionId: string,
+  sendSessionRequest: SendSessionRequest,
+  options?: RequestInit,
+): Promise<sendSessionResponse> => {
+  const res = await fetch(getSendSessionUrl(sessionId), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(sendSessionRequest),
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: sendSessionResponse["data"] = body ? JSON.parse(body) : {};
+  return {
+    data,
+    status: res.status,
+    headers: res.headers,
+  } as sendSessionResponse;
 };
