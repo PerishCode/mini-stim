@@ -10,7 +10,10 @@ command = "cargo"
 args = ["run", "--quiet", "-p", "mini-stim-server-cell", "--"]
 cwd = "."
 mode = "dev"
-inspect_socket = "unix:///tmp/mini-stim-sidecar/{namespace}/server.sock"
+
+[sidecars.ready]
+role = "server"
+timeout_secs = 120
 
 [[sidecars]]
 name = "client"
@@ -18,4 +21,11 @@ command = "cargo"
 args = ["run", "--quiet", "-p", "mini-stim-client-cell", "--"]
 cwd = "."
 mode = "dev"
-inspect_socket = "unix:///tmp/mini-stim-sidecar/{namespace}/client.sock"
+
+[[sidecars.inherits_env]]
+name = "MINI_STIM_SERVER_URL"
+from = "server.endpoint"
+
+[sidecars.ready]
+role = "client"
+timeout_secs = 120

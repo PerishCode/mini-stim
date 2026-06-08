@@ -1,30 +1,8 @@
-use std::{
-    fs::OpenOptions,
-    net::TcpListener,
-    path::Path,
-    process::Stdio,
-    sync::Arc,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::{env, fs::OpenOptions, net::TcpListener, path::Path, process::Stdio, time::Duration};
 
-use async_trait::async_trait;
-use mini_stim_proto_client::{
-    CellMode, CellState, ClientCell, ClientCellStatus, TransportError, TransportResult, bootstrap,
-};
+use mini_stim_proto_client::{CellMode, TransportError, bootstrap};
 use mini_stim_proto_transport::CellContext;
-use tokio::{process::Command, sync::Mutex, time::sleep};
-
-#[derive(Clone)]
-struct ClientCellState {
-    status: Arc<Mutex<ClientCellStatus>>,
-}
-
-#[async_trait]
-impl ClientCell for ClientCellState {
-    async fn status(&self) -> TransportResult<ClientCellStatus> {
-        Ok(self.status.lock().await.clone())
-    }
-}
+use tokio::{process::Command, time::sleep};
 
 #[tokio::main]
 async fn main() -> Result<(), TransportError> {
@@ -34,106 +12,48 @@ async fn main() -> Result<(), TransportError> {
     let log_path = store.join("logs").join("soma.log");
     tokio::fs::create_dir_all(log_path.parent().expect("log path has parent")).await?;
 
-    let status = Arc::new(Mutex::new(ClientCellStatus {
-        error: None,
-        mode: context.mode.clone(),
-        pid: None,
-        state: CellState::Starting,
-        updated_at: now_stamp(),
-        url: None,
-    }));
-    let inspect_state = ClientCellState {
-        status: Arc::clone(&status),
-    };
-    let inspect_task = tokio::spawn(async move { runtime.register(inspect_state).await });
-
     let server_url = wait_for_server_url(&context, Duration::from_secs(45)).await?;
     let port = allocate_port()?;
     let url = format!("http://127.0.0.1:{port}");
-    let child = Arc::new(Mutex::new(spawn_client_soma(
-        &context,
-        port,
-        &server_url,
-        &log_path,
-    )?));
-    {
-        let mut current = status.lock().await;
-        current.pid = child.lock().await.id();
-        current.url = Some(url.clone());
-        current.updated_at = now_stamp();
-    }
+    let mut child = spawn_client_soma(&context, port, &server_url, &log_path)?;
+    let pid = child.id();
 
     match wait_for_health(&url, Duration::from_secs(45)).await {
-        Ok(()) => {
-            let mut current = status.lock().await;
-            current.state = CellState::Running;
-            current.updated_at = now_stamp();
-        }
+        Ok(()) => print_ready("client", &url, &context.endpoint, pid),
         Err(error) => {
-            let mut current = status.lock().await;
-            current.error = Some(error.to_string());
-            current.state = CellState::Failed;
-            current.updated_at = now_stamp();
+            let _ = child.start_kill();
+            let _ = child.wait().await;
+            return Err(error);
         }
     }
 
     tokio::select! {
-        result = watch_child(Arc::clone(&child)) => {
-            let mut current = status.lock().await;
-            current.state = match result {
-                Ok(status) if status.success() => CellState::Stopped,
+        result = child.wait() => {
+            match result {
+                Ok(status) if status.success() => {}
                 Ok(status) => {
-                    current.error = Some(format!("client soma exited with {status}"));
-                    CellState::Failed
+                    return Err(TransportError::Config(format!("client soma exited with {status}")));
                 }
-                Err(error) => {
-                    current.error = Some(error.to_string());
-                    CellState::Failed
-                }
-            };
-            current.updated_at = now_stamp();
+                Err(error) => return Err(TransportError::Io(error)),
+            }
         }
         _ = shutdown_signal() => {
-            let mut child = child.lock().await;
             let _ = child.start_kill();
             let _ = child.wait().await;
-            let mut current = status.lock().await;
-            current.state = CellState::Stopped;
-            current.updated_at = now_stamp();
-        }
-        result = inspect_task => {
-            if let Ok(Err(error)) = result {
-                let mut current = status.lock().await;
-                current.error = Some(error.to_string());
-                current.state = CellState::Failed;
-                current.updated_at = now_stamp();
-            }
         }
     }
 
     Ok(())
 }
 
-async fn watch_child(
-    child: Arc<Mutex<tokio::process::Child>>,
-) -> Result<std::process::ExitStatus, std::io::Error> {
-    loop {
-        if let Some(status) = child.lock().await.try_wait()? {
-            return Ok(status);
-        }
-        sleep(Duration::from_millis(200)).await;
-    }
-}
-
 async fn wait_for_server_url(
-    context: &CellContext,
+    _context: &CellContext,
     timeout: Duration,
 ) -> Result<String, TransportError> {
-    let server = mini_stim_proto_client::ServerCellClient::for_context(context);
     let started = std::time::Instant::now();
     while started.elapsed() < timeout {
-        if let Ok(status) = server.status().await
-            && let (CellState::Running, Some(url)) = (status.state, status.url)
+        if let Ok(url) = env::var("MINI_STIM_SERVER_URL")
+            && !url.trim().is_empty()
         {
             return Ok(url);
         }
@@ -142,6 +62,13 @@ async fn wait_for_server_url(
     Err(TransportError::Config(
         "server cell did not report a ready URL".to_string(),
     ))
+}
+
+fn print_ready(role: &str, endpoint: &str, runtime_endpoint: &str, pid: Option<u32>) {
+    let instance_id = pid.map(|value| value.to_string()).unwrap_or_default();
+    println!(
+        "{{\"role\":\"{role}\",\"endpoint\":\"{endpoint}\",\"runtime_endpoint\":\"{runtime_endpoint}\",\"instance_id\":\"{instance_id}\"}}"
+    );
 }
 
 fn spawn_client_soma(
@@ -209,12 +136,4 @@ async fn shutdown_signal() {
     {
         let _ = tokio::signal::ctrl_c().await;
     }
-}
-
-fn now_stamp() -> String {
-    let seconds = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-    format!("unix:{seconds}")
 }

@@ -116,11 +116,11 @@ sidecar start --config sidecar.toml
 Find the client URL:
 
 ```sh
-sidecar inspect client client.status --config sidecar.toml
+sidecar list --format json
 ```
 
 The cells allocate dev ports dynamically. `server` reports the API URL and
-`client` reports the web URL through their typed cell status entries.
+`client` reports the web URL through sidecar ready state.
 
 Directly running `mini-stim-server-soma` requires `SANTI_DB` to be set. The
 sidecar-managed server cell injects a namespace-local database path derived from
