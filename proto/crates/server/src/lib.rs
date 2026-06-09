@@ -1,14 +1,16 @@
 use std::{ffi::OsString, path::PathBuf, sync::Arc};
 
 use async_trait::async_trait;
-pub use mini_stim_proto_transport::{CellContext, CellMode, TransportError, TransportResult};
+pub use mini_stim_proto_transport::{
+    CellContext, CellMode, CellRuntime, TransportError, TransportResult,
+};
 use mini_stim_proto_transport::{InspectRegistry, bootstrap as bootstrap_transport, invoke};
 use serde::{Deserialize, Serialize};
 
 pub const SERVER_CELL: &str = "server";
 const STATUS_EVENT: &str = "server.status";
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum CellState {
     Starting,
@@ -66,6 +68,12 @@ impl ServerCellRuntime {
             registry,
         )
         .await
+    }
+}
+
+impl CellRuntime for ServerCellRuntime {
+    fn context(&self) -> &CellContext {
+        &self.context
     }
 }
 

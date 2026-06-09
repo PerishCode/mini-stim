@@ -1,3 +1,5 @@
+mod tcp_port;
+
 use std::{
     collections::HashMap,
     ffi::OsString,
@@ -13,6 +15,8 @@ use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::{UnixListener, UnixStream},
 };
+
+pub use tcp_port::acquire_stored_tcp_port;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -56,6 +60,18 @@ pub struct CellContext {
 impl CellContext {
     pub fn inspect_socket_for(&self, app: &str) -> PathBuf {
         inspect_socket_path(&self.namespace, app)
+    }
+}
+
+pub trait CellRuntime {
+    fn context(&self) -> &CellContext;
+
+    fn cell_store(&self) -> PathBuf {
+        self.context().store.join(&self.context().app)
+    }
+
+    fn acquire_tcp_port(&self, name: &str, label: &str) -> TransportResult<u16> {
+        acquire_stored_tcp_port(&self.cell_store().join(name), label)
     }
 }
 
