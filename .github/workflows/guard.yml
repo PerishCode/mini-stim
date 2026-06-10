@@ -45,7 +45,7 @@ jobs:
 
       - name: Install runseal
         run: |
-          curl -fsSL https://runseal.perish.uk/manage.sh | sh
+          curl -fsSL https://runseal.perish.uk/manage.sh | sh -s -- install --channel beta
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           "$HOME/.local/bin/runseal" --version
 
@@ -101,7 +101,7 @@ jobs:
 
       - name: Install runseal
         run: |
-          curl -fsSL https://runseal.perish.uk/manage.sh | sh
+          curl -fsSL https://runseal.perish.uk/manage.sh | sh -s -- install --channel beta
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           "$HOME/.local/bin/runseal" --version
 
