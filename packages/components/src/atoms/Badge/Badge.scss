@@ -1,0 +1,25 @@
+.msBadge {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid var(--ms-color-border);
+  border-radius: 999px;
+  padding: 0.1875rem var(--ms-space-2);
+  font-size: var(--ms-font-size-sm);
+  line-height: 1.2;
+}
+
+.msBadge--tone-neutral {
+  background: var(--ms-color-badge-neutral-bg);
+  color: var(--ms-color-badge-neutral-text);
+}
+
+.msBadge--tone-success {
+  background: var(--ms-color-badge-success-bg);
+  color: var(--ms-color-badge-success-text);
+}
+
+.msBadge--tone-danger {
+  background: var(--ms-color-badge-danger-bg);
+  color: var(--ms-color-badge-danger-text);
+}

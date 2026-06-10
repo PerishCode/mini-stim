@@ -1,0 +1,79 @@
+.msButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ms-space-2);
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: var(--ms-radius-md);
+  padding: 0 var(--ms-space-4);
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.msButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.msButton--block {
+  width: 100%;
+}
+
+.msButton--justify-center {
+  justify-content: center;
+}
+
+.msButton--justify-start {
+  justify-content: flex-start;
+}
+
+.msButton--justify-between {
+  justify-content: space-between;
+}
+
+.msButton--size-sm {
+  min-height: 2rem;
+  font-size: var(--ms-font-size-sm);
+}
+
+.msButton--size-md {
+  min-height: 2.5rem;
+  font-size: var(--ms-font-size-md);
+}
+
+.msButton--variant-solid.msButton--tone-neutral {
+  background: var(--ms-color-button-bg);
+  border-color: var(--ms-color-button-border);
+  color: var(--ms-color-button-text);
+}
+
+.msButton--variant-solid.msButton--tone-accent {
+  background: var(--ms-color-accent);
+  border-color: var(--ms-color-accent);
+  color: var(--ms-color-accent-text);
+}
+
+.msButton--variant-outline {
+  background: var(--ms-color-surface);
+  border-color: var(--ms-color-border-strong);
+  color: var(--ms-color-text);
+}
+
+.msButton--variant-ghost {
+  background: transparent;
+  color: var(--ms-color-text);
+}
+
+.msButton--variant-selected {
+  background: var(--ms-color-selected-bg);
+  border-color: var(--ms-color-selected-border);
+  color: var(--ms-color-text);
+}
+
+.msButton:not(:disabled):hover {
+  filter: brightness(0.98);
+}

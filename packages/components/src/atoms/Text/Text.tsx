@@ -1,0 +1,34 @@
+import type { ComponentPropsWithoutRef } from "react";
+
+import { cx } from "../../internal/cx";
+import "./Text.scss";
+
+type TextProps = ComponentPropsWithoutRef<"span"> & {
+  size?: "sm" | "md";
+  tag?: "p" | "span" | "small";
+  tone?: "default" | "muted";
+  truncate?: boolean;
+};
+
+export function Text({
+  className,
+  size = "md",
+  tag = "span",
+  tone = "default",
+  truncate = false,
+  ...props
+}: TextProps) {
+  const Component = tag;
+  return (
+    <Component
+      {...props}
+      className={cx(
+        "msText",
+        `msText--size-${size}`,
+        `msText--tone-${tone}`,
+        truncate && "msText--truncate",
+        className,
+      )}
+    />
+  );
+}

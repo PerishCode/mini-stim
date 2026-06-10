@@ -1,0 +1,20 @@
+.msScrollArea {
+  min-width: 0;
+}
+
+.msScrollArea--grow {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.msScrollArea--y {
+  overflow-y: auto;
+}
+
+.msScrollArea--x {
+  overflow-x: auto;
+}
+
+.msScrollArea--both {
+  overflow: auto;
+}

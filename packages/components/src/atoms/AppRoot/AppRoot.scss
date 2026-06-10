@@ -1,0 +1,24 @@
+.msAppRoot {
+  display: grid;
+  grid-template-columns: minmax(18rem, 22rem) minmax(0, 1fr);
+  min-height: 100vh;
+  background: var(--ms-color-canvas);
+  color: var(--ms-color-text);
+}
+
+.msAppRoot__sidebar,
+.msAppRoot__main {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+.msAppRoot__main {
+  min-height: 100vh;
+}
+
+@media (max-width: 48rem) {
+  .msAppRoot {
+    grid-template-columns: 1fr;
+  }
+}

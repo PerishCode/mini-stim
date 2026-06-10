@@ -1,0 +1,13 @@
+.msCodeBlock {
+  overflow: auto;
+  margin: 0;
+  border: 1px solid var(--ms-color-code-border);
+  border-radius: var(--ms-radius-md);
+  background: var(--ms-color-code-bg);
+  color: var(--ms-color-code-text);
+  padding: var(--ms-space-3);
+  font-family: var(--ms-font-family-mono);
+  font-size: var(--ms-font-size-sm);
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
