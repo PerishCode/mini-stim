@@ -26,9 +26,9 @@ echo "==> cargo test"
 cargo test --locked --workspace
 
 echo "==> contracts"
-./scripts/contracts-codegen.sh
+runseal :codegen
 if ! git diff --exit-code -- packages/contracts/openapi.json packages/contracts/src/openapi.ts >/dev/null; then
-  echo "contracts are out of date; run ./scripts/contracts-codegen.sh and stage the result" >&2
+  echo "contracts are out of date; run runseal :codegen and stage the result" >&2
   exit 1
 fi
 

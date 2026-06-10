@@ -1,0 +1,46 @@
+print() {
+  printf '%s\n' "$1"
+}
+
+error() {
+  printf '%s\n' "$1" >&2
+}
+
+fail() {
+  error "$1"
+  exit 1
+}
+
+usage() {
+  print "Usage: runseal :codegen"
+  print ""
+  print "Regenerate contracts from the Rust OpenAPI source of truth."
+}
+
+__seal_help=false
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --)
+      shift
+      break
+      ;;
+    -h|--help|help)
+      __seal_help=true
+      shift
+      ;;
+    *)
+      fail "unknown option: $1"
+      ;;
+  esac
+done
+
+if [ "$__seal_help" = true ]; then
+  usage
+  exit 0
+fi
+
+root=$(git rev-parse --show-toplevel)
+cd "$root"
+
+cargo run --quiet -p mini-stim-server-soma -- export-openapi > packages/contracts/openapi.json
+pnpm -C packages/contracts codegen

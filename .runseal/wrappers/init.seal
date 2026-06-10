@@ -114,7 +114,6 @@ print "repository: $root"
 
 print "==> checking required tools"
 require_tool git
-require_tool python3
 require_tool cargo
 require_tool pnpm
 require_tool sidecar
@@ -123,10 +122,8 @@ require_tool runseal
 require_tool sh
 require_tool sed
 require_tool grep
-require_tool curl
-require_tool mv
 require_tool cp
-print "ok: git, python3, cargo, pnpm, sidecar, flavor, runseal, sh, sed, grep, curl, mv, cp"
+print "ok: git, cargo, pnpm, sidecar, flavor, runseal, sh, sed, grep, cp"
 
 print "==> checking repository entrypoints"
 require_path AGENTS.md
@@ -152,6 +149,7 @@ require_path apps/client/soma/Cargo.toml
 require_path apps/client/soma/web/package.json
 require_path packages/components/package.json
 require_path packages/contracts/package.json
+require_path .runseal/wrappers/codegen.seal
 require_path .runseal/wrappers/init.seal
 require_path .runseal/wrappers/pr.seal
 require_path .runseal/hooks/pre-commit
