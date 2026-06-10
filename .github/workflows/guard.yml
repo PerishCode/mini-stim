@@ -99,6 +99,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install runseal
+        run: |
+          curl -fsSL https://runseal.perish.uk/manage.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/runseal" --version
+
       - name: Start API
         env:
           OPENAI_API_KEY: ci-placeholder
@@ -111,7 +117,7 @@ jobs:
           mkdir -p .tmp
           cargo run -p mini-stim-server-soma -- serve &
           for attempt in $(seq 1 180); do
-            if curl -fsS http://127.0.0.1:43307/api/health >/dev/null; then
+            if curl -fsS http://127.0.0.1:43307/api/v1/health >/dev/null; then
               exit 0
             fi
             sleep 1
@@ -119,13 +125,7 @@ jobs:
           exit 1
 
       - name: Generate contracts
-        env:
-          SANTI_API_URL: http://127.0.0.1:43307
-        run: |
-          curl -fsS "$SANTI_API_URL/api/openapi.json" -o packages/contracts/openapi.json
-          python3 -m json.tool --indent 2 packages/contracts/openapi.json packages/contracts/openapi.json.tmp
-          mv packages/contracts/openapi.json.tmp packages/contracts/openapi.json
-          pnpm -C packages/contracts codegen
+        run: runseal :codegen
 
       - name: Typecheck
         run: pnpm typecheck
