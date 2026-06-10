@@ -5,21 +5,22 @@ import "./Stack.scss";
 
 type StackProps = ComponentPropsWithoutRef<"div"> & {
   align?: "start" | "center" | "stretch";
-  as?: "div" | "span";
   gap?: "xs" | "sm" | "md" | "lg";
   grow?: boolean;
   justify?: "start" | "center" | "between";
+  tag?: "div" | "span";
 };
 
 export function Stack({
   align = "stretch",
-  as: Component = "div",
   className,
   gap = "md",
   grow = false,
   justify = "start",
+  tag = "div",
   ...props
 }: StackProps) {
+  const Component = tag;
   return (
     <Component
       {...props}

@@ -5,23 +5,24 @@ import "./Inline.scss";
 
 type InlineProps = ComponentPropsWithoutRef<"div"> & {
   align?: "start" | "center" | "end" | "stretch";
-  as?: "div" | "span";
   gap?: "xs" | "sm" | "md" | "lg";
   grow?: boolean;
   justify?: "start" | "center" | "between" | "end";
+  tag?: "div" | "span";
   wrap?: boolean;
 };
 
 export function Inline({
   align = "center",
-  as: Component = "div",
   className,
   gap = "md",
   grow = false,
   justify = "start",
+  tag = "div",
   wrap = false,
   ...props
 }: InlineProps) {
+  const Component = tag;
   return (
     <Component
       {...props}

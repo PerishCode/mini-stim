@@ -14,7 +14,7 @@ export function ChatHeader(props: {
   return (
     <Pane border="bottom" padding="md" tone="panel">
       <Inline justify="between" wrap gap="sm">
-        <Heading as="h2" size="md" truncate>
+        <Heading tag="h2" size="md" truncate>
           {props.title}
         </Heading>
         <Inline gap="sm" wrap>

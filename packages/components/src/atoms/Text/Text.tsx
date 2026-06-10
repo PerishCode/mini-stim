@@ -4,20 +4,21 @@ import { cx } from "../../internal/cx";
 import "./Text.scss";
 
 type TextProps = ComponentPropsWithoutRef<"span"> & {
-  as?: "p" | "span" | "small";
   size?: "sm" | "md";
+  tag?: "p" | "span" | "small";
   tone?: "default" | "muted";
   truncate?: boolean;
 };
 
 export function Text({
-  as: Component = "span",
   className,
   size = "md",
+  tag = "span",
   tone = "default",
   truncate = false,
   ...props
 }: TextProps) {
+  const Component = tag;
   return (
     <Component
       {...props}

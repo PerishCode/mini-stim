@@ -21,7 +21,7 @@ export function SessionRail(props: {
     <Pane border="right" padding="md" tone="panel" grow>
       <Stack gap="md" grow>
         <Inline justify="between">
-          <Heading as="h1" size="md">mini-stim</Heading>
+          <Heading tag="h1" size="md">mini-stim</Heading>
           <Button
             size="sm"
             variant="outline"
@@ -43,9 +43,9 @@ export function SessionRail(props: {
                   variant={selected ? "selected" : "ghost"}
                   onClick={() => props.onSelect(session.id)}
                 >
-                  <Stack as="span" gap="xs" grow align="start">
+                  <Stack tag="span" gap="xs" grow align="start">
                     <Text truncate>{sessionLabel(session)}</Text>
-                    <Inline as="span" justify="between" grow wrap gap="sm">
+                    <Inline tag="span" justify="between" grow wrap gap="sm">
                       <Text size="sm" tone="muted" truncate>
                         {session.updated_at}
                       </Text>
