@@ -2,6 +2,8 @@ export { AppRoot } from "./atoms/AppRoot/AppRoot";
 export { Badge } from "./atoms/Badge/Badge";
 export { Button } from "./atoms/Button/Button";
 export { CodeBlock } from "./atoms/CodeBlock/CodeBlock";
+export { Grid, GridItem } from "./atoms/Grid/Grid";
+export { GridRows } from "./atoms/GridRows/GridRows";
 export { Heading } from "./atoms/Heading/Heading";
 export { IconButton } from "./atoms/IconButton/IconButton";
 export { Inline } from "./atoms/Inline/Inline";

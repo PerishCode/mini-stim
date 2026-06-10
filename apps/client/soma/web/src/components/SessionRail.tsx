@@ -1,6 +1,7 @@
 import {
   Badge,
   Button,
+  GridRows,
   Heading,
   Inline,
   Pane,
@@ -19,7 +20,7 @@ export function SessionRail(props: {
 }) {
   return (
     <Pane border="right" padding="md" tone="panel" grow>
-      <Stack gap="md" grow>
+      <GridRows grow template="header-body" gap="md">
         <Inline justify="between">
           <Heading tag="h1" size="md">mini-stim</Heading>
           <Button
@@ -57,7 +58,7 @@ export function SessionRail(props: {
             })}
           </Stack>
         </ScrollArea>
-      </Stack>
+      </GridRows>
     </Pane>
   );
 }

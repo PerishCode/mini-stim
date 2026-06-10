@@ -1,61 +1,52 @@
+$inline-gaps: (
+  "xs": var(--ms-space-1),
+  "sm": var(--ms-space-2),
+  "md": var(--ms-space-4),
+  "lg": var(--ms-space-6),
+);
+
+$inline-alignments: (
+  "start": flex-start,
+  "center": center,
+  "end": flex-end,
+  "stretch": stretch,
+);
+
+$inline-justifications: (
+  "start": flex-start,
+  "center": center,
+  "between": space-between,
+  "end": flex-end,
+);
+
 .msInline {
   display: flex;
   min-width: 0;
-}
 
-.msInline--grow {
-  flex: 1 1 auto;
-  min-width: 0;
-}
+  &--grow {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
 
-.msInline--wrap {
-  flex-wrap: wrap;
-}
+  &--wrap {
+    flex-wrap: wrap;
+  }
 
-.msInline--gap-xs {
-  gap: var(--ms-space-1);
-}
+  @each $name, $value in $inline-gaps {
+    &--gap-#{$name} {
+      gap: $value;
+    }
+  }
 
-.msInline--gap-sm {
-  gap: var(--ms-space-2);
-}
+  @each $name, $value in $inline-alignments {
+    &--align-#{$name} {
+      align-items: $value;
+    }
+  }
 
-.msInline--gap-md {
-  gap: var(--ms-space-4);
-}
-
-.msInline--gap-lg {
-  gap: var(--ms-space-6);
-}
-
-.msInline--align-start {
-  align-items: flex-start;
-}
-
-.msInline--align-center {
-  align-items: center;
-}
-
-.msInline--align-end {
-  align-items: flex-end;
-}
-
-.msInline--align-stretch {
-  align-items: stretch;
-}
-
-.msInline--justify-start {
-  justify-content: flex-start;
-}
-
-.msInline--justify-center {
-  justify-content: center;
-}
-
-.msInline--justify-between {
-  justify-content: space-between;
-}
-
-.msInline--justify-end {
-  justify-content: flex-end;
+  @each $name, $value in $inline-justifications {
+    &--justify-#{$name} {
+      justify-content: $value;
+    }
+  }
 }
