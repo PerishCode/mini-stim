@@ -40,7 +40,6 @@ if [ "$__seal_help" = true ]; then
 fi
 
 root=$(git rev-parse --show-toplevel)
-cd "$root"
 
-cargo run --quiet -p mini-stim-server-soma -- export-openapi > packages/contracts/openapi.json
-pnpm -C packages/contracts codegen
+cargo run --manifest-path "$root/Cargo.toml" --quiet -p mini-stim-server-soma -- export-openapi > "$root/packages/contracts/openapi.json"
+pnpm -C "$root/packages/contracts" codegen
