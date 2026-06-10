@@ -2,7 +2,9 @@ use std::{ffi::OsString, path::PathBuf, sync::Arc};
 
 use async_trait::async_trait;
 pub use mini_stim_proto_server::{CellState, ServerCellClient};
-pub use mini_stim_proto_transport::{CellContext, CellMode, TransportError, TransportResult};
+pub use mini_stim_proto_transport::{
+    CellContext, CellMode, CellRuntime, TransportError, TransportResult,
+};
 use mini_stim_proto_transport::{InspectRegistry, bootstrap as bootstrap_transport, invoke};
 use serde::{Deserialize, Serialize};
 
@@ -56,6 +58,12 @@ impl ClientCellRuntime {
             registry,
         )
         .await
+    }
+}
+
+impl CellRuntime for ClientCellRuntime {
+    fn context(&self) -> &CellContext {
+        &self.context
     }
 }
 

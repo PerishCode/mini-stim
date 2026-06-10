@@ -86,16 +86,7 @@ runseal :init
 Generate contracts from the Rust OpenAPI source of truth:
 
 ```sh
-SANTI_HOST=127.0.0.1 SANTI_PORT=43307 SANTI_DB=.tmp/manual.sqlite cargo run -p mini-stim-server-soma -- serve
-```
-
-Then, in another shell:
-
-```sh
-curl -fsS "${SANTI_API_URL:-http://127.0.0.1:43307}/api/openapi.json" -o packages/contracts/openapi.json
-python3 -m json.tool --indent 2 packages/contracts/openapi.json packages/contracts/openapi.json.tmp
-mv packages/contracts/openapi.json.tmp packages/contracts/openapi.json
-pnpm -C packages/contracts codegen
+runseal :codegen
 ```
 
 ## Run
@@ -138,6 +129,7 @@ cargo fmt --all --check
 flavor check --root . --config flavor.toml
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace
+runseal :codegen
 pnpm typecheck
 pnpm build
 sidecar status --config sidecar.toml
