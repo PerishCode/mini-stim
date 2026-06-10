@@ -1,0 +1,24 @@
+.msHeading {
+  margin: 0;
+  min-width: 0;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.msHeading--size-sm {
+  font-size: 1rem;
+}
+
+.msHeading--size-md {
+  font-size: 1.125rem;
+}
+
+.msHeading--size-lg {
+  font-size: 1.375rem;
+}
+
+.msHeading--truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -1,0 +1,33 @@
+@use "./tokens.colors.scss" as *;
+@use "./tokens.space.scss" as *;
+@use "./tokens.radius.scss" as *;
+@use "./tokens.typography.scss" as *;
+@use "./tokens.border.scss" as *;
+
+:root {
+  color: var(--ms-color-text);
+  background: var(--ms-color-canvas);
+  font-family: var(--ms-font-family-sans);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--ms-color-canvas);
+  color: var(--ms-color-text);
+  font-family: var(--ms-font-family-sans);
+}
+
+button,
+textarea {
+  font: inherit;
+}

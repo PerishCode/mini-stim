@@ -1,0 +1,53 @@
+.msPane {
+  min-width: 0;
+}
+
+.msPane--grow {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.msPane--tone-canvas {
+  background: var(--ms-color-canvas);
+}
+
+.msPane--tone-panel {
+  background: var(--ms-color-panel);
+}
+
+.msPane--tone-subtle {
+  background: var(--ms-color-panel-subtle);
+}
+
+.msPane--padding-none {
+  padding: 0;
+}
+
+.msPane--padding-sm {
+  padding: var(--ms-space-3);
+}
+
+.msPane--padding-md {
+  padding: var(--ms-space-4);
+}
+
+.msPane--padding-lg {
+  padding: var(--ms-space-6);
+}
+
+.msPane--border-right {
+  border-right: 1px solid var(--ms-color-border);
+}
+
+.msPane--border-top {
+  border-top: 1px solid var(--ms-color-border);
+}
+
+.msPane--border-bottom {
+  border-bottom: 1px solid var(--ms-color-border);
+}
+
+.msPane--border-around {
+  border: 1px solid var(--ms-color-border);
+}

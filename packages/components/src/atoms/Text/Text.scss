@@ -1,0 +1,27 @@
+.msText {
+  margin: 0;
+  min-width: 0;
+  line-height: 1.45;
+}
+
+.msText--size-sm {
+  font-size: var(--ms-font-size-sm);
+}
+
+.msText--size-md {
+  font-size: var(--ms-font-size-md);
+}
+
+.msText--tone-default {
+  color: var(--ms-color-text);
+}
+
+.msText--tone-muted {
+  color: var(--ms-color-text-muted);
+}
+
+.msText--truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

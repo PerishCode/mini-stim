@@ -1,0 +1,61 @@
+.msInline {
+  display: flex;
+  min-width: 0;
+}
+
+.msInline--grow {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.msInline--wrap {
+  flex-wrap: wrap;
+}
+
+.msInline--gap-xs {
+  gap: var(--ms-space-1);
+}
+
+.msInline--gap-sm {
+  gap: var(--ms-space-2);
+}
+
+.msInline--gap-md {
+  gap: var(--ms-space-4);
+}
+
+.msInline--gap-lg {
+  gap: var(--ms-space-6);
+}
+
+.msInline--align-start {
+  align-items: flex-start;
+}
+
+.msInline--align-center {
+  align-items: center;
+}
+
+.msInline--align-end {
+  align-items: flex-end;
+}
+
+.msInline--align-stretch {
+  align-items: stretch;
+}
+
+.msInline--justify-start {
+  justify-content: flex-start;
+}
+
+.msInline--justify-center {
+  justify-content: center;
+}
+
+.msInline--justify-between {
+  justify-content: space-between;
+}
+
+.msInline--justify-end {
+  justify-content: flex-end;
+}

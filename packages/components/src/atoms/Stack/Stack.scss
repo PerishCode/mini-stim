@@ -1,0 +1,50 @@
+.msStack {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.msStack--grow {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.msStack--gap-xs {
+  gap: var(--ms-space-1);
+}
+
+.msStack--gap-sm {
+  gap: var(--ms-space-2);
+}
+
+.msStack--gap-md {
+  gap: var(--ms-space-4);
+}
+
+.msStack--gap-lg {
+  gap: var(--ms-space-6);
+}
+
+.msStack--align-start {
+  align-items: flex-start;
+}
+
+.msStack--align-center {
+  align-items: center;
+}
+
+.msStack--align-stretch {
+  align-items: stretch;
+}
+
+.msStack--justify-start {
+  justify-content: flex-start;
+}
+
+.msStack--justify-center {
+  justify-content: center;
+}
+
+.msStack--justify-between {
+  justify-content: space-between;
+}

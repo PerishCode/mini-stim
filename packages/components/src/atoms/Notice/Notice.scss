@@ -1,0 +1,16 @@
+.msNotice {
+  border: 1px solid var(--ms-color-border);
+  border-radius: var(--ms-radius-md);
+  padding: var(--ms-space-3);
+}
+
+.msNotice--tone-neutral {
+  background: var(--ms-color-panel-subtle);
+  color: var(--ms-color-text-muted);
+}
+
+.msNotice--tone-danger {
+  background: var(--ms-color-danger-bg);
+  border-color: var(--ms-color-danger-border);
+  color: var(--ms-color-danger-text);
+}

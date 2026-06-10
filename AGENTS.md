@@ -59,7 +59,9 @@ mini-stim/
 │           └── web/   # Vite/React web client
 ├── packages/
 │   ├── contracts/           # generated OpenAPI schema/types
-│   └── components/          # reusable UI primitives used by client
+│   ├── mqueue/              # browser transport/event projection over contracts + SSE
+│   ├── hooks/               # React provider + atomic hooks over mqueue
+│   └── components/          # reusable UI primitives/compositions used by client
 ├── docs/
 └── .task/                   # local task memory, ignored by git
 ```
@@ -99,6 +101,8 @@ plane and must stay limited to cell lifecycle facts.
 - Prefer one working web chat loop over architecture scaffolding.
 - Server product truth lives in `santi-core`; web UI consumes API contracts and
   must not define durable product semantics.
+- `mini-stim` is self-contained, so frontend package boundaries exist for code
+  ownership and clarity, not for independent external release choreography.
 - Provider integration truth lives behind `santi-provider::ProviderClient`;
   `santi-core` must stay provider-agnostic.
 - The server soma owns HTTP routing, SSE framing, and OpenAPI export through the
@@ -111,6 +115,30 @@ plane and must stay limited to cell lifecycle facts.
   missing prerequisite directly and stop that path. Do not spend time inventing
   fallbacks or exploring unrelated environment workarounds unless the user asks.
 - Keep hard cuts acceptable. Add compatibility only for a real external surface.
+
+## Frontend Package Boundary
+
+- Keep the frontend split strict even though everything ships from one repo.
+- `packages/contracts` owns generated OpenAPI clients and DTOs only.
+- `packages/mqueue` owns browser-facing HTTP calls, SSE wiring, stream merge,
+  event projection, and any direct use of `@mini-stim/contracts`.
+- `packages/hooks` owns React context/providers and atomic hooks over
+  `mqueue`. It is the only stateful integration layer the web app should
+  consume.
+- `packages/components` owns reusable presentational UI primitives and small
+  compositions. It should stay transport-agnostic and product-light.
+- `apps/client/soma/web` owns route/page assembly, product-specific layout,
+  and composer/transcript/session UX built from hooks and components.
+- Web app code must not call raw `fetch`, construct `EventSource`, import
+  `@mini-stim/contracts`, or reach into sidecar/browser globals directly.
+- If a UI pattern is reusable across multiple client surfaces or would
+  otherwise cause page-level CSS/control duplication, move it into
+  `packages/components` instead of re-implementing it in `web`.
+- If logic is about transport, replay, stream state, or event normalization, it
+  belongs below `web`, usually in `mqueue` or `hooks`, not inside React pages.
+- Do not create a fake package/release process inside the repo. Keep the
+  boundary architectural and local-first: workspace packages, direct
+  consumption, and simple builds are enough.
 
 ## Data Modeling Rules
 
