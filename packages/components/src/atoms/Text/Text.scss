@@ -1,27 +1,33 @@
+@use "../../theme/mixins" as *;
+
+$text-sizes: (
+  "sm": var(--ms-font-size-sm),
+  "md": var(--ms-font-size-md),
+);
+
+$text-tones: (
+  "default": var(--ms-color-text),
+  "muted": var(--ms-color-text-muted),
+);
+
 .msText {
   margin: 0;
   min-width: 0;
   line-height: 1.45;
-}
 
-.msText--size-sm {
-  font-size: var(--ms-font-size-sm);
-}
+  @each $name, $value in $text-sizes {
+    &--size-#{$name} {
+      font-size: $value;
+    }
+  }
 
-.msText--size-md {
-  font-size: var(--ms-font-size-md);
-}
+  @each $name, $value in $text-tones {
+    &--tone-#{$name} {
+      color: $value;
+    }
+  }
 
-.msText--tone-default {
-  color: var(--ms-color-text);
-}
-
-.msText--tone-muted {
-  color: var(--ms-color-text-muted);
-}
-
-.msText--truncate {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  &--truncate {
+    @include truncate-single-line;
+  }
 }

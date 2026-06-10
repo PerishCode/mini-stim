@@ -1,0 +1,35 @@
+@use "sass:list";
+
+@mixin control-disabled($opacity: 0.58) {
+  &:disabled {
+    cursor: not-allowed;
+    opacity: $opacity;
+  }
+}
+
+@mixin focus-ring($selector: "&:focus-visible") {
+  #{$selector} {
+    outline: none;
+    box-shadow: var(--ms-shadow-focus);
+  }
+}
+
+@mixin transition($properties...) {
+  $transitions: ();
+
+  @each $property in $properties {
+    $transitions: list.append(
+      $transitions,
+      #{$property} var(--ms-motion-duration-fast) var(--ms-motion-ease-standard),
+      comma
+    );
+  }
+
+  transition: $transitions;
+}
+
+@mixin truncate-single-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

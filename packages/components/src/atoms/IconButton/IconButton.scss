@@ -1,3 +1,5 @@
+@use "../../theme/mixins" as *;
+
 .msIconButton {
   display: inline-grid;
   width: 2.625rem;
@@ -8,17 +10,16 @@
   background: var(--ms-color-button-bg);
   color: var(--ms-color-button-text);
   cursor: pointer;
-  transition:
-    background-color 120ms ease,
-    border-color 120ms ease,
-    color 120ms ease;
-}
+  box-shadow: var(--ms-shadow-button);
+  @include transition(background-color, border-color, color, box-shadow, transform);
 
-.msIconButton:disabled {
-  cursor: not-allowed;
-  opacity: 0.58;
-}
+  @include control-disabled;
 
-.msIconButton:not(:disabled):hover {
-  filter: brightness(0.98);
+  &:not(:disabled):hover {
+    background: var(--ms-color-button-hover-bg);
+    border-color: var(--ms-color-border-strong);
+    transform: translateY(-1px);
+  }
+
+  @include focus-ring;
 }

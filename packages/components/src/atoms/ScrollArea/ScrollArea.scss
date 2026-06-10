@@ -1,20 +1,31 @@
+$scroll-overflows: (
+  "y": (
+    overflow-y: auto,
+  ),
+  "x": (
+    overflow-x: auto,
+  ),
+  "both": (
+    overflow: auto,
+  ),
+);
+
 .msScrollArea {
   min-width: 0;
-}
-
-.msScrollArea--grow {
-  flex: 1 1 auto;
   min-height: 0;
-}
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 
-.msScrollArea--y {
-  overflow-y: auto;
-}
+  &--grow {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
 
-.msScrollArea--x {
-  overflow-x: auto;
-}
-
-.msScrollArea--both {
-  overflow: auto;
+  @each $name, $declarations in $scroll-overflows {
+    &--#{$name} {
+      @each $property, $value in $declarations {
+        #{$property}: $value;
+      }
+    }
+  }
 }

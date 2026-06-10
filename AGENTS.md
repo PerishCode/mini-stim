@@ -1,5 +1,9 @@
 # AGENTS
 
+Read this file together with `DESIGN.md`.
+`AGENTS.md` is the engineering and ownership source of truth.
+`DESIGN.md` is the visual and component-aesthetics source of truth.
+
 ## Purpose
 
 `mini-stim` is now a small, local-first single-person AI chat prototype.

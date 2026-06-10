@@ -1,48 +1,57 @@
 :root {
-  --ms-color-canvas: #f4f1ea;
-  --ms-color-panel: #fbfaf6;
-  --ms-color-panel-subtle: #f7f3ea;
+  --ms-color-canvas: #e9eff4;
+  --ms-color-panel: #f8fbfd;
+  --ms-color-panel-subtle: #f1f6fa;
   --ms-color-surface: #ffffff;
-  --ms-color-text: #1d2430;
-  --ms-color-text-muted: #6f6a62;
-  --ms-color-border: #d7d0c2;
-  --ms-color-border-strong: #b8afa1;
+  --ms-color-surface-muted-bg: #f7fafc;
+  --ms-color-surface-muted-border: #d7e2ea;
+  --ms-color-text: #17212b;
+  --ms-color-text-muted: #617181;
+  --ms-color-border: #d6e0e8;
+  --ms-color-border-strong: #aab9c7;
+  --ms-color-frame-border: rgba(155, 174, 190, 0.32);
 
   --ms-color-button-bg: #ffffff;
-  --ms-color-button-border: #b8afa1;
-  --ms-color-button-text: #202833;
-  --ms-color-accent: #20302d;
+  --ms-color-button-subtle-bg: #fbfdff;
+  --ms-color-button-hover-bg: #f0f5f9;
+  --ms-color-button-border: #c7d2dc;
+  --ms-color-button-text: #1c2a35;
+  --ms-color-ghost-hover-bg: rgba(91, 116, 139, 0.08);
+  --ms-color-accent: #235f90;
+  --ms-color-accent-border: #235f90;
+  --ms-color-accent-hover: #1e547f;
   --ms-color-accent-text: #ffffff;
-  --ms-color-selected-bg: #eee7d8;
-  --ms-color-selected-border: #c9bea9;
+  --ms-color-selected-bg: #e4eff8;
+  --ms-color-selected-hover-bg: #dbe9f5;
+  --ms-color-selected-border: #a8c3dc;
 
   --ms-color-input-bg: #ffffff;
-  --ms-color-input-border: #c7bdad;
+  --ms-color-input-border: #cad6e0;
 
-  --ms-color-surface-accent-bg: #20302d;
-  --ms-color-surface-accent-border: #20302d;
-  --ms-color-surface-accent-text: #ffffff;
+  --ms-color-surface-accent-bg: #dce9f5;
+  --ms-color-surface-accent-border: #a8c2d8;
+  --ms-color-surface-accent-text: #163a54;
 
-  --ms-color-surface-warning-bg: #fff8e8;
-  --ms-color-surface-warning-border: #e5d7b5;
-  --ms-color-surface-warning-text: #4f4532;
+  --ms-color-surface-warning-bg: #fff4e4;
+  --ms-color-surface-warning-border: #ead1a5;
+  --ms-color-surface-warning-text: #6c4a12;
 
-  --ms-color-surface-success-bg: #edf4f0;
-  --ms-color-surface-success-border: #bbc8c1;
-  --ms-color-surface-success-text: #26342e;
+  --ms-color-surface-success-bg: #e7f2ec;
+  --ms-color-surface-success-border: #bad5c8;
+  --ms-color-surface-success-text: #234f3d;
 
-  --ms-color-danger-bg: #fff2f2;
-  --ms-color-danger-border: #e0a0a0;
-  --ms-color-danger-text: #8f1f1f;
+  --ms-color-danger-bg: #fff1f1;
+  --ms-color-danger-border: #e2aaaa;
+  --ms-color-danger-text: #8d2222;
 
-  --ms-color-code-bg: #f8fbf9;
-  --ms-color-code-border: #d3ddd8;
-  --ms-color-code-text: #26342e;
+  --ms-color-code-bg: #f3f8fb;
+  --ms-color-code-border: #cfd9e3;
+  --ms-color-code-text: #22323e;
 
-  --ms-color-badge-neutral-bg: #f0ece3;
-  --ms-color-badge-neutral-text: #4f4532;
-  --ms-color-badge-success-bg: #e6f3eb;
-  --ms-color-badge-success-text: #1f5b38;
-  --ms-color-badge-danger-bg: #fff2f2;
-  --ms-color-badge-danger-text: #8f1f1f;
+  --ms-color-badge-neutral-bg: #eaf1f6;
+  --ms-color-badge-neutral-text: #476173;
+  --ms-color-badge-success-bg: #dff1e8;
+  --ms-color-badge-success-text: #21553d;
+  --ms-color-badge-danger-bg: #fff0f0;
+  --ms-color-badge-danger-text: #8d2222;
 }
