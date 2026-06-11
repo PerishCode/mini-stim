@@ -25,6 +25,7 @@ $button-sizes: (
   --ms-button-text: var(--ms-color-button-text);
   --ms-button-hover-bg: var(--ms-color-button-hover-bg);
   --ms-button-hover-border: var(--ms-color-border-strong);
+  --ms-button-hover-shadow: var(--ms-shadow-button);
 
   display: inline-flex;
   position: relative;
@@ -47,6 +48,7 @@ $button-sizes: (
   &:not(:disabled):hover {
     background: var(--ms-button-hover-bg);
     border-color: var(--ms-button-hover-border);
+    box-shadow: var(--ms-button-hover-shadow);
     transform: translateY(-1px);
   }
 
@@ -93,11 +95,12 @@ $button-sizes: (
   }
 
   &--variant-outline {
-    --ms-button-bg: var(--ms-color-button-bg);
+    --ms-button-bg: var(--ms-color-button-subtle-bg);
     --ms-button-border: var(--ms-color-button-border);
     --ms-button-text: var(--ms-color-text);
     --ms-button-hover-bg: var(--ms-color-button-hover-bg);
     --ms-button-hover-border: var(--ms-color-border-strong);
+    --ms-button-hover-shadow: var(--ms-shadow-card);
   }
 
   &--variant-ghost {
@@ -121,18 +124,19 @@ $button-sizes: (
   &--variant-rail,
   &--variant-rail-selected {
     justify-content: flex-start;
-    border-radius: var(--ms-radius-xl);
+    border-radius: calc(var(--ms-radius-xl) - var(--ms-space-1));
     box-shadow: none;
     text-align: left;
-    padding-block: var(--ms-space-3);
+    padding-block: calc(var(--ms-space-2) + var(--ms-space-1));
   }
 
   &--variant-rail {
-    --ms-button-bg: transparent;
-    --ms-button-border: transparent;
+    --ms-button-bg: rgba(255, 255, 255, 0.52);
+    --ms-button-border: var(--ms-color-border-faint);
     --ms-button-text: var(--ms-color-text);
     --ms-button-hover-bg: var(--ms-color-rail-hover-bg);
-    --ms-button-hover-border: transparent;
+    --ms-button-hover-border: var(--ms-color-rail-hover-border);
+    --ms-button-hover-shadow: var(--ms-shadow-card);
   }
 
   &--variant-rail-selected {
@@ -141,11 +145,12 @@ $button-sizes: (
     --ms-button-text: var(--ms-color-text-strong);
     --ms-button-hover-bg: var(--ms-color-selected-hover-bg);
     --ms-button-hover-border: var(--ms-color-rail-active-border);
+    --ms-button-hover-shadow: var(--ms-shadow-card);
 
     &::before {
       content: "";
       position: absolute;
-      inset: 0 auto 0 0;
+      inset: 0.5rem auto 0.5rem 0;
       width: 0.1875rem;
       border-radius: 999px;
       background: var(--ms-color-rail-active-indicator);

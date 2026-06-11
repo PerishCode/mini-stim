@@ -1,6 +1,10 @@
 :root {
-  --ms-shadow-shell: 0 18px 42px -28px rgba(36, 56, 74, 0.28);
-  --ms-shadow-card: 0 10px 24px -22px rgba(34, 51, 66, 0.3);
+  --ms-shadow-shell:
+    0 0 0 1px rgba(129, 147, 164, 0.08),
+    0 16px 34px -28px rgba(25, 42, 59, 0.34);
+  --ms-shadow-card:
+    0 0 0 1px rgba(123, 143, 161, 0.06),
+    0 8px 18px -18px rgba(28, 44, 59, 0.22);
   --ms-shadow-button: none;
-  --ms-shadow-focus: 0 0 0 3px rgba(44, 108, 163, 0.14);
+  --ms-shadow-focus: 0 0 0 3px rgba(36, 93, 143, 0.14);
 }

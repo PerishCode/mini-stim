@@ -7,6 +7,8 @@ import {
 } from "@mini-stim/components";
 import type { TimelineItem } from "@mini-stim/hooks";
 
+import { parseCoreStamp } from "./coreStamp";
+
 export function TimelineItemView(props: {
   item: TimelineItem;
 }) {
@@ -126,8 +128,8 @@ function roleLabel(role: string) {
 }
 
 function formatStamp(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
+  const date = parseCoreStamp(value);
+  if (!date) {
     return value;
   }
   return new Intl.DateTimeFormat(undefined, {

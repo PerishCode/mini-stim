@@ -9,9 +9,9 @@
   color: var(--ms-color-text);
   background: var(--ms-color-canvas);
   font-family: var(--ms-font-family-sans);
-  --ms-shell-padding: var(--ms-space-3);
-  --ms-shell-gap: calc(var(--ms-space-3) * 0.8);
-  --ms-shell-radius: calc(var(--ms-radius-xl) - var(--ms-space-1));
+  --ms-shell-padding: calc(var(--ms-space-2) + var(--ms-space-1));
+  --ms-shell-gap: var(--ms-space-2);
+  --ms-shell-radius: calc(var(--ms-radius-xl) - var(--ms-space-2));
   --ms-shell-shadow: var(--ms-shadow-shell);
 }
 
@@ -29,9 +29,9 @@ body,
 body {
   margin: 0;
   background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.88), transparent 24rem),
-    radial-gradient(circle at bottom right, rgba(196, 214, 231, 0.26), transparent 20rem),
-    linear-gradient(180deg, #eef4f8 0%, var(--ms-color-canvas) 100%);
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.82), transparent 21rem),
+    radial-gradient(circle at bottom right, rgba(179, 197, 214, 0.22), transparent 18rem),
+    linear-gradient(180deg, #edf2f7 0%, var(--ms-color-canvas) 100%);
   color: var(--ms-color-text);
   font-family: var(--ms-font-family-sans);
   overflow: hidden;

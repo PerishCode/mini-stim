@@ -18,7 +18,7 @@ $grid-gaps: (
   }
 
   &--template-sidebar-main {
-    grid-template-columns: minmax(18rem, 22rem) minmax(0, 1fr);
+    grid-template-columns: minmax(16.5rem, 19rem) minmax(0, 1fr);
 
     @media (max-width: 48rem) {
       grid-template-columns: 1fr;
