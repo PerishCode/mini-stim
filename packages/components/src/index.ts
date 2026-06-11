@@ -3,6 +3,7 @@ export { Badge } from "./atoms/Badge/Badge";
 export { Button } from "./atoms/Button/Button";
 export { CodeBlock } from "./atoms/CodeBlock/CodeBlock";
 export { FieldActionLayout } from "./patterns/FieldActionLayout/FieldActionLayout";
+export { SectionStackLayout } from "./patterns/SectionStackLayout/SectionStackLayout";
 export { Grid, GridItem } from "./atoms/Grid/Grid";
 export { GridRows } from "./atoms/GridRows/GridRows";
 export { Heading } from "./atoms/Heading/Heading";

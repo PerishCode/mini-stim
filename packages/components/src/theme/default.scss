@@ -38,6 +38,11 @@ body {
 }
 
 button,
+form,
 textarea {
   font: inherit;
+}
+
+form {
+  margin: 0;
 }

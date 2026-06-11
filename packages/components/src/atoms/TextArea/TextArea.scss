@@ -1,9 +1,42 @@
 @use "../../theme/mixins" as *;
 
+.msTextAreaFrame {
+  --ms-textarea-frame-border: var(--ms-color-input-border);
+  --ms-textarea-frame-bg: var(--ms-color-input-bg);
+  --ms-textarea-frame-radius: var(--ms-radius-lg);
+  --ms-textarea-frame-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--ms-textarea-frame-border);
+  border-radius: var(--ms-textarea-frame-radius);
+  background: var(--ms-textarea-frame-bg);
+  box-shadow: var(--ms-textarea-frame-shadow);
+  transition: height 180ms ease-out;
+
+  @include focus-ring("&:focus-within");
+
+  > .msTextArea {
+    border: 0;
+    border-radius: inherit;
+    background: transparent;
+    box-shadow: none;
+
+    &:focus {
+      box-shadow: none;
+    }
+  }
+}
+
 .msTextArea {
   display: block;
   width: 100%;
   min-height: 5.25rem;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   border: 1px solid var(--ms-color-input-border);
   border-radius: var(--ms-radius-lg);
   background: var(--ms-color-input-bg);
@@ -30,6 +63,11 @@
   }
 
   &--variant-composer {
+    --ms-textarea-frame-border: var(--ms-color-dock-border);
+    --ms-textarea-frame-bg: var(--ms-color-input-dock-bg);
+    --ms-textarea-frame-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      0 1px 0 var(--ms-color-border-faint);
     min-height: 3.5rem;
     border-color: var(--ms-color-dock-border);
     background: var(--ms-color-input-dock-bg);

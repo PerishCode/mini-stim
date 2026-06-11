@@ -1,4 +1,4 @@
-import { GridRows, Notice, Pane, Stack, Text } from "@mini-stim/components";
+import { Pane, SectionStackLayout } from "@mini-stim/components";
 
 import { ChatHeader } from "./ChatHeader";
 import { Composer } from "./Composer";
@@ -19,34 +19,28 @@ export function ChatShell(props: {
 }) {
   return (
     <Pane chrome="panel" tone="subtle" grow>
-      <GridRows grow template="header-body-footer">
-        <ChatHeader
-          busy={props.busy}
-          connection={props.connection}
-          onTitleCommit={props.onTitleCommit}
-          selectedSessionId={props.selectedSessionId}
-          title={props.title}
-          titleValue={props.titleValue}
-        />
-        <Transcript timeline={props.timeline} />
-        <Stack gap="none">
-          {props.error ? (
-            <Pane padding="md">
-              <Notice tone="danger">
-                <Text>{props.error}</Text>
-              </Notice>
-            </Pane>
-          ) : null}
-          <Pane border="top" padding="md" tone="raised">
-            <Composer
-              value={props.draft}
-              disabled={props.busy}
-              onChange={props.onDraftChange}
-              onSubmit={props.onSend}
-            />
-          </Pane>
-        </Stack>
-      </GridRows>
+      <SectionStackLayout
+        top={(
+          <ChatHeader
+            busy={props.busy}
+            connection={props.connection}
+            onTitleCommit={props.onTitleCommit}
+            selectedSessionId={props.selectedSessionId}
+            title={props.title}
+            titleValue={props.titleValue}
+          />
+        )}
+        middle={<Transcript timeline={props.timeline} />}
+        bottom={(
+          <Composer
+            value={props.draft}
+            disabled={props.busy}
+            error={props.error}
+            onChange={props.onDraftChange}
+            onSubmit={props.onSend}
+          />
+        )}
+      />
     </Pane>
   );
 }
