@@ -9,10 +9,9 @@ import {
   ScrollArea,
   Stack,
   Text,
+  Timestamp,
 } from "@mini-stim/components";
 import type { Session } from "@mini-stim/hooks";
-
-import { parseCoreStamp } from "./coreStamp";
 
 export function SessionRail(props: {
   busy: boolean;
@@ -65,9 +64,7 @@ export function SessionRail(props: {
                       {label}
                     </Text>
                     <Inline tag="span" justify="between" align="center" grow gap="sm">
-                      <Text size="xs" tone="subtle" truncate>
-                        {formatSessionStamp(session.updated_at)}
-                      </Text>
+                      <Timestamp value={session.updated_at} size="xs" tone="subtle" truncate />
                       {selected ? <Badge size="sm" tone="accent">active</Badge> : null}
                     </Inline>
                   </Stack>
@@ -88,17 +85,4 @@ export function SessionRail(props: {
 
 function sessionLabel(session: { id: string; title?: string | null }) {
   return session.title?.trim() || session.id;
-}
-
-function formatSessionStamp(value: string) {
-  const date = parseCoreStamp(value);
-  if (!date) {
-    return value;
-  }
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
 }

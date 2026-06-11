@@ -9,6 +9,7 @@ async-stream.workspace = true
 async-trait.workspace = true
 futures-core.workspace = true
 futures-util.workspace = true
+jiff.workspace = true
 rusqlite.workspace = true
 santi-provider.workspace = true
 serde.workspace = true

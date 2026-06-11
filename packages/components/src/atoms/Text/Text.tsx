@@ -4,8 +4,11 @@ import { cx } from "../../internal/cx";
 import "./Text.scss";
 
 type TextProps = ComponentPropsWithoutRef<"span"> & {
+  // `dateTime` is only meaningful on tag="time"; allow it without widening the
+  // whole prop surface to a polymorphic union.
+  dateTime?: string;
   size?: "xs" | "sm" | "md" | "lg";
-  tag?: "p" | "span" | "small";
+  tag?: "p" | "span" | "small" | "time";
   tone?: "default" | "strong" | "muted" | "subtle";
   truncate?: boolean;
 };

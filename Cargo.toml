@@ -25,6 +25,7 @@ bytes = "1"
 dotenvy = "0.15"
 futures-core = "0.3"
 futures-util = "0.3"
+jiff = "0.2"
 mini-stim-proto-client = { path = "proto/crates/client" }
 mini-stim-proto-server = { path = "proto/crates/server" }
 mini-stim-proto-transport = { path = "proto/crates/transport" }
