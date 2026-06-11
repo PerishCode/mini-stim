@@ -140,6 +140,31 @@ export function useSessionTurnTimeline(sessionId?: string | null): TurnGroup[] {
   return projection.turnTimelineBySessionId[resolvedSessionId] ?? [];
 }
 
+/**
+ * First user-authored line of each loaded session, keyed by session id.
+ * Only sessions whose messages have been fetched appear; callers fall
+ * back to their own label (title or id) for the rest.
+ */
+export function useSessionPreviews(): Record<string, string> {
+  const projection = useSessionProjection();
+  return useMemo(() => {
+    const previews: Record<string, string> = {};
+    for (const [sessionId, messages] of Object.entries(
+      projection.messagesBySessionId,
+    )) {
+      const first = messages.find(
+        (message) =>
+          message.message.actor_type === "account" &&
+          message.content_text.trim(),
+      );
+      if (first) {
+        previews[sessionId] = first.content_text.trim();
+      }
+    }
+    return previews;
+  }, [projection]);
+}
+
 export function useSessionRuntime(
   sessionId?: string | null,
 ): SessionRuntimeSnapshot | null {

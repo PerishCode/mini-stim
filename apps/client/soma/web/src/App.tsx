@@ -7,6 +7,7 @@ import {
   useSessionActions,
   useSessionError,
   useSessionPending,
+  useSessionPreviews,
   useSessionRuntime,
   useSessionTurnTimeline,
   useSessions,
@@ -24,6 +25,7 @@ export function App() {
   const connection = useMessageConnection();
   const actions = useSessionActions();
   const runtime = useSessionRuntime();
+  const previews = useSessionPreviews();
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [inspecting, setInspecting] = useState(false);
@@ -146,6 +148,7 @@ export function App() {
           busy={busy}
           onCreate={createNewSession}
           onSelect={selectSession}
+          previews={previews}
           selectedSessionId={selectedSessionId}
           sessions={sessions}
         />

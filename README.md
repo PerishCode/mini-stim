@@ -59,6 +59,27 @@ Out of scope:
   semantics, Tauri, and native projections.
 - Legacy completions or chat completions compatibility.
 
+Modeled in core but deliberately not yet surfaced in the web UI. Each entry
+names its unlock condition so deferral stays distinguishable from neglect:
+
+- Session forking (`parent_session_id`, `fork_point`): modeled and stored,
+  not exposed over the API. Unlocks when a turn-level "fork from here"
+  action is wanted; the turn-grouped transcript is the natural anchor.
+- Image message parts (`MessagePart::Image`): contracts and rendering
+  pipeline accept them; the composer is text-only. Unlocks when a concrete
+  image-input use case shows up in dogfooding.
+- Message editing/deletion (`Message.version`, `deleted_at`,
+  `MessageEvent` audit trail): event-sourced lifecycle exists; the UI
+  renders latest state only. Unlocks if correction workflows matter more
+  than transcript immutability.
+- Soul-view timeline (`SoulSessionEntry`, dual seq sequences): the inspect
+  panel shows memory and compact summaries, not the full "what the agent
+  actually sees" context reconstruction. Unlocks as the inspect panel
+  matures past its v1 form.
+- Effects detail (`SessionEffect` payload/result refs): the inspect panel
+  lists type and status only. Unlocks when hooks start producing effects
+  worth debugging in the UI.
+
 ## Setup
 
 Create `.env` from `.env.example` and fill:
