@@ -27,6 +27,25 @@ export function App() {
 
   const busy = pending > 0;
   const debouncedBusy = useDebouncedValue(busy, { debounceMs: 150 });
+  // While a turn is running, the header chip names the phase the turn is
+  // actually in instead of a generic "sending".
+  const activity = useMemo(() => {
+    const running = timeline.find((group) => group.turn?.status === "running");
+    if (!running) {
+      return "sending";
+    }
+    if (running.items.some((item) => item.kind === "tool_call" && !item.toolResult)) {
+      return "running tool";
+    }
+    if (
+      running.items.some(
+        (item) => item.kind === "message" && item.message.message.state === "pending",
+      )
+    ) {
+      return "generating";
+    }
+    return "thinking";
+  }, [timeline]);
   // Turn failures render in place inside the transcript; the composer
   // notice keeps only errors that no failed turn already carries.
   const inPlaceErrors = useMemo(
@@ -116,6 +135,7 @@ export function App() {
         </GridItem>
         <GridItem area="main" tag="main">
         <ChatShell
+          activity={activity}
           busy={debouncedBusy}
           connection={debouncedConnection}
           error={visibleError}

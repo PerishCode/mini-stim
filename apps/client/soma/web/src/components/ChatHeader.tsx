@@ -11,6 +11,7 @@ import {
 } from "@mini-stim/components";
 
 export function ChatHeader(props: {
+  activity: string;
   busy: boolean;
   connection: string;
   onTitleCommit: (title: string | null) => void;
@@ -86,7 +87,7 @@ export function ChatHeader(props: {
         </Stack>
         <Inline gap="sm" wrap>
           {props.busy ? (
-            <Badge size="sm" tone="success">sending</Badge>
+            <Badge size="sm" tone="success">{props.activity}</Badge>
           ) : null}
           {props.connection === "error" ? (
             <Badge size="sm" tone="danger">reconnecting</Badge>

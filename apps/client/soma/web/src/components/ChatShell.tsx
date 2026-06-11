@@ -5,6 +5,7 @@ import { Composer } from "./Composer";
 import { Transcript } from "./Transcript";
 
 export function ChatShell(props: {
+  activity: string;
   busy: boolean;
   connection: string;
   error: string | null;
@@ -22,6 +23,7 @@ export function ChatShell(props: {
       <SectionStackLayout
         top={(
           <ChatHeader
+            activity={props.activity}
             busy={props.busy}
             connection={props.connection}
             onTitleCommit={props.onTitleCommit}
