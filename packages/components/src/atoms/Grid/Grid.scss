@@ -1,5 +1,6 @@
 $grid-gaps: (
   "none": 0,
+  "shell": var(--ms-shell-gap),
   "sm": var(--ms-space-3),
   "md": var(--ms-space-4),
 );

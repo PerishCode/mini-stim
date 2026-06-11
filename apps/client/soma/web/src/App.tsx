@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { AppRoot, Grid, GridItem } from "@mini-stim/components";
 import {
+  useDebouncedValue,
   useMessageConnection,
   useSelectedSessionId,
   useSessionActions,
@@ -25,11 +26,17 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
 
   const busy = pending > 0;
+  const debouncedBusy = useDebouncedValue(busy, { debounceMs: 150 });
   const visibleError = error ?? sessionError?.message ?? null;
+  const debouncedConnection = useDebouncedValue(connection, { debounceMs: 150 });
   const selectedTitle = useMemo(() => {
     const selected = sessions.find((session) => session.id === selectedSessionId);
     return selected ? sessionLabel(selected) : "New session";
   }, [selectedSessionId, sessions]);
+  const selectedSession = useMemo(
+    () => sessions.find((session) => session.id === selectedSessionId) ?? null,
+    [selectedSessionId, sessions],
+  );
 
   function createNewSession() {
     setError(null);
@@ -67,9 +74,21 @@ export function App() {
     }
   }
 
+  function updateTitle(title: string | null) {
+    if (!selectedSessionId) {
+      return;
+    }
+    setError(null);
+    try {
+      actions.updateTitle(selectedSessionId, title);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    }
+  }
+
   return (
     <AppRoot>
-      <Grid template="sidebar-main" grow>
+      <Grid template="sidebar-main" gap="shell" grow>
         <GridItem area="sidebar" tag="aside">
         <SessionRail
           busy={busy}
@@ -81,13 +100,15 @@ export function App() {
         </GridItem>
         <GridItem area="main" tag="main">
         <ChatShell
-          busy={busy}
-          connection={connection}
+          busy={debouncedBusy}
+          connection={debouncedConnection}
           error={visibleError}
           onDraftChange={setDraft}
           onSend={send}
+          onTitleCommit={updateTitle}
           selectedSessionId={selectedSessionId}
           title={selectedTitle}
+          titleValue={selectedSession?.title ?? null}
           timeline={timeline}
           draft={draft}
         />

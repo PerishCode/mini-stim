@@ -10,19 +10,23 @@ export function ChatShell(props: {
   error: string | null;
   onDraftChange: (value: string) => void;
   onSend: () => void;
+  onTitleCommit: (title: string | null) => void;
   selectedSessionId: string | null;
   title: string;
+  titleValue: string | null;
   timeline: Parameters<typeof Transcript>[0]["timeline"];
   draft: string;
 }) {
   return (
-    <Pane tone="subtle" grow>
+    <Pane chrome="panel" tone="subtle" grow>
       <GridRows grow template="header-body-footer">
         <ChatHeader
           busy={props.busy}
           connection={props.connection}
+          onTitleCommit={props.onTitleCommit}
           selectedSessionId={props.selectedSessionId}
           title={props.title}
+          titleValue={props.titleValue}
         />
         <Transcript timeline={props.timeline} />
         <Stack gap="none">

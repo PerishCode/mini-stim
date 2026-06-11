@@ -5,6 +5,7 @@ import type {
   SessionRuntimeSnapshot,
   ToolCall,
   ToolResult,
+  UpdateSessionRequest,
 } from "@mini-stim/contracts";
 
 export type {
@@ -22,6 +23,7 @@ export type SessionAction =
   | "messages"
   | "runtime"
   | "select"
+  | "update"
   | "send";
 
 export type SessionPhase =
@@ -39,6 +41,7 @@ export interface SessionPayloads {
   runtime: { sessionId: string };
   select: { sessionId: string | null };
   send: { sessionId?: string | null; content: MessagePart[] };
+  update: { sessionId: string; title: UpdateSessionRequest["title"] };
 }
 
 export interface MqueueError {

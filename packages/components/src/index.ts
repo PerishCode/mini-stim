@@ -6,11 +6,15 @@ export { FieldActionLayout } from "./patterns/FieldActionLayout/FieldActionLayou
 export { Grid, GridItem } from "./atoms/Grid/Grid";
 export { GridRows } from "./atoms/GridRows/GridRows";
 export { Heading } from "./atoms/Heading/Heading";
+export { Icon } from "./icons/Icon/Icon";
 export { IconButton } from "./atoms/IconButton/IconButton";
+export { Input } from "./atoms/Input/Input";
 export { Inline } from "./atoms/Inline/Inline";
 export { Notice } from "./atoms/Notice/Notice";
 export { Pane } from "./atoms/Pane/Pane";
+export { PlusIcon } from "./icons/PlusIcon";
 export { ScrollArea } from "./atoms/ScrollArea/ScrollArea";
+export { SendIcon } from "./icons/SendIcon";
 export { Stack } from "./atoms/Stack/Stack";
 export { Surface } from "./atoms/Surface/Surface";
 export { Text } from "./atoms/Text/Text";

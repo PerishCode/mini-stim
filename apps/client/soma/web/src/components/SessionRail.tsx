@@ -5,6 +5,7 @@ import {
   Heading,
   Inline,
   Pane,
+  PlusIcon,
   ScrollArea,
   Stack,
   Text,
@@ -19,7 +20,7 @@ export function SessionRail(props: {
   sessions: Session[];
 }) {
   return (
-    <Pane border="right" padding="lg" tone="raised" grow>
+    <Pane chrome="panel" padding="lg" tone="raised" grow>
       <GridRows grow template="header-body" gap="md">
         <Stack gap="sm">
           <Inline justify="between" align="start" gap="md">
@@ -33,6 +34,7 @@ export function SessionRail(props: {
             disabled={props.busy}
             onClick={props.onCreate}
           >
+            <PlusIcon size="sm" />
             New
           </Button>
           </Inline>

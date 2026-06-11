@@ -5,6 +5,7 @@ import {
   listSessions,
   runtimeSnapshot,
   sendSession,
+  updateSession,
   type CreateSessionResponse,
   type SendSessionResponse,
   type Session,
@@ -261,6 +262,19 @@ function createMqueueCore(target: Window): SantiMqueue {
         connectSessionEvents(detail.session.id);
         emitMessageProjection(detail.session.id);
         dispatchSession(target, sessionEvent(action, "committed", detail, "http"));
+        return;
+      }
+      case "update": {
+        const updatePayload = payload as SessionPayloads["update"];
+        const session = expectStatus(
+          await updateSession(updatePayload.sessionId, { title: updatePayload.title }),
+          200,
+        ) as Session;
+        upsertSession(session);
+        if (state.selectedSessionId === session.id) {
+          state.messages = state.messagesBySessionId[session.id] ?? [];
+        }
+        dispatchSession(target, sessionEvent(action, "committed", { session }, "http"));
         return;
       }
       case "messages": {

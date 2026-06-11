@@ -1,4 +1,4 @@
-import { Button, FieldActionLayout, TextArea } from "@mini-stim/components";
+import { Button, FieldActionLayout, SendIcon, TextArea } from "@mini-stim/components";
 
 export function Composer(props: {
   disabled?: boolean;
@@ -22,6 +22,7 @@ export function Composer(props: {
             size="lg"
             disabled={props.disabled || !props.value.trim()}
           >
+            <SendIcon size="sm" />
             Send
           </Button>
         )}

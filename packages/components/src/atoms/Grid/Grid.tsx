@@ -4,7 +4,7 @@ import { cx } from "../../internal/cx";
 import "./Grid.scss";
 
 type GridProps = ComponentPropsWithoutRef<"div"> & {
-  gap?: "none" | "sm" | "md";
+  gap?: "none" | "shell" | "sm" | "md";
   grow?: boolean;
   template?: "sidebar-main";
 };

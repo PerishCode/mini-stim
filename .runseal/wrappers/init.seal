@@ -150,6 +150,7 @@ require_path apps/client/soma/web/package.json
 require_path packages/components/package.json
 require_path packages/contracts/package.json
 require_path .runseal/wrappers/codegen.seal
+require_path .runseal/wrappers/browser.seal
 require_path .runseal/wrappers/init.seal
 require_path .runseal/wrappers/pr.seal
 require_path .runseal/hooks/pre-commit
