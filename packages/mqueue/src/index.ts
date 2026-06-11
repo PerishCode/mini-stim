@@ -15,22 +15,18 @@ import {
 } from "@mini-stim/contracts";
 
 import {
-  appendText,
   cloneMessageProjection,
   cloneProjection,
   dedupeMessages,
-  dedupeToolCalls,
-  dedupeToolResults,
   dispatchMessage,
   dispatchSession,
   expectStatus,
   messageEvent,
   normalizeError,
   sessionEvent,
-  timelineItems,
-  transientMessage,
   validateSessionPayload,
 } from "./events";
+import { createProjectionWriter } from "./projection";
 import { openSessionStream } from "./stream";
 import type {
   MessageConnectionState,
@@ -51,6 +47,7 @@ import type {
   ToolCall,
   ToolResult,
   TimelineItem,
+  Turn,
 } from "./types";
 
 export type {
@@ -77,6 +74,9 @@ export type {
   TimelineItem,
   ToolCall,
   ToolResult,
+  Turn,
+  TurnGroup,
+  TurnStatus,
 } from "./types";
 
 declare global {
@@ -113,12 +113,23 @@ function createMqueueCore(target: Window): SantiMqueue {
   const messageState: MessageProjection = {
     messagesBySessionId: {},
     timelineBySessionId: {},
+    turnTimelineBySessionId: {},
+    turnsBySessionId: {},
     toolCallsBySessionId: {},
     toolResultsBySessionId: {},
     connectionBySessionId: {},
   };
   let activeSessionId: string | null = null;
   let eventSource: EventSource | null = null;
+  const {
+    applyDelta,
+    markTurnFailed,
+    removeTransient,
+    setMessageProjection,
+    upsertMessages,
+    upsertTools,
+    upsertTurns,
+  } = createProjectionWriter(state, messageState);
 
   const session: SessionMqueue = { pub, sub: subSession, snapshot };
   const message: MessageMqueue = { sub: subMessage, snapshot: messageSnapshot };
@@ -299,6 +310,7 @@ function createMqueueCore(target: Window): SantiMqueue {
           200,
         ) as SessionRuntimeSnapshot;
         state.runtimeBySessionId[runtimePayload.sessionId] = runtime;
+        upsertTurns(runtimePayload.sessionId, runtime.turns);
         upsertTools(runtimePayload.sessionId, runtime.tool_calls, runtime.tool_results);
         emitMessageProjection(runtimePayload.sessionId);
         dispatchSession(target, sessionEvent(action, "committed", runtime, "http"));
@@ -344,6 +356,7 @@ function createMqueueCore(target: Window): SantiMqueue {
       response.user_message,
       response.assistant_message,
     ]);
+    upsertTurns(response.session.id, [response.turn]);
     upsertTools(response.session.id, response.tool_calls, response.tool_results);
     state.messages = state.messagesBySessionId[response.session.id];
     emitMessageProjection(response.session.id);
@@ -401,16 +414,21 @@ function createMqueueCore(target: Window): SantiMqueue {
         dispatchMessage(target, messageEvent("tool_result", sessionId, payload, "sse"));
         emitMessageProjection(sessionId);
       },
+      turnStarted: (payload) => {
+        upsertTurns(sessionId, [payload.turn]);
+        dispatchMessage(target, messageEvent("turn_started", sessionId, payload, "sse"));
+        emitMessageProjection(sessionId);
+      },
       turnFailed: (payload) => {
-        const failure = { code: "turn_failed", message: payload.error };
-        state.error = failure;
+        markTurnFailed(sessionId, payload.turn_id, payload.error);
         dispatchMessage(
           target,
           messageEvent("failed", sessionId, payload, "sse", {
-            error: failure,
+            error: { code: "turn_failed", message: payload.error },
           }),
         );
         emitProjection();
+        emitMessageProjection(sessionId);
       },
     });
   }
@@ -434,65 +452,10 @@ function createMqueueCore(target: Window): SantiMqueue {
     emitMessageProjection(sessionId);
   }
 
-  function applyDelta(sessionId: string, payload: MessageDeltaPayload) {
-    const existing = state.messagesBySessionId[sessionId] ?? [];
-    const index = existing.findIndex((message) => message.message.id === payload.message_id);
-    if (index === -1) {
-      state.messagesBySessionId[sessionId] = [...existing, transientMessage(sessionId, payload)];
-    } else {
-      const current = existing[index];
-      state.messagesBySessionId[sessionId] = [
-        ...existing.slice(0, index),
-        appendText(current, payload.text),
-        ...existing.slice(index + 1),
-      ];
-    }
-    if (state.selectedSessionId === sessionId) {
-      state.messages = state.messagesBySessionId[sessionId];
-    }
-    setMessageProjection(sessionId);
-  }
 
-  function removeTransient(sessionId: string, turnId: string) {
-    const transientId = `stream_${turnId}`;
-    state.messagesBySessionId[sessionId] = (state.messagesBySessionId[sessionId] ?? []).filter(
-      (message) => message.message.id !== transientId,
-    );
-  }
 
-  function upsertMessages(sessionId: string, messages: SessionMessage[]) {
-    state.messagesBySessionId[sessionId] = dedupeMessages([
-      ...(state.messagesBySessionId[sessionId] ?? []),
-      ...messages,
-    ]);
-    if (state.selectedSessionId === sessionId) {
-      state.messages = state.messagesBySessionId[sessionId];
-    }
-    setMessageProjection(sessionId);
-  }
 
-  function upsertTools(sessionId: string, calls: ToolCall[], results: ToolResult[]) {
-    messageState.toolCallsBySessionId[sessionId] = dedupeToolCalls([
-      ...(messageState.toolCallsBySessionId[sessionId] ?? []),
-      ...calls,
-    ]);
-    messageState.toolResultsBySessionId[sessionId] = dedupeToolResults([
-      ...(messageState.toolResultsBySessionId[sessionId] ?? []),
-      ...results,
-    ]);
-    setMessageProjection(sessionId);
-  }
 
-  function setMessageProjection(sessionId: string) {
-    const messages = state.messagesBySessionId[sessionId] ?? [];
-    const calls = messageState.toolCallsBySessionId[sessionId] ?? [];
-    const results = messageState.toolResultsBySessionId[sessionId] ?? [];
-    messageState.messagesBySessionId[sessionId] = messages;
-    messageState.timelineBySessionId[sessionId] = timelineItems(
-      sessionId,
-      messages,
-      calls,
-      results,
-    );
-  }
+
+
 }

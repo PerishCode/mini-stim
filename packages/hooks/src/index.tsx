@@ -21,6 +21,7 @@ import {
   type SessionMessage,
   type SessionProjection,
   type TimelineItem,
+  type TurnGroup,
 } from "@mini-stim/mqueue";
 
 export type {
@@ -33,6 +34,9 @@ export type {
   SessionMessage,
   SessionProjection,
   TimelineItem,
+  Turn,
+  TurnGroup,
+  TurnStatus,
 } from "@mini-stim/mqueue";
 
 interface SantiMqueueProviderProps {
@@ -114,7 +118,7 @@ export function useSessionMessages(sessionId?: string | null): SessionMessage[] 
   return projection.messagesBySessionId[resolvedSessionId] ?? [];
 }
 
-export function useSessionTimeline(sessionId?: string | null): TimelineItem[] {
+export function useSessionTurnTimeline(sessionId?: string | null): TurnGroup[] {
   const mqueue = useSantiMqueue();
   const selectedSessionId = useSelectedSessionId();
   const store = useMemo(() => createMessageStore(mqueue), [mqueue]);
@@ -127,7 +131,7 @@ export function useSessionTimeline(sessionId?: string | null): TimelineItem[] {
   if (!resolvedSessionId) {
     return [];
   }
-  return projection.timelineBySessionId[resolvedSessionId] ?? [];
+  return projection.turnTimelineBySessionId[resolvedSessionId] ?? [];
 }
 
 export function useSessionPending(): number {

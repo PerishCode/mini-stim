@@ -4,6 +4,7 @@ import type {
   SessionMessage,
   ToolCall,
   ToolResult,
+  Turn,
 } from "@mini-stim/contracts";
 
 import type {
@@ -19,6 +20,7 @@ import type {
   SessionProjection,
   StreamEvent,
   TimelineItem,
+  TurnGroup,
 } from "./types";
 
 const DEFAULT_ACTOR_ID = "account_local";
@@ -197,6 +199,18 @@ export function cloneMessageProjection(value: MessageProjection): MessageProject
         [...items],
       ]),
     ),
+    turnTimelineBySessionId: Object.fromEntries(
+      Object.entries(value.turnTimelineBySessionId).map(([sessionId, groups]) => [
+        sessionId,
+        groups.map((group) => ({ ...group, items: [...group.items] })),
+      ]),
+    ),
+    turnsBySessionId: Object.fromEntries(
+      Object.entries(value.turnsBySessionId).map(([sessionId, turns]) => [
+        sessionId,
+        [...turns],
+      ]),
+    ),
     toolCallsBySessionId: Object.fromEntries(
       Object.entries(value.toolCallsBySessionId).map(([sessionId, calls]) => [
         sessionId,
@@ -210,6 +224,132 @@ export function cloneMessageProjection(value: MessageProjection): MessageProject
       ]),
     ),
   };
+}
+
+export function dedupeTurns(turns: Turn[]): Turn[] {
+  const byId = new Map<string, Turn>();
+  for (const turn of turns) {
+    const existing = byId.get(turn.id);
+    if (!existing || existing.updated_at.localeCompare(turn.updated_at) <= 0) {
+      byId.set(turn.id, turn);
+    }
+  }
+  return [...byId.values()].sort(
+    (left, right) =>
+      left.input_through_session_seq - right.input_through_session_seq ||
+      left.created_at.localeCompare(right.created_at),
+  );
+}
+
+const STREAM_MESSAGE_PREFIX = "stream_";
+
+/**
+ * Group a flat, time-sorted timeline into turn envelopes.
+ *
+ * Attribution rules, strongest first:
+ * - tool_call / paired tool_result: `turn_id` on the call.
+ * - transient streaming message: its id is `stream_<turn_id>` (core emits
+ *   MessageDelta with that synthetic id).
+ * - user message: the turn whose `trigger_ref` is the message id.
+ * - anything else: the turn with the largest `input_through_session_seq`
+ *   that is <= the message's `session_seq` (each turn's appended messages
+ *   sit after its input watermark and before the next turn's).
+ *
+ * Items that resolve to no turn (turns not loaded yet, old data) fall into
+ * envelope-less groups, one per consecutive run, so render order is
+ * preserved and nothing ever fails to render. Turns with no attributed
+ * items (just-started turns) still produce an empty group so the UI can
+ * show a running envelope immediately.
+ */
+export function turnGroups(
+  sessionId: string,
+  items: TimelineItem[],
+  turns: Turn[],
+): TurnGroup[] {
+  const sortedTurns = dedupeTurns(turns);
+  const turnsById = new Map(sortedTurns.map((turn) => [turn.id, turn]));
+  const groupsByTurnId = new Map<string, TurnGroup>();
+  const groups: TurnGroup[] = [];
+  let fallback: TurnGroup | null = null;
+
+  const ensureTurnGroup = (turn: Turn): TurnGroup => {
+    let group = groupsByTurnId.get(turn.id);
+    if (!group) {
+      group = {
+        id: turn.id,
+        sessionId,
+        createdAt: turn.created_at,
+        turn,
+        items: [],
+      };
+      groupsByTurnId.set(turn.id, group);
+      groups.push(group);
+    }
+    return group;
+  };
+
+  for (const item of items) {
+    const turn = attributeItem(item, sortedTurns, turnsById);
+    if (turn) {
+      fallback = null;
+      const group = ensureTurnGroup(turn);
+      group.items.push(item);
+      if (item.createdAt.localeCompare(group.createdAt) < 0) {
+        group.createdAt = item.createdAt;
+      }
+    } else {
+      if (!fallback) {
+        fallback = {
+          id: `ungrouped_${item.id}`,
+          sessionId,
+          createdAt: item.createdAt,
+          items: [],
+        };
+        groups.push(fallback);
+      }
+      fallback.items.push(item);
+    }
+  }
+
+  for (const turn of sortedTurns) {
+    ensureTurnGroup(turn);
+  }
+
+  return groups.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+}
+
+function attributeItem(
+  item: TimelineItem,
+  sortedTurns: Turn[],
+  turnsById: Map<string, Turn>,
+): Turn | undefined {
+  if (item.kind === "tool_call") {
+    return turnsById.get(item.toolCall.turn_id);
+  }
+  if (item.kind === "tool_result") {
+    return item.toolCall ? turnsById.get(item.toolCall.turn_id) : undefined;
+  }
+  const messageId = item.message.message.id;
+  if (messageId.startsWith(STREAM_MESSAGE_PREFIX)) {
+    const turn = turnsById.get(messageId.slice(STREAM_MESSAGE_PREFIX.length));
+    if (turn) {
+      return turn;
+    }
+  }
+  const byTrigger = sortedTurns.find((turn) => turn.trigger_ref === messageId);
+  if (byTrigger) {
+    return byTrigger;
+  }
+  const seq = item.message.relation.session_seq;
+  let candidate: Turn | undefined;
+  for (const turn of sortedTurns) {
+    if (turn.input_through_session_seq <= seq) {
+      candidate = turn;
+    } else {
+      break;
+    }
+  }
+  return candidate;
 }
 
 export function dedupeToolCalls(calls: ToolCall[]): ToolCall[] {

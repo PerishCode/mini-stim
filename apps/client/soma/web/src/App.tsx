@@ -7,7 +7,7 @@ import {
   useSessionActions,
   useSessionError,
   useSessionPending,
-  useSessionTimeline,
+  useSessionTurnTimeline,
   useSessions,
 } from "@mini-stim/hooks";
 
@@ -17,7 +17,7 @@ import { SessionRail } from "./components/SessionRail";
 export function App() {
   const sessions = useSessions();
   const selectedSessionId = useSelectedSessionId();
-  const timeline = useSessionTimeline();
+  const timeline = useSessionTurnTimeline();
   const pending = useSessionPending();
   const sessionError = useSessionError();
   const connection = useMessageConnection();
@@ -27,7 +27,23 @@ export function App() {
 
   const busy = pending > 0;
   const debouncedBusy = useDebouncedValue(busy, { debounceMs: 150 });
-  const visibleError = error ?? sessionError?.message ?? null;
+  // Turn failures render in place inside the transcript; the composer
+  // notice keeps only errors that no failed turn already carries.
+  const inPlaceErrors = useMemo(
+    () =>
+      new Set(
+        timeline
+          .filter((group) => group.turn?.status === "failed")
+          .map((group) => group.turn?.error_text)
+          .filter((text): text is string => Boolean(text)),
+      ),
+    [timeline],
+  );
+  const sessionErrorMessage =
+    sessionError && !inPlaceErrors.has(sessionError.message)
+      ? sessionError.message
+      : null;
+  const visibleError = error ?? sessionErrorMessage;
   const debouncedConnection = useDebouncedValue(connection, { debounceMs: 150 });
   const selectedTitle = useMemo(() => {
     const selected = sessions.find((session) => session.id === selectedSessionId);
