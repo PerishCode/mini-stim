@@ -1,14 +1,20 @@
 @use "../../theme/mixins" as *;
 
 .msIconButton {
+  --ms-icon-button-bg: var(--ms-color-button-bg);
+  --ms-icon-button-border: var(--ms-color-button-border);
+  --ms-icon-button-text: var(--ms-color-button-text);
+  --ms-icon-button-hover-bg: var(--ms-color-button-hover-bg);
+  --ms-icon-button-hover-border: var(--ms-color-border-strong);
+
   display: inline-grid;
   width: 2.625rem;
   height: 2.625rem;
   place-items: center;
-  border: 1px solid var(--ms-color-button-border);
+  border: 1px solid var(--ms-icon-button-border);
   border-radius: var(--ms-radius-md);
-  background: var(--ms-color-button-bg);
-  color: var(--ms-color-button-text);
+  background: var(--ms-icon-button-bg);
+  color: var(--ms-icon-button-text);
   cursor: pointer;
   box-shadow: var(--ms-shadow-button);
   @include transition(background-color, border-color, color, box-shadow, transform);
@@ -16,10 +22,18 @@
   @include control-disabled;
 
   &:not(:disabled):hover {
-    background: var(--ms-color-button-hover-bg);
-    border-color: var(--ms-color-border-strong);
+    background: var(--ms-icon-button-hover-bg);
+    border-color: var(--ms-icon-button-hover-border);
     transform: translateY(-1px);
   }
 
   @include focus-ring;
+
+  &--tone-accent {
+    --ms-icon-button-bg: var(--ms-color-accent);
+    --ms-icon-button-border: var(--ms-color-accent-border);
+    --ms-icon-button-text: var(--ms-color-accent-text);
+    --ms-icon-button-hover-bg: var(--ms-color-accent-hover);
+    --ms-icon-button-hover-border: var(--ms-color-accent-hover);
+  }
 }

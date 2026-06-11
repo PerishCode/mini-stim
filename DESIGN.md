@@ -51,7 +51,108 @@ Only after that translation should the idea appear in product UI.
 This is how visual taste becomes a maintainable system instead of a sequence of
  one-off page edits.
 
-## 3. Current aesthetic direction
+## 3. Templates, creativity, and patterns
+
+Template use and creativity are orthogonal.
+
+Templates are not the opposite of creative work.
+They are the normal way to solve a problem once its constraints are clear
+enough that the correct structure becomes stable.
+
+In `mini-stim`:
+
+- creativity is used to choose, revise, extend, or delete patterns
+- templates are used to solve recurring, high-constraint local UI problems
+- patterns are the formal system asset that carries those templates
+
+This means:
+
+- we do not treat every local UI problem as a fresh composition exercise
+- we do not reject a near-unique structural solution just to preserve the
+  appearance of originality
+- we do not confuse repeated, mature layout practice with a lack of design
+  judgment
+
+When a local UI problem becomes structurally obvious, the correct action is
+usually to recognize the pattern and encode it, not to improvise again.
+
+## 4. Pattern layer
+
+`mini-stim` recognizes a layer between low-level design-system primitives and
+product-specific components.
+
+That layer is `patterns`.
+
+Patterns are:
+
+- business-blind
+- structurally opinionated
+- reusable
+- allowed to be hard-coded
+- subject to revision, expansion, and deletion
+
+Patterns are not:
+
+- page-local implementation tricks
+- product-semantic components
+- permanent rules frozen forever
+- just documentation with no code representation
+
+The intended hierarchy is:
+
+1. tokens
+2. atoms
+3. patterns
+4. product components
+
+Patterns sit above atoms because they express recommended composition logic.
+Patterns sit below product components because they must not encode product
+meaning.
+
+For example, a pattern may express:
+
+- fluid primary region + fixed action region
+- label stack + trailing status cluster
+- header + scroll body + pinned footer
+- primary content + secondary meta line
+
+It should not express:
+
+- session rail item
+- assistant transcript card
+- mini-stim composer
+
+Those are product-semantic usages of more general patterns.
+
+## 5. Pattern lifecycle
+
+Patterns are design assets, not sacred artifacts.
+
+They may be:
+
+- added
+- modified
+- expanded
+- simplified
+- deprecated
+- deleted
+
+The design question is not whether a pattern should stay untouched forever.
+The design question is whether the current recurring problem is better served by
+reusing an existing pattern, revising one, or creating a new one.
+
+The default storage rule is:
+
+- mature patterns belong in code
+- `DESIGN.md` explains pattern philosophy and indexes pattern assets
+- `DESIGN.md` may temporarily hold provisional patterns that are not yet ready
+  to hard-code
+
+`DESIGN.md` is not the permanent home of mature pattern behavior.
+If a pattern is stable enough to trust, the preferred outcome is to encode it
+in `packages/components`.
+
+## 6. Current aesthetic direction
 
 The current direction is:
 
@@ -71,7 +172,7 @@ The closest useful inspiration pattern is:
 The wrong takeaway from editorial references is warm paper nostalgia.
 The right takeaway is restraint, hierarchy, and accent discipline.
 
-## 4. Color philosophy
+## 7. Color philosophy
 
 ### Base rule
 
@@ -128,7 +229,7 @@ Do not drift into:
 
 Warm accents may exist, but the workspace itself should remain clear and clean.
 
-## 5. Surface hierarchy
+## 8. Surface hierarchy
 
 The product should read as a stack of clear working layers:
 
@@ -152,7 +253,7 @@ Not by:
 
 Shadows should be minimal. Borders and tonal separation do most of the work.
 
-## 6. Typography roles
+## 9. Typography roles
 
 Typography has distinct jobs.
 
@@ -198,7 +299,7 @@ Use for:
 
 Mono is not a theme. It is a utility lane.
 
-## 7. Component translation rules
+## 10. Component translation rules
 
 Visual language must land in the component system, not in page-local styling.
 
@@ -223,25 +324,105 @@ They do not own product concepts like:
 - assistant
 - transcript
 
+Atoms should answer questions like:
+
+- what surface tones exist
+- what padding/radius/typography roles exist
+- how low-level layout primitives behave
+- how controls expose state and affordance
+
+They should not answer recurring high-level composition questions that already
+have a stable structural solution.
+
+### Patterns
+
+Patterns are business-blind hard-coded composition templates.
+
+They own:
+
+- recurring high-constraint layout solutions
+- recommended structural combinations of atoms
+- reusable information hierarchy templates
+- stable local surface/lane relationships
+
+They do not own:
+
+- transport logic
+- page routing
+- product semantics
+- one-off page composition
+
+If a UI problem repeatedly causes `web` to compose the same atoms in nearly the
+same way, stop and consider whether that structure is actually a missing
+pattern.
+
 ### Web business components
 
-Business components may compose atoms into:
+Business components may compose atoms and patterns into:
 
 - session rail rows
 - transcript items
 - composer blocks
 - tool result views
 
-They may express product meaning, but they must not invent local visual rules.
+They may express product meaning, but they must not invent local visual rules
+when those rules already belong in atoms or patterns.
 
 ### Web CSS rule
 
 `apps/client/soma/web` should not become a styling escape hatch.
 
 If `web` appears to need CSS, assume atom expressiveness is missing.
-Add or refine atom capability instead of patching page-local styles.
+Add or refine atom/pattern capability instead of patching page-local styles.
 
-## 8. Message styling rules
+## 11. Pattern index and provisional storage
+
+This file also acts as the pattern index.
+
+Use the following interpretation:
+
+- hard-coded pattern
+  the pattern is implemented in `packages/components` and code is the primary
+  truth
+- provisional pattern
+  the pattern has been identified and should be remembered, but is not yet
+  stable enough or enabled enough to hard-code
+- deprecated pattern
+  the pattern should no longer guide new work and should be removed or replaced
+
+When a provisional pattern is recorded here, include:
+
+- status
+- constraints
+- intended structural shape
+- why it is not yet hard-coded
+- what would trigger promotion into code
+
+Current index:
+
+### Hard-coded patterns
+
+#### FieldActionLayout
+
+- status: hard-coded
+- intent:
+  - one fluid primary region
+  - one fixed-width secondary action region
+  - one shared control body without page-local layout improvisation
+- code location:
+  - `packages/components/src/patterns/FieldActionLayout/FieldActionLayout.tsx`
+  - `packages/components/src/patterns/FieldActionLayout/FieldActionLayout.scss`
+- current product usage:
+  - the `mini-stim` chat composer is the first pilot consumer
+- notes:
+  - this pattern is intentionally business-blind
+  - it captures a recurring layout solution, not a chat-specific component
+
+### Provisional patterns
+
+None currently tracked.
+
+## 12. Message styling rules
 
 Messages should be visually distinct by role, but still belong to one family.
 
@@ -267,7 +448,7 @@ Messages should be visually distinct by role, but still belong to one family.
 - should feel structured and inspectable
 - code/payload areas should remain mono and neutral enough for scanning
 
-## 9. Motion and interaction
+## 13. Motion and interaction
 
 Motion should be sparse and useful.
 
@@ -285,7 +466,7 @@ Do not use motion for:
 
 The interface should feel responsive, not animated.
 
-## 10. Background and atmosphere
+## 14. Background and atmosphere
 
 The product may have a small amount of atmosphere, but it must stay behind the
  work.
@@ -305,7 +486,7 @@ Not allowed:
 If a background effect is noticeable before the content is noticeable, it is
 too strong.
 
-## 11. Borrowing from external references
+## 15. Borrowing from external references
 
 When studying another project, extract only stable principles such as:
 
@@ -327,17 +508,17 @@ The question is never "How do we make mini-stim look like that project?"
 
 The question is:
 
-"What visual rule from that project is durable enough to become a token or atom
- capability here?"
+"What visual rule from that project is durable enough to become a token, atom,
+ or pattern capability here?"
 
-## 12. Review heuristics
+## 16. Review heuristics
 
 A visual change is likely correct when:
 
 - readability improves
 - hierarchy gets clearer
 - fewer colors carry more meaning
-- the change can be explained through tokens or atoms
+- the change can be explained through tokens, atoms, or patterns
 - another screen could reuse the same rule
 
 A visual change is likely wrong when:
@@ -347,8 +528,10 @@ A visual change is likely wrong when:
 - it depends on `web`-local CSS
 - it makes reading harder to gain personality
 - it copies a reference surface without translating its logic
+- it leaves a recurring high-constraint local structure trapped in page-level
+  JSX instead of promoting it to a reusable pattern
 
-## 13. Near-term direction for mini-stim
+## 17. Near-term direction for mini-stim
 
 Near-term refinement should focus on:
 
@@ -357,6 +540,8 @@ Near-term refinement should focus on:
 - clearer meta typography
 - improved transcript readability
 - stronger atom capabilities for shell/layout/surfaces
+- extracting the first true business-blind hard-coded patterns from recurring
+  chat/workspace structures
 
 Not on:
 
@@ -365,12 +550,13 @@ Not on:
 - dark mode expansion before the light mode language is stable
 - high-brand marketing aesthetics inside the working chat surface
 
-## 14. Maintenance rule
+## 18. Maintenance rule
 
 When `mini-stim` gains new visual capabilities, update this file if the change
 alters:
 
 - the aesthetic direction
+- the pattern philosophy or layer boundary
 - the interpretation of accent usage
 - the allowed surface hierarchy
 - the boundary between inspiration and system

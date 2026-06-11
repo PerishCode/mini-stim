@@ -6,9 +6,9 @@ import "./Button.scss";
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   block?: boolean;
   justify?: "center" | "start" | "between";
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
   tone?: "neutral" | "accent";
-  variant?: "solid" | "outline" | "ghost" | "selected";
+  variant?: "solid" | "outline" | "ghost" | "selected" | "rail" | "rail-selected";
 };
 
 export function Button({

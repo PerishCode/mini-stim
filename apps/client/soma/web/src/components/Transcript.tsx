@@ -8,14 +8,14 @@ export function Transcript(props: {
 }) {
   return (
     <ScrollArea grow>
-      <Pane padding="lg">
-        <Stack gap="md">
+      <Pane padding="xl">
+        <Stack gap="lg">
           {props.timeline.map((item) => (
             <TimelineItemView key={item.id} item={item} />
           ))}
           {!props.timeline.length ? (
             <Notice>
-              <Text tone="muted">Start a session</Text>
+              <Text tone="muted">Start a session to see the transcript build here.</Text>
             </Notice>
           ) : null}
         </Stack>

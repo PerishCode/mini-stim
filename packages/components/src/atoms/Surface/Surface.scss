@@ -19,6 +19,7 @@ $surface-paddings: (
   "sm": var(--ms-space-3),
   "md": var(--ms-space-4),
   "lg": var(--ms-space-5),
+  "xl": var(--ms-space-6),
 );
 
 .msSurface {
@@ -70,6 +71,13 @@ $surface-paddings: (
     --ms-surface-bg: var(--ms-color-surface-muted-bg);
     --ms-surface-border: var(--ms-color-surface-muted-border);
     --ms-surface-text: var(--ms-color-text);
+  }
+
+  &--tone-inset {
+    --ms-surface-bg: var(--ms-color-surface-inset-bg);
+    --ms-surface-border: var(--ms-color-surface-inset-border);
+    --ms-surface-text: var(--ms-color-text);
+    box-shadow: none;
   }
 
   &--tone-warning {

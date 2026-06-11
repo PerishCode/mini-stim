@@ -65,7 +65,7 @@ mini-stim/
 │   ├── contracts/           # generated OpenAPI schema/types
 │   ├── mqueue/              # browser transport/event projection over contracts + SSE
 │   ├── hooks/               # React provider + atomic hooks over mqueue
-│   └── components/          # reusable UI primitives/compositions used by client
+│   └── components/          # reusable UI atoms/patterns consumed by client
 ├── docs/
 └── .task/                   # local task memory, ignored by git
 ```
@@ -120,7 +120,131 @@ plane and must stay limited to cell lifecycle facts.
   fallbacks or exploring unrelated environment workarounds unless the user asks.
 - Keep hard cuts acceptable. Add compatibility only for a real external surface.
 
+## Browser Automation Rules
+
+Treat browser automation as a persistent working surface, not a disposable
+subprocess.
+
+- Browser automation policy follows the current official `@playwright/cli`
+  documentation surface, not ad hoc local muscle memory from older installs.
+- A working browser surface assumes a modern `@playwright/cli` with named
+  sessions via `-s=<name>` and session management via `list`, `close`,
+  `close-all`, `kill-all`, and `delete-data`.
+- Start browser work by checking `playwright-cli --version` when session
+  behavior looks unfamiliar. If the installed CLI does not match the current
+  documented command surface, treat that as environment drift and report it
+  directly instead of burning time on exploratory command permutations.
+- Prefer reusing the current `playwright-cli` session and tab instead of
+  stopping/restarting or closing/reopening the browser.
+- If the target page needs to refresh, prefer `playwright-cli reload`.
+- If the task needs a different page in the same working surface, prefer
+  `playwright-cli -s=<name> open <url>` or `playwright-cli goto <url>` on the
+  active session/tab instead of tearing the session down first.
+- Only stop, restart, or delete a browser session when the current session is
+  unusable, isolated state is explicitly required, or the user asks for a fresh
+  browser context.
+- Avoid unnecessary browser restarts because they destroy the current window
+  shape, tab arrangement, and other user-adjusted visual context.
+
+For routine local iteration, the primary `playwright-cli` session name is
+`mini-stim`. Do not fall back to the default session for ordinary work unless
+the named session is unusable.
+
+`playwright-cli` cold start is `mini-stim-session-first`, not help-first,
+restart-first, or new-session-first.
+
+`working-surface check` is the standard phrase for cold-starting or revalidating
+the local runtime/browser surface before discussing concrete edits. It means:
+
+- verify the installed `playwright-cli` command surface before using browser
+  session commands when there is any sign of version drift
+- verify `sidecar` health first
+- recover the runtime only if cells are unhealthy
+- read the current `web.port` from the active namespace store
+- reuse the routine `playwright-cli` session `mini-stim`
+- open the current local web URL and take a fresh snapshot so everyone is
+  looking at the same live surface
+
+Normal local web startup path:
+
+```bash
+playwright-cli --version
+sidecar status --config sidecar.toml
+sidecar stop --config sidecar.toml   # only if runtime/cells are unhealthy
+sidecar start --config sidecar.toml  # only if runtime/cells are unhealthy
+cat .tmp/sidecar/<namespace>/client/web.port
+playwright-cli -s=mini-stim open http://127.0.0.1:<port> --headed
+playwright-cli -s=mini-stim snapshot
+```
+
+Only deviate from that path when the current session is unusable or the task
+explicitly requires isolated browser state. If the installed CLI does not
+support this command surface, stop and report the version drift instead of
+guessing alternate syntax.
+
+Normal `playwright-cli` shutdown path:
+
+```bash
+playwright-cli -s=mini-stim close        # stop the routine session cleanly
+playwright-cli close-all                 # stop all sessions when broader cleanup is intended
+playwright-cli kill-all                  # only for stale/zombie browser processes
+playwright-cli -s=<name> delete-data     # only after close, and only if session data should be removed
+```
+
+Do not kill the underlying browser process directly unless there is no cleaner
+recovery path left.
+
+For `playwright-cli`, treat the following as the normal hot path:
+
+- start with the routine `mini-stim` session for ordinary local iteration
+- use additional named sessions only when the task truly needs separate
+  cookies/storage or parallel browser contexts
+- prefer semantic session names when extra named sessions are required
+- use `-s=<name>` with `open`, `snapshot`, `click`, `fill`, `press`, `reload`,
+  `tab-list`, and `tab-select` as the default interactive workflow
+- resnapshot after significant page changes instead of guessing stale refs
+- use `tab-new` only when the task benefits from a second live tab; otherwise
+  keep work in the current tab
+- use `list` to inspect existing sessions before creating extra ones if
+  session state is unclear
+- if the current page is simply stale, prefer `reload` over re-`open`ing unless
+  the URL itself must change
+- clean up sessions only when the task is complete or stale state is clearly
+  harmful; do not treat cleanup as the default first move
+
 ## Frontend Package Boundary
+
+The frontend design-system asset model is explicit:
+
+- `packages/components/src/atoms`
+  owns business-blind primitives, low-level layout/control capabilities, token
+  consumption, and SCSS for those primitives.
+- `packages/components/src/patterns`
+  owns business-blind but higher-level hard-coded composition templates. A
+  pattern is not a page component and not a product concept; it is a reusable
+  structural solution for a recurring, high-constraint UI problem.
+- `apps/client/soma/web/src/components`
+  owns product-semantic assembly such as session rails, transcript item views,
+  composer instances, and other `mini-stim`-specific compositions built from
+  hooks plus component-system assets.
+
+Treat `patterns` as a first-class asset layer, not as a documentation-only
+idea and not as an accidental pile of "slightly larger atoms".
+
+- A pattern must stay business-blind.
+  It may encode structural relationships, surface layering, spacing rhythm,
+  fixed-vs-fluid layout logic, label/status clustering, and similar reusable
+  composition rules.
+  It must not encode product concepts such as `session`, `conversation`,
+  `assistant`, `tool result`, or `mini-stim`.
+- A mature pattern should be hard-coded in `packages/components`, with code as
+  the primary truth.
+- `DESIGN.md` may temporarily carry provisional patterns that are not yet ready
+  to hard-code, but that is a staging area, not the long-term home of mature
+  pattern behavior.
+- If a local UI problem is sufficiently constrained that the correct atom
+  combination is effectively unique, treat that as a pattern-discovery signal.
+  Do not keep re-solving that problem in `web`.
 
 - Keep the frontend split strict even though everything ships from one repo.
 - `packages/contracts` owns generated OpenAPI clients and DTOs only.
@@ -129,15 +253,25 @@ plane and must stay limited to cell lifecycle facts.
 - `packages/hooks` owns React context/providers and atomic hooks over
   `mqueue`. It is the only stateful integration layer the web app should
   consume.
-- `packages/components` owns reusable presentational UI primitives and small
-  compositions. It should stay transport-agnostic and product-light.
+- `packages/components` owns reusable presentational UI primitives and
+  hard-coded business-blind patterns. It should stay transport-agnostic and
+  product-light.
 - `apps/client/soma/web` owns route/page assembly, product-specific layout,
   and composer/transcript/session UX built from hooks and components.
 - Web app code must not call raw `fetch`, construct `EventSource`, import
   `@mini-stim/contracts`, or reach into sidecar/browser globals directly.
 - If a UI pattern is reusable across multiple client surfaces or would
-  otherwise cause page-level CSS/control duplication, move it into
-  `packages/components` instead of re-implementing it in `web`.
+  otherwise cause repeated atom soup or page-level CSS/control duplication,
+  move it into `packages/components`, usually as a `pattern`, instead of
+  re-implementing it in `web`.
+- When deciding where a UI change belongs, use this ladder:
+  - token issue -> theme/tokens
+  - primitive capability issue -> `atoms`
+  - recurring high-constraint composition issue -> `patterns`
+  - product semantics / content assembly issue -> `web`
+- Do not skip the `patterns` layer merely because a layout can technically be
+  assembled from atoms. The question is not "can atoms express this?" but
+  "should `web` have to re-decide this structure?"
 - If logic is about transport, replay, stream state, or event normalization, it
   belongs below `web`, usually in `mqueue` or `hooks`, not inside React pages.
 - Do not create a fake package/release process inside the repo. Keep the

@@ -6,12 +6,14 @@ import "./IconButton.scss";
 type IconButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children: ReactNode;
   label: string;
+  tone?: "neutral" | "accent";
 };
 
 export function IconButton({
   children,
   className,
   label,
+  tone = "neutral",
   type = "button",
   ...props
 }: IconButtonProps) {
@@ -19,7 +21,7 @@ export function IconButton({
     <button
       {...props}
       type={type}
-      className={cx("msIconButton", className)}
+      className={cx("msIconButton", `msIconButton--tone-${tone}`, className)}
       aria-label={label}
       title={label}
     >

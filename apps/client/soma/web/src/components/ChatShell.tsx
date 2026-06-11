@@ -33,7 +33,7 @@ export function ChatShell(props: {
               </Notice>
             </Pane>
           ) : null}
-          <Pane border="top" padding="md" tone="panel">
+          <Pane border="top" padding="md" tone="raised">
             <Composer
               value={props.draft}
               disabled={props.busy}

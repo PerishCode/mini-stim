@@ -25,8 +25,9 @@ body,
 body {
   margin: 0;
   background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.82), transparent 28rem),
-    linear-gradient(180deg, #f3f7fa 0%, var(--ms-color-canvas) 100%);
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.88), transparent 24rem),
+    radial-gradient(circle at bottom right, rgba(196, 214, 231, 0.26), transparent 20rem),
+    linear-gradient(180deg, #eef4f8 0%, var(--ms-color-canvas) 100%);
   color: var(--ms-color-text);
   font-family: var(--ms-font-family-sans);
   overflow: hidden;

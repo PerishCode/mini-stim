@@ -1,4 +1,4 @@
-import { IconButton, Inline, TextArea } from "@mini-stim/components";
+import { Button, FieldActionLayout, TextArea } from "@mini-stim/components";
 
 export function Composer(props: {
   disabled?: boolean;
@@ -13,21 +13,29 @@ export function Composer(props: {
         props.onSubmit();
       }}
     >
-      <Inline align="end" gap="sm">
+      <FieldActionLayout
+        actionWidth="lg"
+        action={(
+          <Button
+            type="submit"
+            tone="accent"
+            size="lg"
+            disabled={props.disabled || !props.value.trim()}
+          >
+            Send
+          </Button>
+        )}
+      >
         <TextArea
+          autosize={{ min: 1, max: 6 }}
           value={props.value}
           disabled={props.disabled}
-          placeholder="Message"
+          placeholder="Message mini-stim and press Enter"
+          resize="none"
+          variant="composer"
           onChange={(event) => props.onChange(event.currentTarget.value)}
         />
-        <IconButton
-          type="submit"
-          label="Send"
-          disabled={props.disabled || !props.value.trim()}
-        >
-          <span aria-hidden="true">↑</span>
-        </IconButton>
-      </Inline>
+      </FieldActionLayout>
     </form>
   );
 }

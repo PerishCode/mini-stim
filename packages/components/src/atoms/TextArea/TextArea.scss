@@ -5,7 +5,7 @@
   width: 100%;
   min-height: 5.25rem;
   border: 1px solid var(--ms-color-input-border);
-  border-radius: var(--ms-radius-md);
+  border-radius: var(--ms-radius-lg);
   background: var(--ms-color-input-bg);
   color: var(--ms-color-text);
   padding: var(--ms-space-3);
@@ -17,11 +17,30 @@
 
   @include focus-ring("&:focus");
 
+  &:focus {
+    background: var(--ms-color-input-focus-bg);
+  }
+
   &--resize-none {
     resize: none;
   }
 
   &--resize-vertical {
     resize: vertical;
+  }
+
+  &--variant-composer {
+    min-height: 3.5rem;
+    border-color: var(--ms-color-dock-border);
+    background: var(--ms-color-input-dock-bg);
+    padding: var(--ms-space-4);
+    line-height: 1.5;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      0 1px 0 var(--ms-color-border-faint);
+  }
+
+  &--autosize {
+    overflow-y: hidden;
   }
 }

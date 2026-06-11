@@ -9,15 +9,28 @@
   border-radius: 999px;
   background: var(--ms-badge-bg);
   color: var(--ms-badge-text);
-  padding: 0.25rem 0.625rem;
-  font-size: var(--ms-font-size-sm);
   font-weight: 600;
-  letter-spacing: 0.01em;
-  line-height: 1.2;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+
+  &--size-sm {
+    padding: 0.1875rem 0.5rem;
+    font-size: var(--ms-font-size-xs);
+  }
+
+  &--size-md {
+    padding: 0.25rem 0.625rem;
+    font-size: var(--ms-font-size-sm);
+  }
 
   &--tone-neutral {
     --ms-badge-bg: var(--ms-color-badge-neutral-bg);
     --ms-badge-text: var(--ms-color-badge-neutral-text);
+  }
+
+  &--tone-accent {
+    --ms-badge-bg: var(--ms-color-badge-accent-bg);
+    --ms-badge-text: var(--ms-color-badge-accent-text);
   }
 
   &--tone-success {

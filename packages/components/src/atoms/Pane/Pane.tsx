@@ -6,8 +6,8 @@ import "./Pane.scss";
 type PaneProps = ComponentPropsWithoutRef<"div"> & {
   border?: "none" | "right" | "top" | "bottom" | "around";
   grow?: boolean;
-  padding?: "none" | "sm" | "md" | "lg";
-  tone?: "canvas" | "panel" | "subtle";
+  padding?: "none" | "sm" | "md" | "lg" | "xl";
+  tone?: "canvas" | "panel" | "raised" | "subtle";
 };
 
 export function Pane({

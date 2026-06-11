@@ -18,9 +18,20 @@ export function TimelineItemView(props: {
       <Surface
         align={roleAlign(role)}
         tone={roleTone(role)}
+        padding="lg"
         width="content"
       >
-        <Text>{item.message.content_text}</Text>
+        <Stack gap="sm">
+          <Inline justify="between" align="center" wrap gap="sm">
+            <Text size="xs" tone="subtle">
+              {roleLabel(role)}
+            </Text>
+            <Text size="xs" tone="subtle">
+              {formatStamp(item.createdAt)}
+            </Text>
+          </Inline>
+          <Text>{item.message.content_text}</Text>
+        </Stack>
       </Surface>
     );
   }
@@ -29,11 +40,14 @@ export function TimelineItemView(props: {
     const result = item.toolResult;
     const failed = Boolean(result?.error_text);
     return (
-      <Surface tone={failed ? "danger" : "success"} width="full">
+      <Surface tone={failed ? "danger" : "inset"} padding="lg" width="full">
         <Stack gap="sm">
           <Inline justify="between" wrap gap="sm">
-            <Text>{item.toolCall.tool_name}</Text>
-            <Text size="sm" tone="muted">
+            <Stack tag="span" gap="xs">
+              <Text size="xs" tone="subtle">TOOL CALL</Text>
+              <Text tone="strong">{item.toolCall.tool_name}</Text>
+            </Stack>
+            <Text size="xs" tone="subtle">
               {result ? (failed ? "failed" : "completed") : "running"}
             </Text>
           </Inline>
@@ -50,11 +64,16 @@ export function TimelineItemView(props: {
 
   const failed = Boolean(item.toolResult.error_text);
   return (
-    <Surface tone={failed ? "danger" : "success"} width="full">
+    <Surface tone={failed ? "danger" : "inset"} padding="lg" width="full">
       <Stack gap="sm">
         <Inline justify="between" wrap gap="sm">
-          <Text>tool result</Text>
-          <Text size="sm" tone="muted">
+          <Stack tag="span" gap="xs">
+            <Text size="xs" tone="subtle">TOOL RESULT</Text>
+            <Text tone="strong">
+              {item.toolCall?.tool_name ?? "tool result"}
+            </Text>
+          </Stack>
+          <Text size="xs" tone="subtle">
             {failed ? "failed" : "completed"}
           </Text>
         </Inline>
@@ -94,4 +113,25 @@ function formatJson(value: unknown) {
     return value;
   }
   return JSON.stringify(value, null, 2);
+}
+
+function roleLabel(role: string) {
+  if (role === "account") {
+    return "YOU";
+  }
+  if (role === "system") {
+    return "SYSTEM";
+  }
+  return "ASSISTANT";
+}
+
+function formatStamp(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
 }

@@ -4,18 +4,25 @@ import { cx } from "../../internal/cx";
 import "./Badge.scss";
 
 type BadgeProps = ComponentPropsWithoutRef<"span"> & {
-  tone?: "neutral" | "success" | "danger";
+  size?: "sm" | "md";
+  tone?: "neutral" | "accent" | "success" | "danger";
 };
 
 export function Badge({
   className,
+  size = "md",
   tone = "neutral",
   ...props
 }: BadgeProps) {
   return (
     <span
       {...props}
-      className={cx("msBadge", `msBadge--tone-${tone}`, className)}
+      className={cx(
+        "msBadge",
+        `msBadge--size-${size}`,
+        `msBadge--tone-${tone}`,
+        className,
+      )}
     />
   );
 }

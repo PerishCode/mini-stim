@@ -1,35 +1,50 @@
 :root {
-  --ms-color-canvas: #e9eff4;
-  --ms-color-panel: #f8fbfd;
-  --ms-color-panel-subtle: #f1f6fa;
+  --ms-color-canvas: #e7edf3;
+  --ms-color-panel: #f6f9fc;
+  --ms-color-panel-raised: #fbfdff;
+  --ms-color-panel-subtle: #eef3f8;
   --ms-color-surface: #ffffff;
-  --ms-color-surface-muted-bg: #f7fafc;
-  --ms-color-surface-muted-border: #d7e2ea;
-  --ms-color-text: #17212b;
-  --ms-color-text-muted: #617181;
-  --ms-color-border: #d6e0e8;
-  --ms-color-border-strong: #aab9c7;
-  --ms-color-frame-border: rgba(155, 174, 190, 0.32);
+  --ms-color-surface-muted-bg: #f4f8fb;
+  --ms-color-surface-muted-border: #d5e0ea;
+  --ms-color-surface-inset-bg: #edf3f8;
+  --ms-color-surface-inset-border: #d4dde7;
+  --ms-color-text: #16202a;
+  --ms-color-text-strong: #101922;
+  --ms-color-text-muted: #5f7080;
+  --ms-color-text-subtle: #778898;
+  --ms-color-border: #d3dde7;
+  --ms-color-border-strong: #a8b7c5;
+  --ms-color-border-faint: rgba(161, 178, 194, 0.24);
+  --ms-color-frame-border: rgba(140, 162, 180, 0.28);
 
   --ms-color-button-bg: #ffffff;
   --ms-color-button-subtle-bg: #fbfdff;
-  --ms-color-button-hover-bg: #f0f5f9;
-  --ms-color-button-border: #c7d2dc;
+  --ms-color-button-hover-bg: #eef4f9;
+  --ms-color-button-border: #c5d1dc;
   --ms-color-button-text: #1c2a35;
   --ms-color-ghost-hover-bg: rgba(91, 116, 139, 0.08);
-  --ms-color-accent: #235f90;
-  --ms-color-accent-border: #235f90;
-  --ms-color-accent-hover: #1e547f;
+  --ms-color-rail-hover-bg: rgba(74, 99, 124, 0.08);
+  --ms-color-rail-active-bg: #e1ebf5;
+  --ms-color-rail-active-border: #c5d6e7;
+  --ms-color-rail-active-indicator: #2c6899;
+  --ms-color-accent: #2a6598;
+  --ms-color-accent-border: #2a6598;
+  --ms-color-accent-hover: #225884;
   --ms-color-accent-text: #ffffff;
-  --ms-color-selected-bg: #e4eff8;
-  --ms-color-selected-hover-bg: #dbe9f5;
+  --ms-color-selected-bg: #e3edf7;
+  --ms-color-selected-hover-bg: #dae7f3;
   --ms-color-selected-border: #a8c3dc;
+  --ms-color-selected-indicator: #2b648f;
 
-  --ms-color-input-bg: #ffffff;
+  --ms-color-input-bg: #fdfefe;
+  --ms-color-input-dock-bg: #f7fbfe;
   --ms-color-input-border: #cad6e0;
+  --ms-color-input-focus-bg: #ffffff;
+  --ms-color-dock-bg: rgba(244, 248, 252, 0.96);
+  --ms-color-dock-border: #d6e1eb;
 
-  --ms-color-surface-accent-bg: #dce9f5;
-  --ms-color-surface-accent-border: #a8c2d8;
+  --ms-color-surface-accent-bg: #dbe8f4;
+  --ms-color-surface-accent-border: #a7c1d7;
   --ms-color-surface-accent-text: #163a54;
 
   --ms-color-surface-warning-bg: #fff4e4;
@@ -44,12 +59,14 @@
   --ms-color-danger-border: #e2aaaa;
   --ms-color-danger-text: #8d2222;
 
-  --ms-color-code-bg: #f3f8fb;
-  --ms-color-code-border: #cfd9e3;
+  --ms-color-code-bg: #edf4f9;
+  --ms-color-code-border: #cdd9e4;
   --ms-color-code-text: #22323e;
 
   --ms-color-badge-neutral-bg: #eaf1f6;
   --ms-color-badge-neutral-text: #476173;
+  --ms-color-badge-accent-bg: #dbe8f4;
+  --ms-color-badge-accent-text: #1a4565;
   --ms-color-badge-success-bg: #dff1e8;
   --ms-color-badge-success-text: #21553d;
   --ms-color-badge-danger-bg: #fff0f0;

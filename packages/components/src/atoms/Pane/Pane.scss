@@ -3,11 +3,13 @@ $pane-paddings: (
   "sm": var(--ms-space-3),
   "md": var(--ms-space-4),
   "lg": var(--ms-space-6),
+  "xl": calc(var(--ms-space-6) + var(--ms-space-1)),
 );
 
 $pane-tones: (
   "canvas": var(--ms-color-canvas),
   "panel": var(--ms-color-panel),
+  "raised": var(--ms-color-panel-raised),
   "subtle": var(--ms-color-panel-subtle),
 );
 
