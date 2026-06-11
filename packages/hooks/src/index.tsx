@@ -20,19 +20,24 @@ import {
   type Session,
   type SessionMessage,
   type SessionProjection,
+  type SessionRuntimeSnapshot,
   type TimelineItem,
   type TurnGroup,
 } from "@mini-stim/mqueue";
 
 export type {
+  Compact,
   MessageConnectionState,
   MessagePart,
   MqueueError,
   PubAck,
   SantiMqueue,
   Session,
+  SessionEffect,
   SessionMessage,
   SessionProjection,
+  SessionRuntimeSnapshot,
+  SoulSession,
   TimelineItem,
   Turn,
   TurnGroup,
@@ -50,6 +55,7 @@ interface SessionActions {
   create(): PubAck;
   get(sessionId: string): PubAck;
   list(): PubAck;
+  refreshRuntime(sessionId: string): PubAck;
   select(sessionId: string | null): PubAck;
   selectAndGet(sessionId: string): PubAck[];
   send(input: { sessionId?: string | null; content: MessagePart[] }): PubAck;
@@ -134,6 +140,17 @@ export function useSessionTurnTimeline(sessionId?: string | null): TurnGroup[] {
   return projection.turnTimelineBySessionId[resolvedSessionId] ?? [];
 }
 
+export function useSessionRuntime(
+  sessionId?: string | null,
+): SessionRuntimeSnapshot | null {
+  const projection = useSessionProjection();
+  const resolvedSessionId = sessionId ?? projection.selectedSessionId;
+  if (!resolvedSessionId) {
+    return null;
+  }
+  return projection.runtimeBySessionId[resolvedSessionId] ?? null;
+}
+
 export function useSessionPending(): number {
   return useSessionProjection().pending;
 }
@@ -214,6 +231,8 @@ export function useSessionActions(): SessionActions {
       create: () => mqueue.session.pub("create"),
       get: (sessionId: string) => mqueue.session.pub("get", { sessionId }),
       list: () => mqueue.session.pub("list"),
+      refreshRuntime: (sessionId: string) =>
+        mqueue.session.pub("runtime", { sessionId }),
       select: (sessionId: string | null) =>
         mqueue.session.pub("select", { sessionId }),
       selectAndGet: (sessionId: string) => [

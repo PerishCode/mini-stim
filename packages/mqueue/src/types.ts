@@ -11,9 +11,13 @@ import type {
 } from "@mini-stim/contracts";
 
 export type {
+  Compact,
   MessagePart,
   Session,
+  SessionEffect,
   SessionMessage,
+  SessionRuntimeSnapshot,
+  SoulSession,
   ToolCall,
   ToolResult,
   Turn,

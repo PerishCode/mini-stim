@@ -51,6 +51,7 @@ import type {
 } from "./types";
 
 export type {
+  Compact,
   MessageConnectionState,
   MessageDeltaPayload,
   MessageEvent,
@@ -64,13 +65,16 @@ export type {
   SantiWindow,
   Session,
   SessionAction,
+  SessionEffect,
   SessionEvent,
   SessionMqueue,
   SessionMessage,
   SessionPayloads,
   SessionPhase,
   SessionProjection,
+  SessionRuntimeSnapshot,
   SessionSubOptions,
+  SoulSession,
   TimelineItem,
   ToolCall,
   ToolResult,

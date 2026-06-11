@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppRoot, Grid, GridItem } from "@mini-stim/components";
 import {
   useDebouncedValue,
@@ -7,6 +7,7 @@ import {
   useSessionActions,
   useSessionError,
   useSessionPending,
+  useSessionRuntime,
   useSessionTurnTimeline,
   useSessions,
 } from "@mini-stim/hooks";
@@ -22,8 +23,24 @@ export function App() {
   const sessionError = useSessionError();
   const connection = useMessageConnection();
   const actions = useSessionActions();
+  const runtime = useSessionRuntime();
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [inspecting, setInspecting] = useState(false);
+
+  // The inspect panel is a view over the selected session; switching
+  // sessions returns to the transcript. Opening it refreshes the snapshot
+  // so memory/compacts/effects reflect the turns since selection.
+  useEffect(() => {
+    setInspecting(false);
+  }, [selectedSessionId]);
+
+  function toggleInspect() {
+    if (!inspecting && selectedSessionId) {
+      actions.refreshRuntime(selectedSessionId);
+    }
+    setInspecting((current) => !current);
+  }
 
   const busy = pending > 0;
   const debouncedBusy = useDebouncedValue(busy, { debounceMs: 150 });
@@ -139,9 +156,12 @@ export function App() {
           busy={debouncedBusy}
           connection={debouncedConnection}
           error={visibleError}
+          inspecting={inspecting}
           onDraftChange={setDraft}
           onSend={send}
           onTitleCommit={updateTitle}
+          onToggleInspect={toggleInspect}
+          runtime={runtime}
           selectedSessionId={selectedSessionId}
           title={selectedTitle}
           titleValue={selectedSession?.title ?? null}
