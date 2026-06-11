@@ -4,6 +4,7 @@ import {
   Stack,
   Surface,
   Text,
+  Timestamp,
 } from "@mini-stim/components";
 import type { TimelineItem } from "@mini-stim/hooks";
 
@@ -26,9 +27,7 @@ export function TimelineItemView(props: {
             <Text size="xs" tone="subtle">
               {roleLabel(role)}
             </Text>
-            <Text size="xs" tone="subtle">
-              {formatStamp(item.createdAt)}
-            </Text>
+            <Timestamp value={item.createdAt} size="xs" tone="subtle" />
           </Inline>
           <Text>{item.message.content_text}</Text>
         </Stack>
@@ -123,15 +122,4 @@ function roleLabel(role: string) {
     return "SYSTEM";
   }
   return "ASSISTANT";
-}
-
-function formatStamp(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return new Intl.DateTimeFormat(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
 }

@@ -44,8 +44,7 @@ export function ChatHeader(props: {
   return (
     <Pane padding="lg">
       <Inline justify="between" align="start" wrap gap="md">
-        <Stack gap="xs">
-          <Text size="xs" tone="subtle">SESSION</Text>
+        <Stack gap="none" grow>
           {editing ? (
             <Input
               autoFocus
@@ -66,8 +65,10 @@ export function ChatHeader(props: {
             />
           ) : (
             <Button
+              block
               justify="start"
               size="sm"
+              title={props.title}
               variant="ghost"
               disabled={!props.selectedSessionId}
               type="button"
@@ -77,18 +78,19 @@ export function ChatHeader(props: {
                 }
               }}
             >
-              <Text size="lg" tone="strong">
+              <Text size="lg" tone="strong" truncate>
                 {props.title}
               </Text>
             </Button>
           )}
         </Stack>
         <Inline gap="sm" wrap>
-          <Badge size="sm" tone={props.busy ? "success" : "neutral"}>
-            {props.busy ? "sending" : "idle"}
-          </Badge>
-          {props.selectedSessionId ? <Badge size="sm" tone="accent">{props.connection}</Badge> : null}
-          {!props.selectedSessionId ? <Badge size="sm">new</Badge> : null}
+          {props.busy ? (
+            <Badge size="sm" tone="success">sending</Badge>
+          ) : null}
+          {props.connection === "error" ? (
+            <Badge size="sm" tone="danger">reconnecting</Badge>
+          ) : null}
         </Inline>
       </Inline>
     </Pane>

@@ -340,12 +340,20 @@ pub struct SessionRuntimeSnapshot {
 }
 
 pub fn timestamp_now() -> Timestamp {
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use jiff::fmt::temporal::DateTimePrinter;
 
-    let duration = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system clock before unix epoch");
-    format!("{}-{:03}", duration.as_secs(), duration.subsec_millis())
+    // RFC3339 / ISO 8601 UTC with fixed millisecond precision. Fixed-width
+    // fractional digits keep the string lexicographically sortable, which the
+    // store and the browser projection both rely on (timestamps are used as
+    // `ORDER BY` / `localeCompare` sort keys). A `jiff::Timestamp` is UTC, so
+    // the printed form ends in `Z`.
+    let now = jiff::Timestamp::now();
+    let mut buf = String::new();
+    DateTimePrinter::new()
+        .precision(Some(3))
+        .print_timestamp(&now, &mut buf)
+        .expect("formatting a timestamp into a String cannot fail");
+    buf
 }
 
 pub fn prefixed_id(prefix: &str) -> String {

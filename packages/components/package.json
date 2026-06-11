@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "dayjs": "^1.11.21",
     "lucide-react": "^1.17.0",
     "react": "^19.2.7"
   },

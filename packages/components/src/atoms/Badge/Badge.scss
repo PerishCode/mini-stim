@@ -1,45 +1,53 @@
 .msBadge {
   --ms-badge-bg: var(--ms-color-badge-neutral-bg);
+  --ms-badge-border: var(--ms-color-badge-neutral-border);
   --ms-badge-text: var(--ms-color-badge-neutral-text);
 
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   min-width: 0;
-  border: 1px solid var(--ms-color-border);
+  min-height: 1.5rem;
+  border: 1px solid var(--ms-badge-border);
   border-radius: 999px;
   background: var(--ms-badge-bg);
   color: var(--ms-badge-text);
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-weight: 650;
+  letter-spacing: 0.01em;
   line-height: 1.15;
+  white-space: nowrap;
 
   &--size-sm {
-    padding: 0.1875rem 0.5rem;
+    padding: 0.125rem 0.5rem;
     font-size: var(--ms-font-size-xs);
   }
 
   &--size-md {
-    padding: 0.25rem 0.625rem;
+    padding: 0.1875rem 0.625rem;
     font-size: var(--ms-font-size-sm);
   }
 
   &--tone-neutral {
     --ms-badge-bg: var(--ms-color-badge-neutral-bg);
+    --ms-badge-border: var(--ms-color-badge-neutral-border);
     --ms-badge-text: var(--ms-color-badge-neutral-text);
   }
 
   &--tone-accent {
     --ms-badge-bg: var(--ms-color-badge-accent-bg);
+    --ms-badge-border: var(--ms-color-badge-accent-border);
     --ms-badge-text: var(--ms-color-badge-accent-text);
   }
 
   &--tone-success {
     --ms-badge-bg: var(--ms-color-badge-success-bg);
+    --ms-badge-border: var(--ms-color-badge-success-border);
     --ms-badge-text: var(--ms-color-badge-success-text);
   }
 
   &--tone-danger {
     --ms-badge-bg: var(--ms-color-badge-danger-bg);
+    --ms-badge-border: var(--ms-color-badge-danger-border);
     --ms-badge-text: var(--ms-color-badge-danger-text);
   }
 }
