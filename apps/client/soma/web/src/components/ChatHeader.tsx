@@ -42,7 +42,7 @@ export function ChatHeader(props: {
   }
 
   return (
-    <Pane border="bottom" padding="lg" tone="raised">
+    <Pane padding="lg">
       <Inline justify="between" align="start" wrap gap="md">
         <Stack gap="xs">
           <Text size="xs" tone="subtle">SESSION</Text>
