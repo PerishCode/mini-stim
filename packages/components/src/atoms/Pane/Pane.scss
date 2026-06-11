@@ -1,53 +1,59 @@
+$pane-paddings: (
+  "none": 0,
+  "sm": var(--ms-space-3),
+  "md": var(--ms-space-4),
+  "lg": var(--ms-space-6),
+  "xl": calc(var(--ms-space-6) + var(--ms-space-1)),
+);
+
+$pane-tones: (
+  "canvas": var(--ms-color-canvas),
+  "panel": var(--ms-color-panel),
+  "raised": var(--ms-color-panel-raised),
+  "subtle": var(--ms-color-panel-subtle),
+);
+
+$pane-borders: (
+  "right": (
+    border-right: 1px solid var(--ms-color-border),
+  ),
+  "top": (
+    border-top: 1px solid var(--ms-color-border),
+  ),
+  "bottom": (
+    border-bottom: 1px solid var(--ms-color-border),
+  ),
+  "around": (
+    border: 1px solid var(--ms-color-border),
+  ),
+);
+
 .msPane {
   min-width: 0;
-}
 
-.msPane--grow {
-  display: flex;
-  flex: 1 1 auto;
-  min-height: 0;
-}
+  &--grow {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
 
-.msPane--tone-canvas {
-  background: var(--ms-color-canvas);
-}
+  @each $name, $value in $pane-tones {
+    &--tone-#{$name} {
+      background: $value;
+    }
+  }
 
-.msPane--tone-panel {
-  background: var(--ms-color-panel);
-}
+  @each $name, $value in $pane-paddings {
+    &--padding-#{$name} {
+      padding: $value;
+    }
+  }
 
-.msPane--tone-subtle {
-  background: var(--ms-color-panel-subtle);
-}
-
-.msPane--padding-none {
-  padding: 0;
-}
-
-.msPane--padding-sm {
-  padding: var(--ms-space-3);
-}
-
-.msPane--padding-md {
-  padding: var(--ms-space-4);
-}
-
-.msPane--padding-lg {
-  padding: var(--ms-space-6);
-}
-
-.msPane--border-right {
-  border-right: 1px solid var(--ms-color-border);
-}
-
-.msPane--border-top {
-  border-top: 1px solid var(--ms-color-border);
-}
-
-.msPane--border-bottom {
-  border-bottom: 1px solid var(--ms-color-border);
-}
-
-.msPane--border-around {
-  border: 1px solid var(--ms-color-border);
+  @each $name, $declarations in $pane-borders {
+    &--border-#{$name} {
+      @each $property, $property-value in $declarations {
+        #{$property}: $property-value;
+      }
+    }
+  }
 }

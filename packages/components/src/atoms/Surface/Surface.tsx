@@ -5,8 +5,8 @@ import "./Surface.scss";
 
 type SurfaceProps = ComponentPropsWithoutRef<"div"> & {
   align?: "start" | "center" | "end" | "stretch";
-  padding?: "sm" | "md" | "lg";
-  tone?: "default" | "accent" | "muted" | "success" | "warning" | "danger";
+  padding?: "sm" | "md" | "lg" | "xl";
+  tone?: "default" | "accent" | "muted" | "inset" | "success" | "warning" | "danger";
   width?: "full" | "content";
 };
 

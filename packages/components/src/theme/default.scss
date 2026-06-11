@@ -3,6 +3,7 @@
 @use "./tokens.radius.scss" as *;
 @use "./tokens.typography.scss" as *;
 @use "./tokens.border.scss" as *;
+@use "./tokens.motion.scss" as *;
 
 :root {
   color: var(--ms-color-text);
@@ -17,14 +18,19 @@
 html,
 body,
 #root {
+  height: 100%;
   min-height: 100%;
 }
 
 body {
   margin: 0;
-  background: var(--ms-color-canvas);
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.88), transparent 24rem),
+    radial-gradient(circle at bottom right, rgba(196, 214, 231, 0.26), transparent 20rem),
+    linear-gradient(180deg, #eef4f8 0%, var(--ms-color-canvas) 100%);
   color: var(--ms-color-text);
   font-family: var(--ms-font-family-sans);
+  overflow: hidden;
 }
 
 button,

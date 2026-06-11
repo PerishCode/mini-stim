@@ -1,76 +1,100 @@
+$surface-alignments: (
+  "start": flex-start,
+  "center": center,
+  "end": flex-end,
+  "stretch": stretch,
+);
+
+$surface-widths: (
+  "full": (
+    width: 100%,
+  ),
+  "content": (
+    width: fit-content,
+    max-width: min(48rem, 88%),
+  ),
+);
+
+$surface-paddings: (
+  "sm": var(--ms-space-3),
+  "md": var(--ms-space-4),
+  "lg": var(--ms-space-5),
+  "xl": var(--ms-space-6),
+);
+
 .msSurface {
+  --ms-surface-bg: var(--ms-color-surface);
+  --ms-surface-border: var(--ms-color-border);
+  --ms-surface-text: var(--ms-color-text);
+
   min-width: 0;
   border: 1px solid var(--ms-color-border);
   border-radius: var(--ms-radius-lg);
+  background: var(--ms-surface-bg);
+  border-color: var(--ms-surface-border);
+  color: var(--ms-surface-text);
   box-shadow: var(--ms-shadow-card);
-}
 
-.msSurface--align-start {
-  align-self: flex-start;
-}
+  @each $name, $value in $surface-alignments {
+    &--align-#{$name} {
+      align-self: $value;
+    }
+  }
 
-.msSurface--align-center {
-  align-self: center;
-}
+  @each $name, $declarations in $surface-widths {
+    &--width-#{$name} {
+      @each $property, $value in $declarations {
+        #{$property}: $value;
+      }
+    }
+  }
 
-.msSurface--align-end {
-  align-self: flex-end;
-}
+  @each $name, $value in $surface-paddings {
+    &--padding-#{$name} {
+      padding: $value;
+    }
+  }
 
-.msSurface--align-stretch {
-  align-self: stretch;
-}
+  &--tone-default {
+    --ms-surface-bg: var(--ms-color-surface);
+    --ms-surface-border: var(--ms-color-border);
+    --ms-surface-text: var(--ms-color-text);
+  }
 
-.msSurface--width-full {
-  width: 100%;
-}
+  &--tone-accent {
+    --ms-surface-bg: var(--ms-color-surface-accent-bg);
+    --ms-surface-border: var(--ms-color-surface-accent-border);
+    --ms-surface-text: var(--ms-color-surface-accent-text);
+  }
 
-.msSurface--width-content {
-  width: fit-content;
-  max-width: min(48rem, 88%);
-}
+  &--tone-muted {
+    --ms-surface-bg: var(--ms-color-surface-muted-bg);
+    --ms-surface-border: var(--ms-color-surface-muted-border);
+    --ms-surface-text: var(--ms-color-text);
+  }
 
-.msSurface--padding-sm {
-  padding: var(--ms-space-3);
-}
+  &--tone-inset {
+    --ms-surface-bg: var(--ms-color-surface-inset-bg);
+    --ms-surface-border: var(--ms-color-surface-inset-border);
+    --ms-surface-text: var(--ms-color-text);
+    box-shadow: none;
+  }
 
-.msSurface--padding-md {
-  padding: var(--ms-space-4);
-}
+  &--tone-warning {
+    --ms-surface-bg: var(--ms-color-surface-warning-bg);
+    --ms-surface-border: var(--ms-color-surface-warning-border);
+    --ms-surface-text: var(--ms-color-surface-warning-text);
+  }
 
-.msSurface--padding-lg {
-  padding: var(--ms-space-5);
-}
+  &--tone-success {
+    --ms-surface-bg: var(--ms-color-surface-success-bg);
+    --ms-surface-border: var(--ms-color-surface-success-border);
+    --ms-surface-text: var(--ms-color-surface-success-text);
+  }
 
-.msSurface--tone-default {
-  background: var(--ms-color-surface);
-  color: var(--ms-color-text);
-}
-
-.msSurface--tone-accent {
-  background: var(--ms-color-surface-accent-bg);
-  border-color: var(--ms-color-surface-accent-border);
-  color: var(--ms-color-surface-accent-text);
-}
-
-.msSurface--tone-muted {
-  background: var(--ms-color-surface);
-}
-
-.msSurface--tone-warning {
-  background: var(--ms-color-surface-warning-bg);
-  border-color: var(--ms-color-surface-warning-border);
-  color: var(--ms-color-surface-warning-text);
-}
-
-.msSurface--tone-success {
-  background: var(--ms-color-surface-success-bg);
-  border-color: var(--ms-color-surface-success-border);
-  color: var(--ms-color-surface-success-text);
-}
-
-.msSurface--tone-danger {
-  background: var(--ms-color-danger-bg);
-  border-color: var(--ms-color-danger-border);
-  color: var(--ms-color-danger-text);
+  &--tone-danger {
+    --ms-surface-bg: var(--ms-color-danger-bg);
+    --ms-surface-border: var(--ms-color-danger-border);
+    --ms-surface-text: var(--ms-color-danger-text);
+  }
 }

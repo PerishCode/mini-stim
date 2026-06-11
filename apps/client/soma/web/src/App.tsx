@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AppRoot } from "@mini-stim/components";
+import { AppRoot, Grid, GridItem } from "@mini-stim/components";
 import {
   useMessageConnection,
   useSelectedSessionId,
@@ -68,8 +68,9 @@ export function App() {
   }
 
   return (
-    <AppRoot
-      sidebar={
+    <AppRoot>
+      <Grid template="sidebar-main" grow>
+        <GridItem area="sidebar" tag="aside">
         <SessionRail
           busy={busy}
           onCreate={createNewSession}
@@ -77,8 +78,8 @@ export function App() {
           selectedSessionId={selectedSessionId}
           sessions={sessions}
         />
-      }
-      main={
+        </GridItem>
+        <GridItem area="main" tag="main">
         <ChatShell
           busy={busy}
           connection={connection}
@@ -90,8 +91,9 @@ export function App() {
           timeline={timeline}
           draft={draft}
         />
-      }
-    />
+        </GridItem>
+      </Grid>
+    </AppRoot>
   );
 }
 

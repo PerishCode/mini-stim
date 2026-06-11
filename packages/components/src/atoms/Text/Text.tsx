@@ -4,9 +4,9 @@ import { cx } from "../../internal/cx";
 import "./Text.scss";
 
 type TextProps = ComponentPropsWithoutRef<"span"> & {
-  size?: "sm" | "md";
+  size?: "xs" | "sm" | "md" | "lg";
   tag?: "p" | "span" | "small";
-  tone?: "default" | "muted";
+  tone?: "default" | "strong" | "muted" | "subtle";
   truncate?: boolean;
 };
 

@@ -1,25 +1,45 @@
 .msBadge {
+  --ms-badge-bg: var(--ms-color-badge-neutral-bg);
+  --ms-badge-text: var(--ms-color-badge-neutral-text);
+
   display: inline-flex;
   align-items: center;
   min-width: 0;
   border: 1px solid var(--ms-color-border);
   border-radius: 999px;
-  padding: 0.1875rem var(--ms-space-2);
-  font-size: var(--ms-font-size-sm);
-  line-height: 1.2;
-}
+  background: var(--ms-badge-bg);
+  color: var(--ms-badge-text);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
 
-.msBadge--tone-neutral {
-  background: var(--ms-color-badge-neutral-bg);
-  color: var(--ms-color-badge-neutral-text);
-}
+  &--size-sm {
+    padding: 0.1875rem 0.5rem;
+    font-size: var(--ms-font-size-xs);
+  }
 
-.msBadge--tone-success {
-  background: var(--ms-color-badge-success-bg);
-  color: var(--ms-color-badge-success-text);
-}
+  &--size-md {
+    padding: 0.25rem 0.625rem;
+    font-size: var(--ms-font-size-sm);
+  }
 
-.msBadge--tone-danger {
-  background: var(--ms-color-badge-danger-bg);
-  color: var(--ms-color-badge-danger-text);
+  &--tone-neutral {
+    --ms-badge-bg: var(--ms-color-badge-neutral-bg);
+    --ms-badge-text: var(--ms-color-badge-neutral-text);
+  }
+
+  &--tone-accent {
+    --ms-badge-bg: var(--ms-color-badge-accent-bg);
+    --ms-badge-text: var(--ms-color-badge-accent-text);
+  }
+
+  &--tone-success {
+    --ms-badge-bg: var(--ms-color-badge-success-bg);
+    --ms-badge-text: var(--ms-color-badge-success-text);
+  }
+
+  &--tone-danger {
+    --ms-badge-bg: var(--ms-color-badge-danger-bg);
+    --ms-badge-text: var(--ms-color-badge-danger-text);
+  }
 }

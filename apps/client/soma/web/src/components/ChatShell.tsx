@@ -1,4 +1,4 @@
-import { Notice, Pane, Stack, Text } from "@mini-stim/components";
+import { GridRows, Notice, Pane, Stack, Text } from "@mini-stim/components";
 
 import { ChatHeader } from "./ChatHeader";
 import { Composer } from "./Composer";
@@ -17,7 +17,7 @@ export function ChatShell(props: {
 }) {
   return (
     <Pane tone="subtle" grow>
-      <Stack grow>
+      <GridRows grow template="header-body-footer">
         <ChatHeader
           busy={props.busy}
           connection={props.connection}
@@ -25,22 +25,24 @@ export function ChatShell(props: {
           title={props.title}
         />
         <Transcript timeline={props.timeline} />
-        {props.error ? (
-          <Pane padding="md">
-            <Notice tone="danger">
-              <Text>{props.error}</Text>
-            </Notice>
+        <Stack gap="none">
+          {props.error ? (
+            <Pane padding="md">
+              <Notice tone="danger">
+                <Text>{props.error}</Text>
+              </Notice>
+            </Pane>
+          ) : null}
+          <Pane border="top" padding="md" tone="raised">
+            <Composer
+              value={props.draft}
+              disabled={props.busy}
+              onChange={props.onDraftChange}
+              onSubmit={props.onSend}
+            />
           </Pane>
-        ) : null}
-        <Pane border="top" padding="md" tone="panel">
-          <Composer
-            value={props.draft}
-            disabled={props.busy}
-            onChange={props.onDraftChange}
-            onSubmit={props.onSend}
-          />
-        </Pane>
-      </Stack>
+        </Stack>
+      </GridRows>
     </Pane>
   );
 }

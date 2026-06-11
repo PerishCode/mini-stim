@@ -5,7 +5,7 @@ import "./Stack.scss";
 
 type StackProps = ComponentPropsWithoutRef<"div"> & {
   align?: "start" | "center" | "stretch";
-  gap?: "xs" | "sm" | "md" | "lg";
+  gap?: "none" | "xs" | "sm" | "md" | "lg";
   grow?: boolean;
   justify?: "start" | "center" | "between";
   tag?: "div" | "span";
