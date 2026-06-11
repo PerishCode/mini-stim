@@ -9,6 +9,10 @@
   color: var(--ms-color-text);
   background: var(--ms-color-canvas);
   font-family: var(--ms-font-family-sans);
+  --ms-shell-padding: var(--ms-space-3);
+  --ms-shell-gap: calc(var(--ms-space-3) * 0.8);
+  --ms-shell-radius: calc(var(--ms-radius-xl) - var(--ms-space-1));
+  --ms-shell-shadow: var(--ms-shadow-shell);
 }
 
 * {

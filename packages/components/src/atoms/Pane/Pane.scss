@@ -30,11 +30,35 @@ $pane-borders: (
 
 .msPane {
   min-width: 0;
+  min-height: 0;
 
   &--grow {
     display: flex;
     flex: 1 1 auto;
     min-height: 0;
+  }
+
+  &--chrome-panel {
+    position: relative;
+    border-radius: var(--ms-shell-radius);
+    box-shadow: var(--ms-shell-shadow);
+    overflow: hidden;
+    isolation: isolate;
+
+    &::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.56), rgba(255, 255, 255, 0) 4rem);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    > * {
+      position: relative;
+      z-index: 1;
+    }
   }
 
   @each $name, $value in $pane-tones {

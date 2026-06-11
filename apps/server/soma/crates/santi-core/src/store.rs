@@ -160,6 +160,24 @@ impl SantiStore {
         session_by_id(&conn, session_id)
     }
 
+    pub fn update_session_title(
+        &self,
+        session_id: &str,
+        title: Option<String>,
+    ) -> Result<Option<Session>, String> {
+        let conn = self.conn.lock().unwrap();
+        if session_by_id(&conn, session_id)?.is_none() {
+            return Ok(None);
+        }
+        let now = timestamp_now();
+        conn.execute(
+            "UPDATE sessions SET title = ?2, updated_at = ?3 WHERE id = ?1",
+            params![session_id, normalize_session_title(title), now],
+        )
+        .map_err(|error| error.to_string())?;
+        session_by_id(&conn, session_id)
+    }
+
     pub fn session_messages(&self, session_id: &str) -> Result<Vec<SessionMessage>, String> {
         let conn = self.conn.lock().unwrap();
         session_messages(&conn, session_id)
@@ -345,6 +363,11 @@ fn session_title(content: &MessageContent) -> Option<String> {
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ");
+    normalize_session_title(Some(title))
+}
+
+fn normalize_session_title(title: Option<String>) -> Option<String> {
+    let title = title?;
     let trimmed = title.trim();
     if trimmed.is_empty() {
         return None;

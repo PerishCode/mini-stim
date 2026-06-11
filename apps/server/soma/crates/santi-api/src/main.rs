@@ -14,7 +14,7 @@ use futures_core::Stream;
 use santi_core::{
     CreateSessionResponse, ErrorResponse, HealthResponse, SantiService, SantiServiceConfig,
     SantiStreamEvent, SantiStreamPayload, SendSessionRequest, SendSessionResponse, Session,
-    SessionDetail, SessionRuntimeSnapshot, prefixed_id, timestamp_now,
+    SessionDetail, SessionRuntimeSnapshot, UpdateSessionRequest, prefixed_id, timestamp_now,
 };
 use santi_provider::{OpenAIProvider, OpenAIProviderConfig};
 use tower_http::{
@@ -118,7 +118,10 @@ fn router(service: SantiService) -> Router {
         .route("/api/v1/health", get(health))
         .route("/api/v1/openapi.json", get(openapi))
         .route("/api/v1/sessions", post(create_session).get(list_sessions))
-        .route("/api/v1/sessions/{session_id}", get(get_session))
+        .route(
+            "/api/v1/sessions/{session_id}",
+            get(get_session).patch(update_session),
+        )
         .route("/api/v1/sessions/{session_id}/messages", get(list_messages))
         .route("/api/v1/sessions/{session_id}/events", get(session_events))
         .route("/api/v1/sessions/{session_id}/send", post(send_session))
@@ -192,6 +195,29 @@ async fn get_session(
 ) -> Result<Json<SessionDetail>, ApiError> {
     service
         .session(&session_id)
+        .map_err(ApiError::internal)?
+        .map(Json)
+        .ok_or_else(|| ApiError::not_found("session not found"))
+}
+
+#[utoipa::path(
+    patch,
+    path = "/api/v1/sessions/{session_id}",
+    params(("session_id" = String, Path)),
+    request_body = UpdateSessionRequest,
+    responses(
+        (status = 200, body = Session),
+        (status = 404, body = ErrorResponse),
+        (status = 500, body = ErrorResponse)
+    )
+)]
+async fn update_session(
+    State(service): State<SantiService>,
+    Path(session_id): Path<String>,
+    Json(request): Json<UpdateSessionRequest>,
+) -> Result<Json<Session>, ApiError> {
+    service
+        .update_session(&session_id, request)
         .map_err(ApiError::internal)?
         .map(Json)
         .ok_or_else(|| ApiError::not_found("session not found"))
@@ -362,6 +388,7 @@ impl IntoResponse for ApiError {
         create_session,
         list_sessions,
         get_session,
+        update_session,
         list_messages,
         send_session,
         runtime_snapshot
@@ -375,6 +402,7 @@ impl IntoResponse for ApiError {
         Session,
         SessionDetail,
         SessionRuntimeSnapshot,
+        UpdateSessionRequest,
         santi_core::ActorType,
         santi_core::Compact,
         santi_core::Message,

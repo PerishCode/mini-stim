@@ -101,3 +101,22 @@ fn titles_from_first_message() {
         .expect("session exists");
     assert_eq!(session.title.as_deref(), Some(title));
 }
+
+#[test]
+fn trims_session_title() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let store = SantiStore::open(temp.path().join("santi.sqlite")).expect("open store");
+    let session = store.create_session().expect("create session");
+
+    let session = store
+        .update_session_title(&session.id, Some("  renamed title  ".to_string()))
+        .expect("update title")
+        .expect("session exists");
+    assert_eq!(session.title.as_deref(), Some("renamed title"));
+
+    let session = store
+        .update_session_title(&session.id, Some("   ".to_string()))
+        .expect("clear title")
+        .expect("session exists");
+    assert_eq!(session.title, None);
+}

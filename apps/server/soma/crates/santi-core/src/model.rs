@@ -258,6 +258,11 @@ pub struct SessionDetail {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct UpdateSessionRequest {
+    pub title: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SendSessionRequest {
     pub content: Vec<MessagePart>,
 }

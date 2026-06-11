@@ -4,6 +4,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
@@ -48,6 +49,7 @@ interface SessionActions {
   select(sessionId: string | null): PubAck;
   selectAndGet(sessionId: string): PubAck[];
   send(input: { sessionId?: string | null; content: MessagePart[] }): PubAck;
+  updateTitle(sessionId: string, title: string | null): PubAck;
 }
 
 const SantiMqueueContext = createContext<SantiMqueue | null>(null);
@@ -136,6 +138,31 @@ export function useSessionError(): MqueueError | null {
   return useSessionProjection().error;
 }
 
+export function useDebouncedValue<T>(
+  value: T,
+  options: {
+    debounceMs: number;
+    equality?: (left: T, right: T) => boolean;
+  },
+): T {
+  const { debounceMs, equality = defaultEquality } = options;
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    if (equality(value, debouncedValue)) {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      setDebouncedValue((current) => (equality(value, current) ? current : value));
+    }, debounceMs);
+
+    return () => clearTimeout(timeoutId);
+  }, [debouncedValue, debounceMs, equality, value]);
+
+  return debouncedValue;
+}
+
 export function useMessageConnection(sessionId?: string | null): MessageConnectionState {
   const mqueue = useSantiMqueue();
   const selectedSessionId = useSelectedSessionId();
@@ -192,6 +219,8 @@ export function useSessionActions(): SessionActions {
       ],
       send: (input: { sessionId?: string | null; content: MessagePart[] }) =>
         mqueue.session.pub("send", input),
+      updateTitle: (sessionId: string, title: string | null) =>
+        mqueue.session.pub("update", { sessionId, title }),
     }),
     [mqueue],
   );
@@ -205,4 +234,8 @@ function installBrowserMqueue(target?: Window & SantiWindow): SantiMqueue {
     throw new Error("SantiMqueueProvider requires a browser window or mqueue prop");
   }
   return installSantiMqueue(resolvedTarget);
+}
+
+function defaultEquality<T>(left: T, right: T) {
+  return left === right;
 }

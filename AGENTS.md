@@ -154,7 +154,41 @@ the named session is unusable.
 restart-first, or new-session-first.
 
 `working-surface check` is the standard phrase for cold-starting or revalidating
-the local runtime/browser surface before discussing concrete edits. It means:
+the local runtime/browser surface before discussing concrete edits.
+
+Use the runseal browser wrappers for low-confidence browser-surface operations:
+
+- `runseal :browser check`
+  - inspect sidecar/web/session truth and recommend `none` or `recover`
+- `runseal :browser reset`
+  - converge Playwright session/browser state back to empty
+- `runseal :browser recover`
+  - recover the routine browser session after runtime drift or restart
+  - defaults to `--browser chromium`, which resolves to
+    `chrome-for-testing` and is the preferred routine automation channel
+
+Use raw `playwright-cli` for stable page-level operations such as `open`,
+`goto`, `reload`, `snapshot`, `click`, `fill`, and `eval`.
+
+Routine browser recovery should prefer `runseal :browser recover` over ad hoc
+cleanup/reopen command sequences when the surface is stale but not fundamentally
+broken, because the wrapper already bakes in the currently validated ordering:
+
+- wait for sidecar/web readiness before `reload`
+- fall back from `reload` to `goto` to `open`
+- treat `close-all` / `kill-all` cleanup as a convergence process rather than
+  as an instant state transition
+
+For the current validated `mini-stim` hot path, a sidecar-only restart is not
+automatically a browser-recovery event.
+
+- If `sidecar` has just been restarted but the routine session still exists and
+  `runseal :browser check` reports `playwright.state=usable`, prefer a direct
+  `playwright-cli -s=mini-stim reload`.
+- Use `runseal :browser recover` only when the routine session is missing,
+  stale, or the page can no longer be refreshed back to the target surface.
+
+`working-surface check` maps to the `runseal :browser` layer. It means:
 
 - verify the installed `playwright-cli` command surface before using browser
   session commands when there is any sign of version drift
@@ -168,12 +202,8 @@ the local runtime/browser surface before discussing concrete edits. It means:
 Normal local web startup path:
 
 ```bash
-playwright-cli --version
-sidecar status --config sidecar.toml
-sidecar stop --config sidecar.toml   # only if runtime/cells are unhealthy
-sidecar start --config sidecar.toml  # only if runtime/cells are unhealthy
-cat .tmp/sidecar/<namespace>/client/web.port
-playwright-cli -s=mini-stim open http://127.0.0.1:<port> --headed
+runseal :browser check
+runseal :browser recover
 playwright-cli -s=mini-stim snapshot
 ```
 
@@ -186,8 +216,7 @@ Normal `playwright-cli` shutdown path:
 
 ```bash
 playwright-cli -s=mini-stim close        # stop the routine session cleanly
-playwright-cli close-all                 # stop all sessions when broader cleanup is intended
-playwright-cli kill-all                  # only for stale/zombie browser processes
+runseal :browser reset                   # converge session/process state when cleanup matters
 playwright-cli -s=<name> delete-data     # only after close, and only if session data should be removed
 ```
 
@@ -219,6 +248,11 @@ The frontend design-system asset model is explicit:
 - `packages/components/src/atoms`
   owns business-blind primitives, low-level layout/control capabilities, token
   consumption, and SCSS for those primitives.
+- `packages/components/src/icons`
+  owns the business-blind symbol system. Icons are a first-class asset layer,
+  not a sub-type of atoms. This layer owns the controlled icon set, the shared
+  icon wrapper, and any cold-start third-party icon integration behind local
+  exports.
 - `packages/components/src/patterns`
   owns business-blind but higher-level hard-coded composition templates. A
   pattern is not a page component and not a product concept; it is a reusable
@@ -230,6 +264,15 @@ The frontend design-system asset model is explicit:
 
 Treat `patterns` as a first-class asset layer, not as a documentation-only
 idea and not as an accidental pile of "slightly larger atoms".
+
+Treat `icons` the same way.
+
+- Icons are symbol assets, not layout primitives and not product components.
+- Cold-starting from a mature external icon set is acceptable, but the codebase
+  should consume icons through the local `icons` layer rather than importing the
+  third-party package directly throughout atoms or `web`.
+- Icon names should stay controlled by the local export surface, even when the
+  underlying glyphs come from a third-party set.
 
 - A pattern must stay business-blind.
   It may encode structural relationships, surface layering, spacing rhythm,
@@ -266,6 +309,7 @@ idea and not as an accidental pile of "slightly larger atoms".
   re-implementing it in `web`.
 - When deciding where a UI change belongs, use this ladder:
   - token issue -> theme/tokens
+  - symbol issue -> `icons`
   - primitive capability issue -> `atoms`
   - recurring high-constraint composition issue -> `patterns`
   - product semantics / content assembly issue -> `web`
@@ -324,6 +368,17 @@ Current conventions:
 - `pnpm -r --if-present build`
 - `SANTI_DB=.tmp/manual.sqlite cargo run -p mini-stim-server-soma -- serve`
 - `cargo run -p mini-stim-client-soma -- dev`
+
+Routine browser flows use `playwright-cli` as the default browser tool for this
+repository. Prefer the named `mini-stim` session and the existing working
+surface before considering any alternate browser layer.
+
+- `runseal :browser check`
+- `runseal :browser recover`
+- `playwright-cli -s=mini-stim snapshot`
+- `playwright-cli -s=mini-stim reload`
+- `playwright-cli -s=mini-stim open http://127.0.0.1:<web-port> --headed`
+- `playwright-cli -s=mini-stim close`
 
 ## Environment
 

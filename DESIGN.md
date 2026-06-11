@@ -101,9 +101,10 @@ Patterns are not:
 The intended hierarchy is:
 
 1. tokens
-2. atoms
-3. patterns
-4. product components
+2. icons
+3. atoms
+4. patterns
+5. product components
 
 Patterns sit above atoms because they express recommended composition logic.
 Patterns sit below product components because they must not encode product
@@ -124,7 +125,36 @@ It should not express:
 
 Those are product-semantic usages of more general patterns.
 
-## 5. Pattern lifecycle
+## 5. Icon layer
+
+`mini-stim` also recognizes `icons` as a first-class design-system asset layer.
+
+Icons are:
+
+- business-blind
+- controlled through a local export surface
+- allowed to cold-start from a mature external set
+- responsible for symbol consistency rather than layout or product semantics
+
+Icons are not:
+
+- atoms
+- patterns
+- page-local SVG fragments
+- direct product semantics
+
+The default rule is:
+
+- consume icons through `packages/components/src/icons`
+- do not scatter direct third-party icon imports through atoms or `web`
+- keep icon naming and replacement under local control even when the glyph
+  source is external
+
+Cold-starting from a mature icon set is acceptable.
+Long-term icon language may still evolve through replacement, curation, or
+custom additions.
+
+## 6. Pattern lifecycle
 
 Patterns are design assets, not sacred artifacts.
 
@@ -152,7 +182,42 @@ The default storage rule is:
 If a pattern is stable enough to trust, the preferred outcome is to encode it
 in `packages/components`.
 
-## 6. Current aesthetic direction
+## 7. Computed geometry
+
+Not every useful design token should be authored as an isolated final value.
+
+When a visual layer starts showing proportional tension, the preferred fix is
+often to introduce a small set of base values plus explicit derivation rules,
+instead of hand-tuning multiple final tokens independently.
+
+The intended progression is:
+
+1. base atomic values
+2. computed relationships
+3. semantic layer tokens
+4. component consumption
+
+This matters most when values are visually interdependent, such as:
+
+- shell gap
+- shell radius
+- shell shadow
+- shell padding
+
+These values should read as one geometric language, not as unrelated numbers
+that happened to be chosen near each other.
+
+Current shell-level rule:
+
+- shell layout is the first formal landing point for computed geometry tokens
+- shell gap, shell radius, shell padding, and shell shadow may be derived from
+  lower-level atomic tokens
+- when shell density changes, adjust the computed relationship first before
+  introducing page-local overrides
+- expand this approach to other layers only when repeated proportional issues
+  show that the relationship is stable enough to formalize
+
+## 8. Current aesthetic direction
 
 The current direction is:
 
@@ -172,7 +237,7 @@ The closest useful inspiration pattern is:
 The wrong takeaway from editorial references is warm paper nostalgia.
 The right takeaway is restraint, hierarchy, and accent discipline.
 
-## 7. Color philosophy
+## 9. Color philosophy
 
 ### Base rule
 
@@ -229,7 +294,7 @@ Do not drift into:
 
 Warm accents may exist, but the workspace itself should remain clear and clean.
 
-## 8. Surface hierarchy
+## 10. Surface hierarchy
 
 The product should read as a stack of clear working layers:
 
@@ -253,7 +318,7 @@ Not by:
 
 Shadows should be minimal. Borders and tonal separation do most of the work.
 
-## 9. Typography roles
+## 11. Typography roles
 
 Typography has distinct jobs.
 
@@ -299,7 +364,7 @@ Use for:
 
 Mono is not a theme. It is a utility lane.
 
-## 10. Component translation rules
+## 12. Component translation rules
 
 Visual language must land in the component system, not in page-local styling.
 
@@ -333,6 +398,22 @@ Atoms should answer questions like:
 
 They should not answer recurring high-level composition questions that already
 have a stable structural solution.
+
+### Icons
+
+Icons own:
+
+- sanctioned glyphs
+- their shared rendering wrapper
+- size/stroke defaults
+- controlled naming
+
+They do not own:
+
+- page-level layout
+- button/input interaction
+- product semantics
+- arbitrary unreviewed symbol drift
 
 ### Patterns
 
@@ -375,7 +456,7 @@ when those rules already belong in atoms or patterns.
 If `web` appears to need CSS, assume atom expressiveness is missing.
 Add or refine atom/pattern capability instead of patching page-local styles.
 
-## 11. Pattern index and provisional storage
+## 13. Pattern index and provisional storage
 
 This file also acts as the pattern index.
 
@@ -420,9 +501,47 @@ Current index:
 
 ### Provisional patterns
 
-None currently tracked.
+#### Icon system usage constraints
 
-## 12. Message styling rules
+- status: provisional
+- scope:
+  - icon stroke weight policy
+  - icon size-scale policy
+  - outline-only vs filled/outline mixed usage
+  - icon-only vs icon+label usage boundaries
+- current judgment:
+  - the icon layer now exists and is cold-started from `lucide-react`
+  - real usage coverage is still too small to justify hard global rules for
+    these questions
+  - premature certainty here would likely create decorative or arbitrary system
+    constraints rather than durable guidance
+- why not yet hard-coded:
+  - the current product surface does not yet exercise enough icon cases across
+    atoms, patterns, and product components
+  - the repository needs more real icon usage before narrowing the long-term
+    style and interaction policy
+- promotion trigger:
+  - revisit once icons appear across a broader set of controls, status lanes,
+    and reusable patterns
+  - only hard-code rules that continue to hold across multiple validated usage
+    contexts
+
+### Hard-coded icons
+
+Current cold-start icon surface:
+
+- `Icon`
+- `PlusIcon`
+- `SendIcon`
+
+Current policy:
+
+- glyphs are sourced from `lucide-react`
+- the local `icons` layer is the only sanctioned integration point
+- future icon review may rename, replace, or expand this set without exposing
+  raw third-party imports as the system contract
+
+## 14. Message styling rules
 
 Messages should be visually distinct by role, but still belong to one family.
 
@@ -448,7 +567,7 @@ Messages should be visually distinct by role, but still belong to one family.
 - should feel structured and inspectable
 - code/payload areas should remain mono and neutral enough for scanning
 
-## 13. Motion and interaction
+## 15. Motion and interaction
 
 Motion should be sparse and useful.
 
@@ -466,7 +585,7 @@ Do not use motion for:
 
 The interface should feel responsive, not animated.
 
-## 14. Background and atmosphere
+## 16. Background and atmosphere
 
 The product may have a small amount of atmosphere, but it must stay behind the
  work.
@@ -486,7 +605,7 @@ Not allowed:
 If a background effect is noticeable before the content is noticeable, it is
 too strong.
 
-## 15. Borrowing from external references
+## 17. Borrowing from external references
 
 When studying another project, extract only stable principles such as:
 
@@ -511,14 +630,14 @@ The question is:
 "What visual rule from that project is durable enough to become a token, atom,
  or pattern capability here?"
 
-## 16. Review heuristics
+## 18. Review heuristics
 
 A visual change is likely correct when:
 
 - readability improves
 - hierarchy gets clearer
 - fewer colors carry more meaning
-- the change can be explained through tokens, atoms, or patterns
+- the change can be explained through tokens, icons, atoms, or patterns
 - another screen could reuse the same rule
 
 A visual change is likely wrong when:
@@ -531,7 +650,7 @@ A visual change is likely wrong when:
 - it leaves a recurring high-constraint local structure trapped in page-level
   JSX instead of promoting it to a reusable pattern
 
-## 17. Near-term direction for mini-stim
+## 19. Near-term direction for mini-stim
 
 Near-term refinement should focus on:
 
@@ -540,6 +659,7 @@ Near-term refinement should focus on:
 - clearer meta typography
 - improved transcript readability
 - stronger atom capabilities for shell/layout/surfaces
+- a better controlled icon surface now that the cold-start icon layer exists
 - extracting the first true business-blind hard-coded patterns from recurring
   chat/workspace structures
 
@@ -550,12 +670,13 @@ Not on:
 - dark mode expansion before the light mode language is stable
 - high-brand marketing aesthetics inside the working chat surface
 
-## 18. Maintenance rule
+## 20. Maintenance rule
 
 When `mini-stim` gains new visual capabilities, update this file if the change
 alters:
 
 - the aesthetic direction
+- the icon-layer policy
 - the pattern philosophy or layer boundary
 - the interpretation of accent usage
 - the allowed surface hierarchy

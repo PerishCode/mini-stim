@@ -60,8 +60,29 @@ jobs:
           sh -n "$hooks/pre-commit"
           sh -n "$hooks/commit-msg"
 
-  rust:
+  rust-pr:
+    name: rust (ubuntu-latest)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --locked --workspace
+
+  rust-matrix:
     name: rust (${{ matrix.os }})
+    if: github.event_name != 'pull_request'
     strategy:
       fail-fast: false
       matrix:

@@ -209,6 +209,11 @@ export interface SessionRuntimeSnapshot {
   turns: Turn[];
 }
 
+export interface UpdateSessionRequest {
+  /** @nullable */
+  title?: string | null;
+}
+
 export type healthResponse200 = {
   data: HealthResponse;
   status: 200;
@@ -373,6 +378,61 @@ export const getSession = async (
     status: res.status,
     headers: res.headers,
   } as getSessionResponse;
+};
+
+export type updateSessionResponse200 = {
+  data: Session;
+  status: 200;
+};
+
+export type updateSessionResponse404 = {
+  data: ErrorResponse;
+  status: 404;
+};
+
+export type updateSessionResponse500 = {
+  data: ErrorResponse;
+  status: 500;
+};
+
+export type updateSessionResponseSuccess = updateSessionResponse200 & {
+  headers: Headers;
+};
+export type updateSessionResponseError = (
+  | updateSessionResponse404
+  | updateSessionResponse500
+) & {
+  headers: Headers;
+};
+
+export type updateSessionResponse =
+  | updateSessionResponseSuccess
+  | updateSessionResponseError;
+
+export const getUpdateSessionUrl = (sessionId: string) => {
+  return `/api/v1/sessions/${sessionId}`;
+};
+
+export const updateSession = async (
+  sessionId: string,
+  updateSessionRequest: UpdateSessionRequest,
+  options?: RequestInit,
+): Promise<updateSessionResponse> => {
+  const res = await fetch(getUpdateSessionUrl(sessionId), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateSessionRequest),
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: updateSessionResponse["data"] = body ? JSON.parse(body) : {};
+  return {
+    data,
+    status: res.status,
+    headers: res.headers,
+  } as updateSessionResponse;
 };
 
 export type listMessagesResponse200 = {

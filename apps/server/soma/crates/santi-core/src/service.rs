@@ -14,7 +14,7 @@ use crate::service_prompt::{
 use crate::{
     ActorType, CreateSessionResponse, MessageContent, MessageState, SantiStore, SantiStreamEvent,
     SantiStreamPayload, SendSessionRequest, SendSessionResponse, Session, SessionDetail,
-    SessionRuntimeSnapshot, prefixed_id, timestamp_now,
+    SessionRuntimeSnapshot, UpdateSessionRequest, prefixed_id, timestamp_now,
 };
 
 #[derive(Clone)]
@@ -69,6 +69,14 @@ impl SantiService {
             session,
             messages: self.store.session_messages(session_id)?,
         }))
+    }
+
+    pub fn update_session(
+        &self,
+        session_id: &str,
+        request: UpdateSessionRequest,
+    ) -> Result<Option<Session>, String> {
+        self.store.update_session_title(session_id, request.title)
     }
 
     pub fn runtime_snapshot(

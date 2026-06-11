@@ -1,0 +1,2 @@
+root=$(git rev-parse --show-toplevel)
+bash "$root/.runseal/scripts/browser.sh" "$@"

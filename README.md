@@ -124,6 +124,9 @@ Useful commands:
 ```sh
 runseal :init
 runseal :init --check
+runseal :browser check
+runseal :browser recover
+runseal :browser reset
 runseal :pr --dry-run
 cargo fmt --all --check
 flavor check --root . --config flavor.toml

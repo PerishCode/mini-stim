@@ -4,8 +4,13 @@
   height: 100dvh;
   min-width: 0;
   min-height: 0;
+  padding: var(--ms-shell-padding);
   background: var(--ms-color-canvas);
   color: var(--ms-color-text);
   overflow: hidden;
   overscroll-behavior: none;
+
+  @media (max-width: 48rem) {
+    padding: var(--ms-space-2);
+  }
 }
