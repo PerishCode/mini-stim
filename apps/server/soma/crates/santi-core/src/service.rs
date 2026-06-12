@@ -19,9 +19,9 @@ use crate::{
 
 #[derive(Clone)]
 pub struct SantiService {
-    store: SantiStore,
+    pub(crate) store: SantiStore,
     provider: Arc<dyn ProviderClient>,
-    config: SantiServiceConfig,
+    pub(crate) config: SantiServiceConfig,
     stream_events: broadcast::Sender<SantiStreamEvent>,
 }
 
@@ -356,7 +356,7 @@ impl SantiService {
                 tool_call: tool_call.clone(),
             },
         );
-        let dispatch = self.dispatch_tool(soul_session_id, &call);
+        let dispatch = self.dispatch_tool(session_id, soul_session_id, &call);
         let (output, error_text) = match dispatch {
             Ok(output) => (Some(output), None),
             Err(error) => (None, Some(error)),
@@ -384,6 +384,7 @@ impl SantiService {
 
     fn dispatch_tool(
         &self,
+        session_id: &str,
         soul_session_id: &str,
         call: &ProviderFunctionCall,
     ) -> Result<Value, String> {
@@ -402,13 +403,13 @@ impl SantiService {
             }
             "shell" => {
                 let args = parse_tool_args::<ShellArgs>(&call.arguments)?;
-                self.run_shell(args)
+                self.run_shell(session_id, args)
             }
             name => Err(format!("unsupported tool: {name}")),
         }
     }
 
-    fn run_shell(&self, args: ShellArgs) -> Result<Value, String> {
+    fn run_shell(&self, session_id: &str, args: ShellArgs) -> Result<Value, String> {
         std::fs::create_dir_all(self.soul_memory_dir()).map_err(|error| error.to_string())?;
         let cwd = args
             .cwd
@@ -419,7 +420,10 @@ impl SantiService {
         let output = command
             .current_dir(&cwd)
             .env("SANTI_SOUL_MEMORY_DIR", self.soul_memory_dir())
-            .env("SANTI_SESSION_MEMORY_DIR", self.config.runtime_root.clone())
+            .env(
+                "SANTI_SESSION_MEMORY_DIR",
+                self.session_memory_dir(session_id),
+            )
             .output()
             .map_err(|error| format!("failed to run shell: {error}"))?;
         Ok(json!({

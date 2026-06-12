@@ -24,6 +24,8 @@ use tower_http::{
 };
 use utoipa::OpenApi;
 
+mod bucket;
+
 #[tokio::main]
 async fn main() -> Result<(), String> {
     dotenvy::dotenv().ok();
@@ -129,6 +131,10 @@ fn router(service: SantiService) -> Router {
         .route(
             "/api/v1/sessions/{session_id}/runtime",
             get(runtime_snapshot),
+        )
+        .route(
+            "/api/v1/bucket/{soul_id}/{session_id}/{*key}",
+            get(bucket::get_bucket_object),
         )
         .layer(TraceLayer::new_for_http())
         .layer(
@@ -345,14 +351,14 @@ fn sse_event_name(payload: &SantiStreamPayload) -> &'static str {
     }
 }
 
-struct ApiError {
+pub(crate) struct ApiError {
     status: StatusCode,
     code: &'static str,
     message: String,
 }
 
 impl ApiError {
-    fn internal(message: String) -> Self {
+    pub(crate) fn internal(message: String) -> Self {
         Self {
             status: StatusCode::INTERNAL_SERVER_ERROR,
             code: "internal",
@@ -360,11 +366,33 @@ impl ApiError {
         }
     }
 
-    fn not_found(message: impl Into<String>) -> Self {
+    pub(crate) fn not_found(message: impl Into<String>) -> Self {
         Self {
             status: StatusCode::NOT_FOUND,
             code: "not-found",
             message: message.into(),
+        }
+    }
+
+    pub(crate) fn bad_request(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::BAD_REQUEST,
+            code: "bad-request",
+            message: message.into(),
+        }
+    }
+
+    pub(crate) fn from_service(message: String) -> Self {
+        match message.as_str() {
+            "session not found" | "soul not found" => Self::not_found(message),
+            _ if message.contains("object key")
+                || message.contains("object uri")
+                || message.contains("path segment")
+                || message.contains("path separators") =>
+            {
+                Self::bad_request(message)
+            }
+            _ => Self::internal(message),
         }
     }
 }
@@ -392,7 +420,8 @@ impl IntoResponse for ApiError {
         update_session,
         list_messages,
         send_session,
-        runtime_snapshot
+        runtime_snapshot,
+        bucket::get_bucket_object
     ),
     components(schemas(
         CreateSessionResponse,

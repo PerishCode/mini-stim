@@ -243,6 +243,70 @@ export interface UpdateSessionRequest {
   title?: string | null;
 }
 
+export type getBucketObjectResponse200 = {
+  data: Blob;
+  status: 200;
+};
+
+export type getBucketObjectResponse400 = {
+  data: ErrorResponse;
+  status: 400;
+};
+
+export type getBucketObjectResponse404 = {
+  data: ErrorResponse;
+  status: 404;
+};
+
+export type getBucketObjectResponse500 = {
+  data: ErrorResponse;
+  status: 500;
+};
+
+export type getBucketObjectResponseSuccess = getBucketObjectResponse200 & {
+  headers: Headers;
+};
+export type getBucketObjectResponseError = (
+  | getBucketObjectResponse400
+  | getBucketObjectResponse404
+  | getBucketObjectResponse500
+) & {
+  headers: Headers;
+};
+
+export type getBucketObjectResponse =
+  | getBucketObjectResponseSuccess
+  | getBucketObjectResponseError;
+
+export const getGetBucketObjectUrl = (
+  soulId: string,
+  sessionId: string,
+  key: string,
+) => {
+  return `/api/v1/bucket/${soulId}/${sessionId}/${key}`;
+};
+
+export const getBucketObject = async (
+  soulId: string,
+  sessionId: string,
+  key: string,
+  options?: RequestInit,
+): Promise<getBucketObjectResponse> => {
+  const res = await fetch(getGetBucketObjectUrl(soulId, sessionId, key), {
+    ...options,
+    method: "GET",
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.blob();
+  const data: getBucketObjectResponse["data"] =
+    body as getBucketObjectResponse["data"];
+  return {
+    data,
+    status: res.status,
+    headers: res.headers,
+  } as getBucketObjectResponse;
+};
+
 export type healthResponse200 = {
   data: HealthResponse;
   status: 200;

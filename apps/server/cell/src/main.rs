@@ -23,6 +23,8 @@ async fn main() -> Result<(), TransportError> {
     let port = runtime.acquire_tcp_port("api.port", "server API")?;
     let url = format!("http://127.0.0.1:{port}");
     let db_path = store.join("santi.sqlite");
+    let runtime_root = store.join("runtime");
+    let execution_root = store.join("execution");
     if let Some(parent) = db_path.parent() {
         tokio::fs::create_dir_all(parent).await?;
     }
@@ -40,7 +42,14 @@ async fn main() -> Result<(), TransportError> {
         }
     });
 
-    let mut child = spawn_server_soma(&context, &port, &db_path, &log_path)?;
+    let mut child = spawn_server_soma(
+        &context,
+        &port,
+        &db_path,
+        &runtime_root,
+        &execution_root,
+        &log_path,
+    )?;
     let pid = child.id();
     state.write().await.pid = pid;
 
@@ -146,6 +155,8 @@ fn spawn_server_soma(
     context: &CellContext,
     port: &u16,
     db_path: &Path,
+    runtime_root: &Path,
+    execution_root: &Path,
     log_path: &Path,
 ) -> Result<tokio::process::Child, TransportError> {
     let log = OpenOptions::new()
@@ -166,6 +177,8 @@ fn spawn_server_soma(
         .env("SANTI_HOST", "127.0.0.1")
         .env("SANTI_PORT", port.to_string())
         .env("SANTI_DB", db_path)
+        .env("SANTI_RUNTIME_ROOT", runtime_root)
+        .env("SANTI_EXECUTION_ROOT", execution_root)
         .env("MINI_STIM_CELL_MODE", format_mode(&context.mode))
         .env("MINI_STIM_CELL_NAMESPACE", &context.namespace)
         .stdout(Stdio::from(log))
