@@ -23,6 +23,16 @@ export interface Compact {
   turn_id: string;
 }
 
+export interface SessionProfile {
+  created_at: String;
+  /** @nullable */
+  desc?: string | null;
+  session_id: string;
+  /** @nullable */
+  title?: string | null;
+  updated_at: String;
+}
+
 export interface Session {
   created_at: String;
   /** @nullable */
@@ -30,13 +40,16 @@ export interface Session {
   id: string;
   /** @nullable */
   parent_session_id?: string | null;
-  /** @nullable */
-  title?: string | null;
   updated_at: String;
 }
 
-export interface CreateSessionResponse {
+export interface SessionSummary {
+  profile: SessionProfile;
   session: Session;
+}
+
+export interface CreateSessionResponse {
+  session: SessionSummary;
 }
 
 export interface ErrorResponse {
@@ -98,6 +111,18 @@ export interface SessionMessage {
   content_text: string;
   message: Message;
   relation: SessionMessageRef;
+}
+
+export interface SoulProfile {
+  /** @nullable */
+  avatar_ref?: string | null;
+  avatar_seed: string;
+  created_at: String;
+  /** @nullable */
+  desc?: string | null;
+  nickname: string;
+  soul_id: string;
+  updated_at: String;
 }
 
 export interface SoulSession {
@@ -169,7 +194,8 @@ export interface Turn {
 
 export interface SendSessionResponse {
   assistant_message: SessionMessage;
-  session: Session;
+  session: SessionSummary;
+  soul_profile: SoulProfile;
   soul_session: SoulSession;
   tool_calls: ToolCall[];
   tool_results: ToolResult[];
@@ -179,6 +205,7 @@ export interface SendSessionResponse {
 
 export interface SessionDetail {
   messages: SessionMessage[];
+  profile: SessionProfile;
   session: Session;
 }
 
@@ -202,7 +229,9 @@ export interface SessionRuntimeSnapshot {
   compacts: Compact[];
   effects: SessionEffect[];
   messages: SessionMessage[];
+  profile: SessionProfile;
   session: Session;
+  soul_profile?: null | SoulProfile;
   soul_session?: null | SoulSession;
   tool_calls: ToolCall[];
   tool_results: ToolResult[];
@@ -243,7 +272,7 @@ export const health = async (
 };
 
 export type listSessionsResponse200 = {
-  data: Session[];
+  data: SessionSummary[];
   status: 200;
 };
 
@@ -381,7 +410,7 @@ export const getSession = async (
 };
 
 export type updateSessionResponse200 = {
-  data: Session;
+  data: SessionSummary;
   status: 200;
 };
 

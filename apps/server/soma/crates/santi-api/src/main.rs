@@ -14,7 +14,8 @@ use futures_core::Stream;
 use santi_core::{
     CreateSessionResponse, ErrorResponse, HealthResponse, SantiService, SantiServiceConfig,
     SantiStreamEvent, SantiStreamPayload, SendSessionRequest, SendSessionResponse, Session,
-    SessionDetail, SessionRuntimeSnapshot, UpdateSessionRequest, prefixed_id, timestamp_now,
+    SessionDetail, SessionProfile, SessionRuntimeSnapshot, SessionSummary, SoulProfile,
+    UpdateSessionRequest, prefixed_id, timestamp_now,
 };
 use santi_provider::{OpenAIProvider, OpenAIProviderConfig};
 use tower_http::{
@@ -168,11 +169,11 @@ async fn create_session(
 #[utoipa::path(
     get,
     path = "/api/v1/sessions",
-    responses((status = 200, body = [Session]), (status = 500, body = ErrorResponse))
+    responses((status = 200, body = [SessionSummary]), (status = 500, body = ErrorResponse))
 )]
 async fn list_sessions(
     State(service): State<SantiService>,
-) -> Result<Json<Vec<Session>>, ApiError> {
+) -> Result<Json<Vec<SessionSummary>>, ApiError> {
     service
         .list_sessions()
         .map(Json)
@@ -206,7 +207,7 @@ async fn get_session(
     params(("session_id" = String, Path)),
     request_body = UpdateSessionRequest,
     responses(
-        (status = 200, body = Session),
+        (status = 200, body = SessionSummary),
         (status = 404, body = ErrorResponse),
         (status = 500, body = ErrorResponse)
     )
@@ -215,7 +216,7 @@ async fn update_session(
     State(service): State<SantiService>,
     Path(session_id): Path<String>,
     Json(request): Json<UpdateSessionRequest>,
-) -> Result<Json<Session>, ApiError> {
+) -> Result<Json<SessionSummary>, ApiError> {
     service
         .update_session(&session_id, request)
         .map_err(ApiError::internal)?
@@ -401,7 +402,10 @@ impl IntoResponse for ApiError {
         SendSessionResponse,
         Session,
         SessionDetail,
+        SessionProfile,
         SessionRuntimeSnapshot,
+        SessionSummary,
+        SoulProfile,
         UpdateSessionRequest,
         santi_core::ActorType,
         santi_core::Compact,

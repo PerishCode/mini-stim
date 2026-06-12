@@ -13,11 +13,28 @@ CREATE TABLE IF NOT EXISTS souls (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS soul_profiles (
+    soul_id TEXT PRIMARY KEY,
+    nickname TEXT NOT NULL,
+    avatar_ref TEXT,
+    avatar_seed TEXT NOT NULL,
+    desc TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
-    title TEXT,
     parent_session_id TEXT,
     fork_point INTEGER,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS session_profiles (
+    session_id TEXT PRIMARY KEY,
+    title TEXT,
+    desc TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -142,6 +159,7 @@ CREATE TABLE IF NOT EXISTS r_soul_session_messages (
 
 CREATE INDEX IF NOT EXISTS idx_messages_actor_created_at ON messages (actor_type, actor_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_state_created_at ON messages (state, created_at);
+CREATE INDEX IF NOT EXISTS idx_session_profiles_title ON session_profiles (title);
 CREATE INDEX IF NOT EXISTS idx_r_session_messages_message_id ON r_session_messages (message_id);
 CREATE INDEX IF NOT EXISTS idx_r_session_messages_session_seq ON r_session_messages (session_id, session_seq);
 CREATE INDEX IF NOT EXISTS idx_message_events_message_id_created_at ON message_events (message_id, created_at);

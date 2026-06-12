@@ -11,7 +11,7 @@ import {
   Text,
   Timestamp,
 } from "@mini-stim/components";
-import type { Session } from "@mini-stim/hooks";
+import type { SessionSummary } from "@mini-stim/hooks";
 
 export function SessionRail(props: {
   busy: boolean;
@@ -19,7 +19,7 @@ export function SessionRail(props: {
   onSelect: (sessionId: string) => void;
   previews: Record<string, string>;
   selectedSessionId: string | null;
-  sessions: Session[];
+  sessions: SessionSummary[];
 }) {
   return (
     <Pane chrome="panel" padding="lg" tone="raised" grow>
@@ -48,24 +48,25 @@ export function SessionRail(props: {
         <ScrollArea grow>
           <Stack gap="xs">
             {props.sessions.map((session) => {
-              const selected = session.id === props.selectedSessionId;
-              const label = sessionLabel(session, props.previews[session.id]);
+              const id = session.session.id;
+              const selected = id === props.selectedSessionId;
+              const label = sessionLabel(session, props.previews[id]);
               return (
                 <Button
-                  key={session.id}
+                  key={id}
                   block
                   justify="start"
                   size="lg"
                   title={label}
                   variant={selected ? "rail-selected" : "rail"}
-                  onClick={() => props.onSelect(session.id)}
+                  onClick={() => props.onSelect(id)}
                 >
                   <Stack tag="span" gap="xs" grow align="start">
                     <Text tone={selected ? "strong" : "default"} truncate>
                       {label}
                     </Text>
                     <Inline tag="span" justify="between" align="center" grow gap="sm">
-                      <Timestamp value={session.updated_at} size="xs" tone="subtle" truncate />
+                      <Timestamp value={session.session.updated_at} size="xs" tone="subtle" truncate />
                       {selected ? <Badge size="sm" tone="accent">active</Badge> : null}
                     </Inline>
                   </Stack>
@@ -85,8 +86,8 @@ export function SessionRail(props: {
 }
 
 function sessionLabel(
-  session: { id: string; title?: string | null },
+  session: SessionSummary,
   preview?: string,
 ) {
-  return session.title?.trim() || preview || session.id;
+  return session.profile.title?.trim() || preview || session.session.id;
 }

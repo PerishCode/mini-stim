@@ -3,6 +3,7 @@ import type {
   Session,
   SessionMessage,
   SessionRuntimeSnapshot,
+  SessionSummary,
   ToolCall,
   ToolResult,
   Turn,
@@ -17,6 +18,9 @@ export type {
   SessionEffect,
   SessionMessage,
   SessionRuntimeSnapshot,
+  SessionSummary,
+  SessionProfile,
+  SoulProfile,
   SoulSession,
   ToolCall,
   ToolResult,
@@ -59,7 +63,7 @@ export interface MqueueError {
 }
 
 export interface SessionProjection {
-  sessions: Session[];
+  sessions: SessionSummary[];
   selectedSessionId: string | null;
   messages: SessionMessage[];
   messagesBySessionId: Record<string, SessionMessage[]>;

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AppRoot, Grid, GridItem } from "@mini-stim/components";
 import {
+  type SessionSummary,
   useDebouncedValue,
   useMessageConnection,
   useSelectedSessionId,
@@ -84,11 +85,11 @@ export function App() {
   const visibleError = error ?? sessionErrorMessage;
   const debouncedConnection = useDebouncedValue(connection, { debounceMs: 150 });
   const selectedTitle = useMemo(() => {
-    const selected = sessions.find((session) => session.id === selectedSessionId);
+    const selected = sessions.find((session) => session.session.id === selectedSessionId);
     return selected ? sessionLabel(selected) : "New session";
   }, [selectedSessionId, sessions]);
   const selectedSession = useMemo(
-    () => sessions.find((session) => session.id === selectedSessionId) ?? null,
+    () => sessions.find((session) => session.session.id === selectedSessionId) ?? null,
     [selectedSessionId, sessions],
   );
 
@@ -167,7 +168,7 @@ export function App() {
           runtime={runtime}
           selectedSessionId={selectedSessionId}
           title={selectedTitle}
-          titleValue={selectedSession?.title ?? null}
+          titleValue={selectedSession?.profile.title ?? null}
           timeline={timeline}
           draft={draft}
         />
@@ -177,6 +178,6 @@ export function App() {
   );
 }
 
-function sessionLabel(session: { id: string; title?: string | null }) {
-  return session.title?.trim() || session.id;
+function sessionLabel(session: SessionSummary) {
+  return session.profile.title?.trim() || session.session.id;
 }

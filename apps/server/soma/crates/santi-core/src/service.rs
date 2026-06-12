@@ -13,8 +13,8 @@ use crate::service_prompt::{
 };
 use crate::{
     ActorType, CreateSessionResponse, MessageContent, MessageState, SantiStore, SantiStreamEvent,
-    SantiStreamPayload, SendSessionRequest, SendSessionResponse, Session, SessionDetail,
-    SessionRuntimeSnapshot, UpdateSessionRequest, prefixed_id, timestamp_now,
+    SantiStreamPayload, SendSessionRequest, SendSessionResponse, SessionDetail,
+    SessionRuntimeSnapshot, SessionSummary, UpdateSessionRequest, prefixed_id, timestamp_now,
 };
 
 #[derive(Clone)]
@@ -57,7 +57,7 @@ impl SantiService {
         })
     }
 
-    pub fn list_sessions(&self) -> Result<Vec<Session>, String> {
+    pub fn list_sessions(&self) -> Result<Vec<SessionSummary>, String> {
         self.store.list_sessions()
     }
 
@@ -66,6 +66,11 @@ impl SantiService {
             return Ok(None);
         };
         Ok(Some(SessionDetail {
+            profile: self
+                .store
+                .runtime_snapshot(session_id)?
+                .map(|snapshot| snapshot.profile)
+                .ok_or_else(|| "session disappeared".to_string())?,
             session,
             messages: self.store.session_messages(session_id)?,
         }))
@@ -75,7 +80,7 @@ impl SantiService {
         &self,
         session_id: &str,
         request: UpdateSessionRequest,
-    ) -> Result<Option<Session>, String> {
+    ) -> Result<Option<SessionSummary>, String> {
         self.store.update_session_title(session_id, request.title)
     }
 
@@ -187,18 +192,23 @@ impl SantiService {
             },
         );
 
-        let session = self
-            .store
-            .session(session_id)?
-            .ok_or_else(|| "session disappeared".to_string())?;
-        let soul_session = self
+        let snapshot = self
             .store
             .runtime_snapshot(session_id)?
-            .and_then(|snapshot| snapshot.soul_session)
             .ok_or_else(|| "soul_session disappeared".to_string())?;
+        let soul_session = snapshot
+            .soul_session
+            .ok_or_else(|| "soul_session disappeared".to_string())?;
+        let soul_profile = snapshot
+            .soul_profile
+            .ok_or_else(|| "soul_profile disappeared".to_string())?;
         Ok(SendSessionResponse {
-            session,
+            session: SessionSummary {
+                session: snapshot.session,
+                profile: snapshot.profile,
+            },
             soul_session,
+            soul_profile,
             turn: completed_turn,
             user_message,
             assistant_message,

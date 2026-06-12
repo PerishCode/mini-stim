@@ -78,7 +78,7 @@ async fn sends_with_runtime() {
     let session = service.create_session().expect("create session").session;
     let response = service
         .send_session(
-            &session.id,
+            &session.session.id,
             SendSessionRequest {
                 content: vec![MessagePart::Text {
                     text: "hello provider".to_string(),
@@ -120,12 +120,12 @@ async fn sends_with_runtime() {
     );
 
     let detail = service
-        .session(&session.id)
+        .session(&session.session.id)
         .expect("load detail")
         .expect("session");
     assert_eq!(detail.messages.len(), 2);
     let runtime = service
-        .runtime_snapshot(&session.id)
+        .runtime_snapshot(&session.session.id)
         .expect("runtime snapshot")
         .expect("session runtime");
     assert_eq!(runtime.turns.len(), 1);
@@ -152,7 +152,7 @@ async fn dispatches_tools() {
     let session = service.create_session().expect("create session").session;
     let response = service
         .send_session(
-            &session.id,
+            &session.session.id,
             SendSessionRequest {
                 content: vec![MessagePart::Text {
                     text: "run tool".to_string(),

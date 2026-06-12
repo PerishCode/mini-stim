@@ -17,10 +17,10 @@ import {
   type SantiMqueue,
   type SantiWindow,
   type MessageProjection,
-  type Session,
   type SessionMessage,
   type SessionProjection,
   type SessionRuntimeSnapshot,
+  type SessionSummary,
   type TimelineItem,
   type TurnGroup,
 } from "@mini-stim/mqueue";
@@ -37,6 +37,7 @@ export type {
   SessionMessage,
   SessionProjection,
   SessionRuntimeSnapshot,
+  SessionSummary,
   SoulSession,
   TimelineItem,
   Turn,
@@ -107,7 +108,7 @@ export function useSessionProjection(): SessionProjection {
   );
 }
 
-export function useSessions(): Session[] {
+export function useSessions(): SessionSummary[] {
   return useSessionProjection().sessions;
 }
 

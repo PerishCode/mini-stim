@@ -6,7 +6,7 @@ use std::{
 use rusqlite::{Connection, params};
 
 use crate::{
-    ActorType, MessageContent, MessageState, Session, SessionMessage, SoulSession,
+    ActorType, MessageContent, MessageState, Session, SessionMessage, SessionSummary, SoulSession,
     SoulSessionEntry, SoulSessionTargetType, Turn, prefixed_id, timestamp_now,
 };
 
@@ -16,10 +16,10 @@ mod runtime;
 mod schema;
 
 use db::*;
-use rows::{actor_type_db, map_session_row, message_state_db};
+use rows::{actor_type_db, collect_rows, map_session_summary_row, message_state_db};
 use schema::SCHEMA;
 
-const SANTI_SCHEMA_VERSION: u32 = 3;
+const SANTI_SCHEMA_VERSION: u32 = 4;
 const DEFAULT_ACCOUNT_ID: &str = "account_local";
 const DEFAULT_SOUL_ID: &str = "soul_default";
 
@@ -79,7 +79,9 @@ impl SantiStore {
                 DROP TABLE IF EXISTS message_events;
                 DROP TABLE IF EXISTS r_session_messages;
                 DROP TABLE IF EXISTS messages;
+                DROP TABLE IF EXISTS session_profiles;
                 DROP TABLE IF EXISTS sessions;
+                DROP TABLE IF EXISTS soul_profiles;
                 DROP TABLE IF EXISTS souls;
                 DROP TABLE IF EXISTS accounts;
                 "#,
@@ -112,6 +114,16 @@ impl SantiStore {
             params![DEFAULT_SOUL_ID, now],
         )
         .map_err(|error| error.to_string())?;
+        conn.execute(
+            r#"
+            INSERT OR IGNORE INTO soul_profiles (
+              soul_id, nickname, avatar_ref, avatar_seed, desc, created_at, updated_at
+            )
+            VALUES (?1, 'Santi', NULL, ?1, NULL, ?2, ?2)
+            "#,
+            params![DEFAULT_SOUL_ID, now],
+        )
+        .map_err(|error| error.to_string())?;
         Ok(())
     }
 
@@ -123,36 +135,50 @@ impl SantiStore {
         DEFAULT_SOUL_ID
     }
 
-    pub fn list_sessions(&self) -> Result<Vec<Session>, String> {
+    pub fn list_sessions(&self) -> Result<Vec<SessionSummary>, String> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn
             .prepare(
                 r#"
-                SELECT id, title, parent_session_id, fork_point, created_at, updated_at
-                FROM sessions
-                ORDER BY updated_at DESC, id DESC
+                SELECT
+                  s.id, s.parent_session_id, s.fork_point, s.created_at, s.updated_at,
+                  p.session_id, p.title, p.desc, p.created_at, p.updated_at
+                FROM sessions s
+                JOIN session_profiles p ON p.session_id = s.id
+                ORDER BY s.updated_at DESC, s.id DESC
                 "#,
             )
             .map_err(|error| error.to_string())?;
         let rows = stmt
-            .query_map([], map_session_row)
+            .query_map([], map_session_summary_row)
             .map_err(|error| error.to_string())?;
         collect_rows(rows)
     }
 
-    pub fn create_session(&self) -> Result<Session, String> {
-        let conn = self.conn.lock().unwrap();
+    pub fn create_session(&self) -> Result<SessionSummary, String> {
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction().map_err(|error| error.to_string())?;
         let session_id = prefixed_id("sess");
         let now = timestamp_now();
-        conn.execute(
+        tx.execute(
             r#"
-            INSERT INTO sessions (id, title, parent_session_id, fork_point, created_at, updated_at)
-            VALUES (?1, NULL, NULL, NULL, ?2, ?2)
+            INSERT INTO sessions (id, parent_session_id, fork_point, created_at, updated_at)
+            VALUES (?1, NULL, NULL, ?2, ?2)
             "#,
             params![session_id, now],
         )
         .map_err(|error| error.to_string())?;
-        session_by_id(&conn, &session_id)?.ok_or_else(|| "created session missing".to_string())
+        tx.execute(
+            r#"
+            INSERT INTO session_profiles (session_id, title, desc, created_at, updated_at)
+            VALUES (?1, NULL, NULL, ?2, ?2)
+            "#,
+            params![session_id, now],
+        )
+        .map_err(|error| error.to_string())?;
+        tx.commit().map_err(|error| error.to_string())?;
+        session_summary_by_id(&conn, &session_id)?
+            .ok_or_else(|| "created session missing".to_string())
     }
 
     pub fn session(&self, session_id: &str) -> Result<Option<Session>, String> {
@@ -164,18 +190,23 @@ impl SantiStore {
         &self,
         session_id: &str,
         title: Option<String>,
-    ) -> Result<Option<Session>, String> {
+    ) -> Result<Option<SessionSummary>, String> {
         let conn = self.conn.lock().unwrap();
         if session_by_id(&conn, session_id)?.is_none() {
             return Ok(None);
         }
         let now = timestamp_now();
         conn.execute(
-            "UPDATE sessions SET title = ?2, updated_at = ?3 WHERE id = ?1",
+            "UPDATE session_profiles SET title = ?2, updated_at = ?3 WHERE session_id = ?1",
             params![session_id, normalize_session_title(title), now],
         )
         .map_err(|error| error.to_string())?;
-        session_by_id(&conn, session_id)
+        conn.execute(
+            "UPDATE sessions SET updated_at = ?2 WHERE id = ?1",
+            params![session_id, now],
+        )
+        .map_err(|error| error.to_string())?;
+        session_summary_by_id(&conn, session_id)
     }
 
     pub fn session_messages(&self, session_id: &str) -> Result<Vec<SessionMessage>, String> {
@@ -191,10 +222,15 @@ impl SantiStore {
         let Some(session) = session_by_id(&conn, session_id)? else {
             return Ok(None);
         };
+        let profile = session_profile_by_id(&conn, session_id)?
+            .ok_or_else(|| "session profile missing".to_string())?;
         let soul_session = soul_session_by_pair(&conn, DEFAULT_SOUL_ID, session_id)?;
+        let soul_profile = soul_profile_by_id(&conn, DEFAULT_SOUL_ID)?;
         Ok(Some(crate::SessionRuntimeSnapshot {
             session,
+            profile,
             soul_session: soul_session.clone(),
+            soul_profile,
             messages: session_messages(&conn, session_id)?,
             turns: if let Some(soul_session) = &soul_session {
                 turns_for_soul_session(&conn, &soul_session.id)?
@@ -267,8 +303,13 @@ impl SantiStore {
         };
         if let Some(title) = title {
             tx.execute(
-                "UPDATE sessions SET title = COALESCE(title, ?2), updated_at = ?3 WHERE id = ?1",
+                "UPDATE session_profiles SET title = COALESCE(title, ?2), updated_at = ?3 WHERE session_id = ?1",
                 params![session_id, title, now],
+            )
+            .map_err(|error| error.to_string())?;
+            tx.execute(
+                "UPDATE sessions SET updated_at = ?2 WHERE id = ?1",
+                params![session_id, now],
             )
             .map_err(|error| error.to_string())?;
         } else {

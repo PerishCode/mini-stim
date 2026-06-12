@@ -3,18 +3,58 @@ use serde_json::Value;
 
 use crate::{
     ActorType, Compact, Message, MessageContent, MessageState, Session, SessionEffect,
-    SessionMessage, SessionMessageRef, SoulSession, SoulSessionTargetType, ToolCall, ToolResult,
-    Turn, TurnStatus, TurnTriggerType,
+    SessionMessage, SessionMessageRef, SessionProfile, SessionSummary, SoulProfile, SoulSession,
+    SoulSessionTargetType, ToolCall, ToolResult, Turn, TurnStatus, TurnTriggerType,
 };
 
 pub(super) fn map_session_row(row: &Row<'_>) -> rusqlite::Result<Session> {
     Ok(Session {
         id: row.get(0)?,
+        parent_session_id: row.get(1)?,
+        fork_point: row.get(2)?,
+        created_at: row.get(3)?,
+        updated_at: row.get(4)?,
+    })
+}
+
+pub(super) fn map_session_profile_row(row: &Row<'_>) -> rusqlite::Result<SessionProfile> {
+    Ok(SessionProfile {
+        session_id: row.get(0)?,
         title: row.get(1)?,
-        parent_session_id: row.get(2)?,
-        fork_point: row.get(3)?,
-        created_at: row.get(4)?,
-        updated_at: row.get(5)?,
+        desc: row.get(2)?,
+        created_at: row.get(3)?,
+        updated_at: row.get(4)?,
+    })
+}
+
+pub(super) fn map_session_summary_row(row: &Row<'_>) -> rusqlite::Result<SessionSummary> {
+    Ok(SessionSummary {
+        session: Session {
+            id: row.get(0)?,
+            parent_session_id: row.get(1)?,
+            fork_point: row.get(2)?,
+            created_at: row.get(3)?,
+            updated_at: row.get(4)?,
+        },
+        profile: SessionProfile {
+            session_id: row.get(5)?,
+            title: row.get(6)?,
+            desc: row.get(7)?,
+            created_at: row.get(8)?,
+            updated_at: row.get(9)?,
+        },
+    })
+}
+
+pub(super) fn map_soul_profile_row(row: &Row<'_>) -> rusqlite::Result<SoulProfile> {
+    Ok(SoulProfile {
+        soul_id: row.get(0)?,
+        nickname: row.get(1)?,
+        avatar_ref: row.get(2)?,
+        avatar_seed: row.get(3)?,
+        desc: row.get(4)?,
+        created_at: row.get(5)?,
+        updated_at: row.get(6)?,
     })
 }
 
@@ -133,6 +173,16 @@ pub(super) fn map_session_effect_row(row: &Row<'_>) -> rusqlite::Result<SessionE
         created_at: row.get(9)?,
         updated_at: row.get(10)?,
     })
+}
+
+pub(super) fn collect_rows<T>(
+    rows: impl Iterator<Item = rusqlite::Result<T>>,
+) -> Result<Vec<T>, String> {
+    let mut items = Vec::new();
+    for row in rows {
+        items.push(row.map_err(|error| error.to_string())?);
+    }
+    Ok(items)
 }
 
 pub(super) fn actor_type_db(value: &ActorType) -> &'static str {

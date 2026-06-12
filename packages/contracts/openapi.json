@@ -40,7 +40,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Session"
+                    "$ref": "#/components/schemas/SessionSummary"
                   }
                 }
               }
@@ -161,7 +161,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Session"
+                  "$ref": "#/components/schemas/SessionSummary"
                 }
               }
             }
@@ -397,7 +397,7 @@
         ],
         "properties": {
           "session": {
-            "$ref": "#/components/schemas/Session"
+            "$ref": "#/components/schemas/SessionSummary"
           }
         }
       },
@@ -565,6 +565,7 @@
         "required": [
           "session",
           "soul_session",
+          "soul_profile",
           "turn",
           "user_message",
           "assistant_message",
@@ -576,7 +577,10 @@
             "$ref": "#/components/schemas/SessionMessage"
           },
           "session": {
-            "$ref": "#/components/schemas/Session"
+            "$ref": "#/components/schemas/SessionSummary"
+          },
+          "soul_profile": {
+            "$ref": "#/components/schemas/SoulProfile"
           },
           "soul_session": {
             "$ref": "#/components/schemas/SoulSession"
@@ -628,12 +632,6 @@
               "null"
             ]
           },
-          "title": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "updated_at": {
             "$ref": "#/components/schemas/String"
           }
@@ -643,6 +641,7 @@
         "type": "object",
         "required": [
           "session",
+          "profile",
           "messages"
         ],
         "properties": {
@@ -651,6 +650,9 @@
             "items": {
               "$ref": "#/components/schemas/SessionMessage"
             }
+          },
+          "profile": {
+            "$ref": "#/components/schemas/SessionProfile"
           },
           "session": {
             "$ref": "#/components/schemas/Session"
@@ -755,10 +757,42 @@
           }
         }
       },
+      "SessionProfile": {
+        "type": "object",
+        "required": [
+          "session_id",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "$ref": "#/components/schemas/String"
+          },
+          "desc": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/String"
+          }
+        }
+      },
       "SessionRuntimeSnapshot": {
         "type": "object",
         "required": [
           "session",
+          "profile",
           "messages",
           "turns",
           "tool_calls",
@@ -785,8 +819,21 @@
               "$ref": "#/components/schemas/SessionMessage"
             }
           },
+          "profile": {
+            "$ref": "#/components/schemas/SessionProfile"
+          },
           "session": {
             "$ref": "#/components/schemas/Session"
+          },
+          "soul_profile": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SoulProfile"
+              }
+            ]
           },
           "soul_session": {
             "oneOf": [
@@ -815,6 +862,60 @@
             "items": {
               "$ref": "#/components/schemas/Turn"
             }
+          }
+        }
+      },
+      "SessionSummary": {
+        "type": "object",
+        "required": [
+          "session",
+          "profile"
+        ],
+        "properties": {
+          "profile": {
+            "$ref": "#/components/schemas/SessionProfile"
+          },
+          "session": {
+            "$ref": "#/components/schemas/Session"
+          }
+        }
+      },
+      "SoulProfile": {
+        "type": "object",
+        "required": [
+          "soul_id",
+          "nickname",
+          "avatar_seed",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "avatar_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "avatar_seed": {
+            "type": "string"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/String"
+          },
+          "desc": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "nickname": {
+            "type": "string"
+          },
+          "soul_id": {
+            "type": "string"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/String"
           }
         }
       },
