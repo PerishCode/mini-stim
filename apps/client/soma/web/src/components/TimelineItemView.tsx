@@ -15,6 +15,7 @@ export function TimelineItemView(props: {
 
   if (item.kind === "message") {
     const role = item.message.message.actor_type;
+    const pending = item.message.message.state === "pending";
     return (
       <Surface
         align={roleAlign(role)}
@@ -27,7 +28,11 @@ export function TimelineItemView(props: {
             <Text size="xs" tone="subtle">
               {roleLabel(role)}
             </Text>
-            <Timestamp value={item.createdAt} size="xs" tone="subtle" />
+            {pending ? (
+              <Text size="xs" tone="subtle">generating…</Text>
+            ) : (
+              <Timestamp value={item.createdAt} size="xs" tone="subtle" />
+            )}
           </Inline>
           <Text>{item.message.content_text}</Text>
         </Stack>

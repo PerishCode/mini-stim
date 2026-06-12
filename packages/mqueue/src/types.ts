@@ -5,15 +5,23 @@ import type {
   SessionRuntimeSnapshot,
   ToolCall,
   ToolResult,
+  Turn,
+  TurnStatus,
   UpdateSessionRequest,
 } from "@mini-stim/contracts";
 
 export type {
+  Compact,
   MessagePart,
   Session,
+  SessionEffect,
   SessionMessage,
+  SessionRuntimeSnapshot,
+  SoulSession,
   ToolCall,
   ToolResult,
+  Turn,
+  TurnStatus,
 } from "@mini-stim/contracts";
 
 export type SessionAction =
@@ -70,6 +78,7 @@ export type MessagePhase =
   | "completed"
   | "tool_call"
   | "tool_result"
+  | "turn_started"
   | "failed"
   | "projection";
 
@@ -78,9 +87,22 @@ export type MessageConnectionState = "closed" | "connecting" | "open" | "error";
 export interface MessageProjection {
   messagesBySessionId: Record<string, SessionMessage[]>;
   timelineBySessionId: Record<string, TimelineItem[]>;
+  turnTimelineBySessionId: Record<string, TurnGroup[]>;
+  turnsBySessionId: Record<string, Turn[]>;
   toolCallsBySessionId: Record<string, ToolCall[]>;
   toolResultsBySessionId: Record<string, ToolResult[]>;
   connectionBySessionId: Record<string, MessageConnectionState>;
+}
+
+export interface TurnGroup {
+  /** Turn id, or `ungrouped_<first item id>` for the fallback group. */
+  id: string;
+  sessionId: string;
+  /** Sort key: the earliest createdAt among the turn and its items. */
+  createdAt: string;
+  /** Absent for the fallback group holding items with no resolvable turn. */
+  turn?: Turn;
+  items: TimelineItem[];
 }
 
 export type TimelineItem =
@@ -196,7 +218,7 @@ export type StreamPayload =
   | { type: "message_completed"; turn_id: string; message: SessionMessage }
   | { type: "tool_call_created"; tool_call: ToolCall }
   | { type: "tool_result_created"; tool_result: ToolResult }
-  | { type: "turn_started"; turn: unknown }
+  | { type: "turn_started"; turn: Turn }
   | { type: "turn_failed"; turn_id: string; error: string };
 
 export interface MessageDeltaPayload {

@@ -20,19 +20,28 @@ import {
   type Session,
   type SessionMessage,
   type SessionProjection,
+  type SessionRuntimeSnapshot,
   type TimelineItem,
+  type TurnGroup,
 } from "@mini-stim/mqueue";
 
 export type {
+  Compact,
   MessageConnectionState,
   MessagePart,
   MqueueError,
   PubAck,
   SantiMqueue,
   Session,
+  SessionEffect,
   SessionMessage,
   SessionProjection,
+  SessionRuntimeSnapshot,
+  SoulSession,
   TimelineItem,
+  Turn,
+  TurnGroup,
+  TurnStatus,
 } from "@mini-stim/mqueue";
 
 interface SantiMqueueProviderProps {
@@ -46,6 +55,7 @@ interface SessionActions {
   create(): PubAck;
   get(sessionId: string): PubAck;
   list(): PubAck;
+  refreshRuntime(sessionId: string): PubAck;
   select(sessionId: string | null): PubAck;
   selectAndGet(sessionId: string): PubAck[];
   send(input: { sessionId?: string | null; content: MessagePart[] }): PubAck;
@@ -114,7 +124,7 @@ export function useSessionMessages(sessionId?: string | null): SessionMessage[] 
   return projection.messagesBySessionId[resolvedSessionId] ?? [];
 }
 
-export function useSessionTimeline(sessionId?: string | null): TimelineItem[] {
+export function useSessionTurnTimeline(sessionId?: string | null): TurnGroup[] {
   const mqueue = useSantiMqueue();
   const selectedSessionId = useSelectedSessionId();
   const store = useMemo(() => createMessageStore(mqueue), [mqueue]);
@@ -127,7 +137,43 @@ export function useSessionTimeline(sessionId?: string | null): TimelineItem[] {
   if (!resolvedSessionId) {
     return [];
   }
-  return projection.timelineBySessionId[resolvedSessionId] ?? [];
+  return projection.turnTimelineBySessionId[resolvedSessionId] ?? [];
+}
+
+/**
+ * First user-authored line of each loaded session, keyed by session id.
+ * Only sessions whose messages have been fetched appear; callers fall
+ * back to their own label (title or id) for the rest.
+ */
+export function useSessionPreviews(): Record<string, string> {
+  const projection = useSessionProjection();
+  return useMemo(() => {
+    const previews: Record<string, string> = {};
+    for (const [sessionId, messages] of Object.entries(
+      projection.messagesBySessionId,
+    )) {
+      const first = messages.find(
+        (message) =>
+          message.message.actor_type === "account" &&
+          message.content_text.trim(),
+      );
+      if (first) {
+        previews[sessionId] = first.content_text.trim();
+      }
+    }
+    return previews;
+  }, [projection]);
+}
+
+export function useSessionRuntime(
+  sessionId?: string | null,
+): SessionRuntimeSnapshot | null {
+  const projection = useSessionProjection();
+  const resolvedSessionId = sessionId ?? projection.selectedSessionId;
+  if (!resolvedSessionId) {
+    return null;
+  }
+  return projection.runtimeBySessionId[resolvedSessionId] ?? null;
 }
 
 export function useSessionPending(): number {
@@ -210,6 +256,8 @@ export function useSessionActions(): SessionActions {
       create: () => mqueue.session.pub("create"),
       get: (sessionId: string) => mqueue.session.pub("get", { sessionId }),
       list: () => mqueue.session.pub("list"),
+      refreshRuntime: (sessionId: string) =>
+        mqueue.session.pub("runtime", { sessionId }),
       select: (sessionId: string | null) =>
         mqueue.session.pub("select", { sessionId }),
       selectAndGet: (sessionId: string) => [

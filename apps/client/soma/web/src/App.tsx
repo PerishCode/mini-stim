@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppRoot, Grid, GridItem } from "@mini-stim/components";
 import {
   useDebouncedValue,
@@ -7,7 +7,9 @@ import {
   useSessionActions,
   useSessionError,
   useSessionPending,
-  useSessionTimeline,
+  useSessionPreviews,
+  useSessionRuntime,
+  useSessionTurnTimeline,
   useSessions,
 } from "@mini-stim/hooks";
 
@@ -17,17 +19,69 @@ import { SessionRail } from "./components/SessionRail";
 export function App() {
   const sessions = useSessions();
   const selectedSessionId = useSelectedSessionId();
-  const timeline = useSessionTimeline();
+  const timeline = useSessionTurnTimeline();
   const pending = useSessionPending();
   const sessionError = useSessionError();
   const connection = useMessageConnection();
   const actions = useSessionActions();
+  const runtime = useSessionRuntime();
+  const previews = useSessionPreviews();
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [inspecting, setInspecting] = useState(false);
+
+  // The inspect panel is a view over the selected session; switching
+  // sessions returns to the transcript. Opening it refreshes the snapshot
+  // so memory/compacts/effects reflect the turns since selection.
+  useEffect(() => {
+    setInspecting(false);
+  }, [selectedSessionId]);
+
+  function toggleInspect() {
+    if (!inspecting && selectedSessionId) {
+      actions.refreshRuntime(selectedSessionId);
+    }
+    setInspecting((current) => !current);
+  }
 
   const busy = pending > 0;
   const debouncedBusy = useDebouncedValue(busy, { debounceMs: 150 });
-  const visibleError = error ?? sessionError?.message ?? null;
+  // While a turn is running, the header chip names the phase the turn is
+  // actually in instead of a generic "sending".
+  const activity = useMemo(() => {
+    const running = timeline.find((group) => group.turn?.status === "running");
+    if (!running) {
+      return "sending";
+    }
+    if (running.items.some((item) => item.kind === "tool_call" && !item.toolResult)) {
+      return "running tool";
+    }
+    if (
+      running.items.some(
+        (item) => item.kind === "message" && item.message.message.state === "pending",
+      )
+    ) {
+      return "generating";
+    }
+    return "thinking";
+  }, [timeline]);
+  // Turn failures render in place inside the transcript; the composer
+  // notice keeps only errors that no failed turn already carries.
+  const inPlaceErrors = useMemo(
+    () =>
+      new Set(
+        timeline
+          .filter((group) => group.turn?.status === "failed")
+          .map((group) => group.turn?.error_text)
+          .filter((text): text is string => Boolean(text)),
+      ),
+    [timeline],
+  );
+  const sessionErrorMessage =
+    sessionError && !inPlaceErrors.has(sessionError.message)
+      ? sessionError.message
+      : null;
+  const visibleError = error ?? sessionErrorMessage;
   const debouncedConnection = useDebouncedValue(connection, { debounceMs: 150 });
   const selectedTitle = useMemo(() => {
     const selected = sessions.find((session) => session.id === selectedSessionId);
@@ -94,18 +148,23 @@ export function App() {
           busy={busy}
           onCreate={createNewSession}
           onSelect={selectSession}
+          previews={previews}
           selectedSessionId={selectedSessionId}
           sessions={sessions}
         />
         </GridItem>
         <GridItem area="main" tag="main">
         <ChatShell
+          activity={activity}
           busy={debouncedBusy}
           connection={debouncedConnection}
           error={visibleError}
+          inspecting={inspecting}
           onDraftChange={setDraft}
           onSend={send}
           onTitleCommit={updateTitle}
+          onToggleInspect={toggleInspect}
+          runtime={runtime}
           selectedSessionId={selectedSessionId}
           title={selectedTitle}
           titleValue={selectedSession?.title ?? null}

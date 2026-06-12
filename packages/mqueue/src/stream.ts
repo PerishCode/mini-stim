@@ -4,6 +4,7 @@ import type {
   SessionMessage,
   ToolCall,
   ToolResult,
+  Turn,
   StreamPayload,
 } from "./types";
 
@@ -19,6 +20,7 @@ export interface SessionStreamHandlers {
   }): void;
   toolCall(payload: { type: "tool_call_created"; tool_call: ToolCall }): void;
   toolResult(payload: { type: "tool_result_created"; tool_result: ToolResult }): void;
+  turnStarted(payload: { type: "turn_started"; turn: Turn }): void;
   turnFailed(payload: { type: "turn_failed"; turn_id: string; error: string }): void;
 }
 
@@ -34,6 +36,7 @@ export function openSessionStream(
   listen(source, "message_completed", "message_completed", handlers.messageCompleted);
   listen(source, "tool_call_created", "tool_call_created", handlers.toolCall);
   listen(source, "tool_result_created", "tool_result_created", handlers.toolResult);
+  listen(source, "turn_started", "turn_started", handlers.turnStarted);
   listen(source, "turn_failed", "turn_failed", handlers.turnFailed);
   return source;
 }

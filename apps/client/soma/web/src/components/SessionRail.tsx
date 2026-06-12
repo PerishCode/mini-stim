@@ -17,6 +17,7 @@ export function SessionRail(props: {
   busy: boolean;
   onCreate: () => void;
   onSelect: (sessionId: string) => void;
+  previews: Record<string, string>;
   selectedSessionId: string | null;
   sessions: Session[];
 }) {
@@ -48,7 +49,7 @@ export function SessionRail(props: {
           <Stack gap="xs">
             {props.sessions.map((session) => {
               const selected = session.id === props.selectedSessionId;
-              const label = sessionLabel(session);
+              const label = sessionLabel(session, props.previews[session.id]);
               return (
                 <Button
                   key={session.id}
@@ -83,6 +84,9 @@ export function SessionRail(props: {
   );
 }
 
-function sessionLabel(session: { id: string; title?: string | null }) {
-  return session.title?.trim() || session.id;
+function sessionLabel(
+  session: { id: string; title?: string | null },
+  preview?: string,
+) {
+  return session.title?.trim() || preview || session.id;
 }

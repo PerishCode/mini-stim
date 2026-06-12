@@ -11,9 +11,12 @@ import {
 } from "@mini-stim/components";
 
 export function ChatHeader(props: {
+  activity: string;
   busy: boolean;
   connection: string;
+  inspecting: boolean;
   onTitleCommit: (title: string | null) => void;
+  onToggleInspect: () => void;
   selectedSessionId: string | null;
   title: string;
   titleValue: string | null;
@@ -84,13 +87,22 @@ export function ChatHeader(props: {
             </Button>
           )}
         </Stack>
-        <Inline gap="sm" wrap>
+        <Inline gap="sm" align="center" wrap>
           {props.busy ? (
-            <Badge size="sm" tone="success">sending</Badge>
+            <Badge size="sm" tone="success">{props.activity}</Badge>
           ) : null}
           {props.connection === "error" ? (
             <Badge size="sm" tone="danger">reconnecting</Badge>
           ) : null}
+          <Button
+            size="sm"
+            variant={props.inspecting ? "outline" : "ghost"}
+            disabled={!props.selectedSessionId}
+            type="button"
+            onClick={props.onToggleInspect}
+          >
+            {props.inspecting ? "Transcript" : "Inspect"}
+          </Button>
         </Inline>
       </Inline>
     </Pane>
