@@ -1,5 +1,5 @@
 import { Notice, Pane, ScrollArea, Stack, Text } from "@mini-stim/components";
-import type { TurnGroup } from "@mini-stim/hooks";
+import type { TimelineItem, TurnGroup } from "@mini-stim/hooks";
 
 import { TimelineItemView } from "./TimelineItemView";
 
@@ -12,6 +12,7 @@ export function Transcript(props: {
   soulIdentity: SoulIdentity;
   timeline: TurnGroup[];
 }) {
+  const groups = annotateIdentityGroups(props.timeline);
   const empty = !props.timeline.some(
     (group) => group.items.length || group.turn,
   );
@@ -19,7 +20,7 @@ export function Transcript(props: {
     <ScrollArea grow>
       <Pane padding="xl">
         <Stack gap="lg">
-          {props.timeline.map((group) => (
+          {groups.map((group) => (
             <TurnGroupView
               key={group.id}
               group={group}
@@ -37,15 +38,19 @@ export function Transcript(props: {
   );
 }
 
-function TurnGroupView(props: { group: TurnGroup; soulIdentity: SoulIdentity }) {
+function TurnGroupView(props: {
+  group: AnnotatedTurnGroup;
+  soulIdentity: SoulIdentity;
+}) {
   const { group, soulIdentity } = props;
   const turn = group.turn;
   return (
     <Stack gap="lg">
-      {group.items.map((item) => (
+      {group.items.map(({ item, showIdentity }) => (
         <TimelineItemView
           key={item.id}
           item={item}
+          showIdentity={showIdentity}
           soulIdentity={soulIdentity}
         />
       ))}
@@ -62,4 +67,38 @@ function TurnGroupView(props: { group: TurnGroup; soulIdentity: SoulIdentity }) 
       ) : null}
     </Stack>
   );
+}
+
+interface AnnotatedTimelineItem {
+  item: TimelineItem;
+  showIdentity: boolean;
+}
+
+type AnnotatedTurnGroup = Omit<TurnGroup, "items"> & {
+  items: AnnotatedTimelineItem[];
+};
+
+function annotateIdentityGroups(groups: TurnGroup[]): AnnotatedTurnGroup[] {
+  let previousIdentityKey: string | null = null;
+  return groups.map((group) => ({
+    ...group,
+    items: group.items.map((item) => {
+      const identityKey = messageIdentityKey(item);
+      const showIdentity =
+        identityKey === null || identityKey !== previousIdentityKey;
+      previousIdentityKey = identityKey;
+      return {
+        item,
+        showIdentity,
+      };
+    }),
+  }));
+}
+
+function messageIdentityKey(item: TimelineItem) {
+  if (item.kind !== "message") {
+    return null;
+  }
+  const message = item.message.message;
+  return `${message.actor_type}:${message.actor_id}`;
 }

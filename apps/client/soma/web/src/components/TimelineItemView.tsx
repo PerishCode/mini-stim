@@ -16,15 +16,17 @@ import type { SoulIdentity } from "./Transcript";
 
 export function TimelineItemView(props: {
   item: TimelineItem;
+  showIdentity: boolean;
   soulIdentity: SoulIdentity;
 }) {
-  const { item, soulIdentity } = props;
+  const { item, showIdentity, soulIdentity } = props;
   const target = targetForItem(item);
 
   if (item.kind === "message") {
     const role = item.message.message.actor_type;
     const pending = item.message.message.state === "pending";
     const identity = identityForMessage(role, item.message.message.actor_id, soulIdentity);
+    const showHeader = showIdentity || pending;
     return (
       <Pressable onClick={() => selectInspectTarget(target)}>
         <Surface
@@ -34,19 +36,23 @@ export function TimelineItemView(props: {
           width="content"
         >
           <Stack gap="sm">
-            <Inline justify="between" align="center" wrap gap="sm">
-              <IdentityLine
-                avatarSeed={identity.avatarSeed}
-                marker={identity.marker}
-                name={identity.name}
-                size="sm"
-              />
-              {pending ? (
-                <Text size="xs" tone="subtle">generating…</Text>
-              ) : (
-                <Timestamp value={item.createdAt} size="xs" tone="subtle" />
-              )}
-            </Inline>
+            {showHeader ? (
+              <Inline justify="between" align="center" wrap gap="sm">
+                {showIdentity ? (
+                  <IdentityLine
+                    avatarSeed={identity.avatarSeed}
+                    marker={identity.marker}
+                    name={identity.name}
+                    size="sm"
+                  />
+                ) : null}
+                {pending ? (
+                  <Text size="xs" tone="subtle">generating…</Text>
+                ) : (
+                  <Timestamp value={item.createdAt} size="xs" tone="subtle" />
+                )}
+              </Inline>
+            ) : null}
             <Text>{item.message.content_text}</Text>
           </Stack>
         </Surface>
