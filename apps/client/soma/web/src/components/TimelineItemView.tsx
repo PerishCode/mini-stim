@@ -1,6 +1,5 @@
 import {
   Badge,
-  CodeBlock,
   IdentityLine,
   Inline,
   Pressable,
@@ -63,25 +62,17 @@ export function TimelineItemView(props: {
   if (item.kind === "tool_call") {
     const result = item.toolResult;
     const failed = Boolean(result?.error_text);
+    const status = result ? (failed ? "failed" : "completed") : "running";
     return (
       <Pressable onClick={() => selectInspectTarget(target)}>
-        <Surface tone={failed ? "danger" : "inset"} padding="lg" width="full">
-          <Stack gap="sm">
-            <Inline justify="between" wrap gap="sm">
-              <Stack tag="span" gap="xs">
-                <Text size="xs" tone="subtle">TOOL CALL</Text>
-                <Text tone="strong">{item.toolCall.tool_name}</Text>
-              </Stack>
-              <Text size="xs" tone="subtle">
-                {result ? (failed ? "failed" : "completed") : "running"}
-              </Text>
+        <Surface tone={failed ? "danger" : "inset"} padding="sm" width="content">
+          <Stack gap="xs">
+            <Inline align="center" gap="sm" wrap>
+              <Text size="xs" tone="subtle">Used</Text>
+              <Text size="sm" tone="strong">{item.toolCall.tool_name}</Text>
+              <Text size="xs" tone="subtle">{status}</Text>
             </Inline>
-            <CodeBlock>{formatJson(item.toolCall.arguments)}</CodeBlock>
-            {result ? (
-              <CodeBlock>
-                {result.error_text ?? formatJson(result.output)}
-              </CodeBlock>
-            ) : null}
+            <Timestamp value={item.createdAt} size="xs" tone="subtle" />
           </Stack>
         </Surface>
       </Pressable>
@@ -91,22 +82,18 @@ export function TimelineItemView(props: {
   const failed = Boolean(item.toolResult.error_text);
   return (
     <Pressable onClick={() => selectInspectTarget(target)}>
-      <Surface tone={failed ? "danger" : "inset"} padding="lg" width="full">
-        <Stack gap="sm">
-          <Inline justify="between" wrap gap="sm">
-            <Stack tag="span" gap="xs">
-              <Text size="xs" tone="subtle">TOOL RESULT</Text>
-              <Text tone="strong">
-                {item.toolCall?.tool_name ?? "tool result"}
-              </Text>
-            </Stack>
+      <Surface tone={failed ? "danger" : "inset"} padding="sm" width="content">
+        <Stack gap="xs">
+          <Inline align="center" gap="sm" wrap>
+            <Text size="xs" tone="subtle">Tool result</Text>
+            <Text size="sm" tone="strong">
+              {item.toolCall?.tool_name ?? "unknown tool"}
+            </Text>
             <Text size="xs" tone="subtle">
               {failed ? "failed" : "completed"}
             </Text>
           </Inline>
-          <CodeBlock>
-            {item.toolResult.error_text ?? formatJson(item.toolResult.output)}
-          </CodeBlock>
+          <Timestamp value={item.createdAt} size="xs" tone="subtle" />
         </Stack>
       </Surface>
     </Pressable>
@@ -177,14 +164,4 @@ function identityForMessage(
     marker: <Badge size="sm" tone="accent">verified</Badge>,
     name: soulIdentity.name,
   };
-}
-
-function formatJson(value: unknown) {
-  if (value === null || value === undefined) {
-    return "";
-  }
-  if (typeof value === "string") {
-    return value;
-  }
-  return JSON.stringify(value, null, 2);
 }
