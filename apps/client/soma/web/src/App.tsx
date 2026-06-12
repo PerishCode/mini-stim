@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { AppRoot, Grid, GridItem, Pane } from "@mini-stim/components";
+import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { AppRoot, Grid, GridItem, Pane, ResizeHandle } from "@mini-stim/components";
 import { uiStorage } from "@mini-stim/storage";
 import {
   type SessionSummary,
@@ -19,8 +19,15 @@ import { ChatShell } from "./components/ChatShell";
 import { InspectPanel } from "./components/InspectPanel";
 import { SessionRail } from "./components/SessionRail";
 
+const DEFAULT_RAIL_WIDTH = 304;
+const DEFAULT_INSPECT_WIDTH = 352;
+const RAIL_WIDTH_RANGE = { min: 264, max: 420 };
+const INSPECT_WIDTH_RANGE = { min: 288, max: 520 };
+
 export function App() {
   const [preferences] = useState(() => uiStorage.read());
+  const [layout, setLayout] = useState(preferences.desktopLayout);
+  const [resizing, setResizing] = useState<"inspect" | "rail" | null>(null);
   const sessions = useSessions();
   const selectedSessionId = useSelectedSessionId();
   const timeline = useSessionTurnTimeline();
@@ -105,10 +112,6 @@ export function App() {
     () => sessions.find((session) => session.session.id === selectedSessionId) ?? null,
     [selectedSessionId, sessions],
   );
-  const gridStyle = useMemo(
-    () => layoutStyle(preferences.desktopLayout),
-    [preferences.desktopLayout],
-  );
 
   function createNewSession() {
     setError(null);
@@ -158,13 +161,65 @@ export function App() {
     }
   }
 
+  function beginRailResize(event: ReactPointerEvent<HTMLButtonElement>) {
+    beginResize("rail", event);
+  }
+
+  function beginInspectResize(event: ReactPointerEvent<HTMLButtonElement>) {
+    beginResize("inspect", event);
+  }
+
+  function beginResize(
+    target: "inspect" | "rail",
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth =
+      event.currentTarget.parentElement?.getBoundingClientRect().width ??
+      (target === "rail" ? DEFAULT_RAIL_WIDTH : DEFAULT_INSPECT_WIDTH);
+    let nextWidth = startWidth;
+    setResizing(target);
+
+    function handlePointerMove(moveEvent: PointerEvent) {
+      const delta = moveEvent.clientX - startX;
+      nextWidth = clampWidth(
+        target === "rail" ? startWidth + delta : startWidth - delta,
+        target,
+      );
+      setLayout((current) => ({
+        ...current,
+        railWidthPx: target === "rail" ? nextWidth : current.railWidthPx,
+        inspectWidthPx: target === "inspect" ? nextWidth : current.inspectWidthPx,
+      }));
+    }
+
+    function handlePointerUp() {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      setResizing(null);
+      uiStorage.update((current) => ({
+        ...current,
+        desktopLayout: {
+          ...current.desktopLayout,
+          railWidthPx: target === "rail" ? nextWidth : layout.railWidthPx,
+          inspectWidthPx: target === "inspect" ? nextWidth : layout.inspectWidthPx,
+        },
+      }));
+    }
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+  }
+
   return (
     <AppRoot>
       <Grid
         template={inspecting ? "sidebar-main-inspect" : "sidebar-main"}
         gap="shell"
         grow
-        style={gridStyle}
+        sidebarWidthPx={layout.railWidthPx}
+        inspectWidthPx={layout.inspectWidthPx}
       >
         <GridItem area="sidebar" tag="aside">
         <SessionRail
@@ -174,6 +229,12 @@ export function App() {
           previews={previews}
           selectedSessionId={selectedSessionId}
           sessions={sessions}
+        />
+        <ResizeHandle
+          aria-label="Resize sessions panel"
+          aria-pressed={resizing === "rail"}
+          placement="end"
+          onPointerDown={beginRailResize}
         />
         </GridItem>
         <GridItem area="main" tag="main">
@@ -199,6 +260,12 @@ export function App() {
             <Pane chrome="panel" tone="raised" grow>
               <InspectPanel runtime={runtime} />
             </Pane>
+            <ResizeHandle
+              aria-label="Resize inspect panel"
+              aria-pressed={resizing === "inspect"}
+              placement="start"
+              onPointerDown={beginInspectResize}
+            />
           </GridItem>
         ) : null}
       </Grid>
@@ -210,16 +277,7 @@ function sessionLabel(session: SessionSummary) {
   return session.profile.title?.trim() || session.session.id;
 }
 
-function layoutStyle(layout: {
-  railWidthPx: number | null;
-  inspectWidthPx: number | null;
-}): CSSProperties {
-  const style: Record<string, string> = {};
-  if (layout.railWidthPx) {
-    style["--ms-grid-sidebar-width"] = `${layout.railWidthPx}px`;
-  }
-  if (layout.inspectWidthPx) {
-    style["--ms-grid-inspect-width"] = `${layout.inspectWidthPx}px`;
-  }
-  return style as CSSProperties;
+function clampWidth(width: number, target: "inspect" | "rail") {
+  const range = target === "rail" ? RAIL_WIDTH_RANGE : INSPECT_WIDTH_RANGE;
+  return Math.round(Math.min(range.max, Math.max(range.min, width)));
 }

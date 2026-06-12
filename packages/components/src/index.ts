@@ -14,6 +14,7 @@ export { Inline } from "./atoms/Inline/Inline";
 export { Notice } from "./atoms/Notice/Notice";
 export { Pane } from "./atoms/Pane/Pane";
 export { PlusIcon } from "./icons/PlusIcon";
+export { ResizeHandle } from "./atoms/ResizeHandle/ResizeHandle";
 export { ScrollArea } from "./atoms/ScrollArea/ScrollArea";
 export { SendIcon } from "./icons/SendIcon";
 export { Stack } from "./atoms/Stack/Stack";
