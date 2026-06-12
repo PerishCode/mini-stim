@@ -172,15 +172,20 @@ function SelectedTargetBody(props: { selected: RuntimeTargetSelection }) {
     );
   }
   if (selected.kind === "tool_call") {
-    const toolCall = selected.toolCall;
+    const { toolCall, toolResult } = selected;
     return (
       <Pane border="around" padding="md" tone="panel">
-        <Stack gap="xs">
+        <Stack gap="sm">
           <Inline justify="between" align="center" wrap gap="sm">
             <Text size="sm" tone="strong">{toolCall.tool_name}</Text>
             <Timestamp value={toolCall.created_at} size="xs" tone="subtle" />
           </Inline>
           <CodeBlock>{formatJson(toolCall.arguments)}</CodeBlock>
+          {toolResult ? (
+            <CodeBlock>{toolResult.error_text ?? formatJson(toolResult.output)}</CodeBlock>
+          ) : (
+            <Text size="sm" tone="muted">No tool result has been recorded yet.</Text>
+          )}
         </Stack>
       </Pane>
     );
@@ -210,7 +215,11 @@ type RuntimeTargetSelection =
     }
   | { kind: "turn"; turn: SessionRuntimeSnapshot["turns"][number] }
   | { kind: "message"; message: SessionRuntimeSnapshot["messages"][number] }
-  | { kind: "tool_call"; toolCall: SessionRuntimeSnapshot["tool_calls"][number] }
+  | {
+      kind: "tool_call";
+      toolCall: SessionRuntimeSnapshot["tool_calls"][number];
+      toolResult?: SessionRuntimeSnapshot["tool_results"][number];
+    }
   | { kind: "tool_result"; toolResult: SessionRuntimeSnapshot["tool_results"][number] };
 
 function selectRuntimeTarget(
@@ -238,7 +247,13 @@ function selectRuntimeTarget(
     const toolCall = runtime.tool_calls.find(
       (item) => item.id === target.toolCallId,
     );
-    return toolCall ? { kind: "tool_call", toolCall } : null;
+    if (!toolCall) {
+      return null;
+    }
+    const toolResult = runtime.tool_results.find(
+      (item) => item.tool_call_id === toolCall.id,
+    );
+    return { kind: "tool_call", toolCall, toolResult };
   }
   if (target.kind === "tool_result") {
     const toolResult = runtime.tool_results.find(
