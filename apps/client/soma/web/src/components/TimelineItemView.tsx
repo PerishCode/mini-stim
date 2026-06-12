@@ -168,7 +168,7 @@ function identityForMessage(
   }
   return {
     avatarSeed: soulIdentity.avatarSeed,
-    marker: <Badge size="sm" tone="accent">Santi</Badge>,
+    marker: <Badge size="sm" tone="accent">verified</Badge>,
     name: soulIdentity.name,
   };
 }
