@@ -1,6 +1,8 @@
 import { Notice, Pane, ScrollArea, Stack, Text } from "@mini-stim/components";
-import type { TimelineItem, TurnGroup } from "@mini-stim/hooks";
+import type { TurnGroup } from "@mini-stim/hooks";
 
+import type { AnnotatedTurnGroup } from "../projections/identityGrouping";
+import { annotateIdentityGroups } from "../projections/identityGrouping";
 import { TimelineItemView } from "./TimelineItemView";
 
 export interface SoulIdentity {
@@ -67,38 +69,4 @@ function TurnGroupView(props: {
       ) : null}
     </Stack>
   );
-}
-
-interface AnnotatedTimelineItem {
-  item: TimelineItem;
-  showIdentity: boolean;
-}
-
-type AnnotatedTurnGroup = Omit<TurnGroup, "items"> & {
-  items: AnnotatedTimelineItem[];
-};
-
-function annotateIdentityGroups(groups: TurnGroup[]): AnnotatedTurnGroup[] {
-  let previousIdentityKey: string | null = null;
-  return groups.map((group) => ({
-    ...group,
-    items: group.items.map((item) => {
-      const identityKey = messageIdentityKey(item);
-      const showIdentity =
-        identityKey === null || identityKey !== previousIdentityKey;
-      previousIdentityKey = identityKey;
-      return {
-        item,
-        showIdentity,
-      };
-    }),
-  }));
-}
-
-function messageIdentityKey(item: TimelineItem) {
-  if (item.kind !== "message") {
-    return null;
-  }
-  const message = item.message.message;
-  return `${message.actor_type}:${message.actor_id}`;
 }

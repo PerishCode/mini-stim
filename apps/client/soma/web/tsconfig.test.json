@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["src", "tests", "vitest.config.ts"],
+  "compilerOptions": {
+    "paths": {
+      "@web/*": ["./src/*"]
+    },
+    "types": ["vite/client", "vitest/globals"]
+  }
+}
