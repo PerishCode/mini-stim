@@ -4,6 +4,7 @@
   "type": "module",
   "packageManager": "pnpm@10.33.2",
   "scripts": {
+    "test:e2e": "pnpm --filter @mini-stim/e2e test",
     "typecheck": "pnpm -r --if-present typecheck",
     "build": "pnpm -r --if-present build"
   },
