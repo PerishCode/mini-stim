@@ -3,13 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "lint": "biome check lib specs resources package.json playwright.config.ts tsconfig.json",
-    "test": "playwright test",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "lint": "biome check .",
+    "test": "playwright test"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.0",
-    "@playwright/test": "^1.57.0",
-    "@types/node": "^25.9.3"
+    "@biomejs/biome": "2.5.0",
+    "@playwright/test": "1.60.0",
+    "@types/node": "25.9.3"
   }
 }

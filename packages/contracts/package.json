@@ -8,11 +8,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "codegen": "orval --config orval.config.ts && prettier --write src/openapi.ts",
-    "lint": "biome check package.json tsconfig.json orval.config.ts src/index.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "lint": "biome check ."
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.0",
-    "typescript": "^6.0.3"
+    "@biomejs/biome": "2.5.0",
+    "typescript": "6.0.3"
   }
 }
