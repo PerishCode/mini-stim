@@ -3,7 +3,13 @@ import type { TurnGroup } from "@mini-stim/hooks";
 
 import { TimelineItemView } from "./TimelineItemView";
 
+export interface SoulIdentity {
+  avatarSeed: string;
+  name: string;
+}
+
 export function Transcript(props: {
+  soulIdentity: SoulIdentity;
   timeline: TurnGroup[];
 }) {
   const empty = !props.timeline.some(
@@ -14,7 +20,11 @@ export function Transcript(props: {
       <Pane padding="xl">
         <Stack gap="lg">
           {props.timeline.map((group) => (
-            <TurnGroupView key={group.id} group={group} />
+            <TurnGroupView
+              key={group.id}
+              group={group}
+              soulIdentity={props.soulIdentity}
+            />
           ))}
           {empty ? (
             <Notice>
@@ -27,13 +37,17 @@ export function Transcript(props: {
   );
 }
 
-function TurnGroupView(props: { group: TurnGroup }) {
-  const { group } = props;
+function TurnGroupView(props: { group: TurnGroup; soulIdentity: SoulIdentity }) {
+  const { group, soulIdentity } = props;
   const turn = group.turn;
   return (
     <Stack gap="lg">
       {group.items.map((item) => (
-        <TimelineItemView key={item.id} item={item} />
+        <TimelineItemView
+          key={item.id}
+          item={item}
+          soulIdentity={soulIdentity}
+        />
       ))}
       {turn?.status === "failed" ? (
         <Notice tone="danger">

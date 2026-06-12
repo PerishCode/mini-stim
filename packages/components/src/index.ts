@@ -1,4 +1,5 @@
 export { AppRoot } from "./atoms/AppRoot/AppRoot";
+export { Avatar } from "./atoms/Avatar/Avatar";
 export { Badge } from "./atoms/Badge/Badge";
 export { Button } from "./atoms/Button/Button";
 export { CodeBlock } from "./atoms/CodeBlock/CodeBlock";
@@ -9,6 +10,7 @@ export { GridRows } from "./atoms/GridRows/GridRows";
 export { Heading } from "./atoms/Heading/Heading";
 export { Icon } from "./icons/Icon/Icon";
 export { IconButton } from "./atoms/IconButton/IconButton";
+export { IdentityLine } from "./patterns/IdentityLine/IdentityLine";
 export { Input } from "./atoms/Input/Input";
 export { Inline } from "./atoms/Inline/Inline";
 export { Notice } from "./atoms/Notice/Notice";

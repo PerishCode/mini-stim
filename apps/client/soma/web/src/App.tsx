@@ -139,6 +139,10 @@ export function App() {
     () => sessions.find((session) => session.session.id === selectedSessionId) ?? null,
     [selectedSessionId, sessions],
   );
+  const soulIdentity = {
+    avatarSeed: runtime?.soul_profile?.avatar_seed ?? "soul_default",
+    name: runtime?.soul_profile?.nickname ?? "Santi",
+  };
 
   function createNewSession() {
     setError(null);
@@ -280,6 +284,7 @@ export function App() {
             title={selectedTitle}
             titleValue={selectedSession?.profile.title ?? null}
             timeline={timeline}
+            soulIdentity={soulIdentity}
             draft={draft}
           />
         </GridItem>

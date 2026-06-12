@@ -1,5 +1,7 @@
 import {
+  Badge,
   CodeBlock,
+  IdentityLine,
   Inline,
   Pressable,
   Stack,
@@ -10,16 +12,19 @@ import {
 import type { TimelineItem } from "@mini-stim/hooks";
 
 import { selectInspectTarget } from "../events/inspect";
+import type { SoulIdentity } from "./Transcript";
 
 export function TimelineItemView(props: {
   item: TimelineItem;
+  soulIdentity: SoulIdentity;
 }) {
-  const { item } = props;
+  const { item, soulIdentity } = props;
   const target = targetForItem(item);
 
   if (item.kind === "message") {
     const role = item.message.message.actor_type;
     const pending = item.message.message.state === "pending";
+    const identity = identityForMessage(role, item.message.message.actor_id, soulIdentity);
     return (
       <Pressable onClick={() => selectInspectTarget(target)}>
         <Surface
@@ -30,9 +35,12 @@ export function TimelineItemView(props: {
         >
           <Stack gap="sm">
             <Inline justify="between" align="center" wrap gap="sm">
-              <Text size="xs" tone="subtle">
-                {roleLabel(role)}
-              </Text>
+              <IdentityLine
+                avatarSeed={identity.avatarSeed}
+                marker={identity.marker}
+                name={identity.name}
+                size="sm"
+              />
               {pending ? (
                 <Text size="xs" tone="subtle">generating…</Text>
               ) : (
@@ -141,6 +149,30 @@ function roleAlign(role: string) {
   return "start";
 }
 
+function identityForMessage(
+  role: string,
+  actorId: string,
+  soulIdentity: SoulIdentity,
+) {
+  if (role === "account") {
+    return {
+      avatarSeed: `account:${actorId}`,
+      name: "You",
+    };
+  }
+  if (role === "system") {
+    return {
+      avatarSeed: "system",
+      name: "System",
+    };
+  }
+  return {
+    avatarSeed: soulIdentity.avatarSeed,
+    marker: <Badge size="sm" tone="accent">Santi</Badge>,
+    name: soulIdentity.name,
+  };
+}
+
 function formatJson(value: unknown) {
   if (value === null || value === undefined) {
     return "";
@@ -149,14 +181,4 @@ function formatJson(value: unknown) {
     return value;
   }
   return JSON.stringify(value, null, 2);
-}
-
-function roleLabel(role: string) {
-  if (role === "account") {
-    return "YOU";
-  }
-  if (role === "system") {
-    return "SYSTEM";
-  }
-  return "ASSISTANT";
 }

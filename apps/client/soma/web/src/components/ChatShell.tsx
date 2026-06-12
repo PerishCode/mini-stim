@@ -15,6 +15,7 @@ export function ChatShell(props: {
   onTitleCommit: (title: string | null) => void;
   onToggleInspect: () => void;
   selectedSessionId: string | null;
+  soulIdentity: Parameters<typeof Transcript>[0]["soulIdentity"];
   title: string;
   titleValue: string | null;
   timeline: Parameters<typeof Transcript>[0]["timeline"];
@@ -36,7 +37,12 @@ export function ChatShell(props: {
             titleValue={props.titleValue}
           />
         )}
-        middle={<Transcript timeline={props.timeline} />}
+        middle={(
+          <Transcript
+            soulIdentity={props.soulIdentity}
+            timeline={props.timeline}
+          />
+        )}
         bottom={(
           <Composer
             value={props.draft}
