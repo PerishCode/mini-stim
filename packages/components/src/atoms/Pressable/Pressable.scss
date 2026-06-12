@@ -1,0 +1,25 @@
+@use "../../theme/mixins" as *;
+
+.msPressable {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+
+  @include control-disabled;
+  @include focus-ring;
+
+  &--display-block {
+    display: block;
+    width: 100%;
+  }
+
+  &--display-inline {
+    display: inline-block;
+    width: fit-content;
+  }
+}

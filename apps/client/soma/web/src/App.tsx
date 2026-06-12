@@ -18,6 +18,10 @@ import {
 import { ChatShell } from "./components/ChatShell";
 import { InspectPanel } from "./components/InspectPanel";
 import { SessionRail } from "./components/SessionRail";
+import {
+  subscribeInspectTarget,
+  type InspectTarget,
+} from "./events/inspect";
 
 const DEFAULT_RAIL_WIDTH = 304;
 const DEFAULT_INSPECT_WIDTH = 352;
@@ -40,6 +44,7 @@ export function App() {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [inspecting, setInspecting] = useState(preferences.inspect.open);
+  const [inspectTarget, setInspectTarget] = useState<InspectTarget | null>(null);
 
   // Inspect is a remembered view over the selected session. Keeping it open
   // across session changes refreshes the snapshot for the newly selected
@@ -49,6 +54,28 @@ export function App() {
       actions.refreshRuntime(selectedSessionId);
     }
   }, [actions, inspecting, selectedSessionId]);
+
+  useEffect(
+    () =>
+      subscribeInspectTarget(({ target }) => {
+        setError(null);
+        setInspectTarget(target);
+        setInspecting(true);
+        if (target.sessionId !== selectedSessionId) {
+          actions.selectAndGet(target.sessionId);
+        } else {
+          actions.refreshRuntime(target.sessionId);
+        }
+        uiStorage.update((current) => ({
+          ...current,
+          inspect: {
+            ...current.inspect,
+            open: true,
+          },
+        }));
+      }),
+    [actions, selectedSessionId],
+  );
 
   function toggleInspect() {
     const next = !inspecting;
@@ -124,6 +151,7 @@ export function App() {
 
   function selectSession(sessionId: string) {
     setError(null);
+    setInspectTarget(null);
     try {
       actions.selectAndGet(sessionId);
     } catch (caught) {
@@ -222,43 +250,50 @@ export function App() {
         inspectWidthPx={layout.inspectWidthPx}
       >
         <GridItem area="sidebar" tag="aside">
-        <SessionRail
-          busy={busy}
-          onCreate={createNewSession}
-          onSelect={selectSession}
-          previews={previews}
-          selectedSessionId={selectedSessionId}
-          sessions={sessions}
-        />
-        <ResizeHandle
-          aria-label="Resize sessions panel"
-          aria-pressed={resizing === "rail"}
-          placement="end"
-          onPointerDown={beginRailResize}
-        />
+          <SessionRail
+            busy={busy}
+            onCreate={createNewSession}
+            onSelect={selectSession}
+            previews={previews}
+            selectedSessionId={selectedSessionId}
+            sessions={sessions}
+          />
+          <ResizeHandle
+            aria-label="Resize sessions panel"
+            aria-pressed={resizing === "rail"}
+            placement="end"
+            onPointerDown={beginRailResize}
+          />
         </GridItem>
         <GridItem area="main" tag="main">
-        <ChatShell
-          activity={activity}
-          busy={debouncedBusy}
-          connection={debouncedConnection}
-          error={visibleError}
-          inspecting={inspecting}
-          onDraftChange={setDraft}
-          onSend={send}
-          onTitleCommit={updateTitle}
-          onToggleInspect={toggleInspect}
-          selectedSessionId={selectedSessionId}
-          title={selectedTitle}
-          titleValue={selectedSession?.profile.title ?? null}
-          timeline={timeline}
-          draft={draft}
-        />
+          <ChatShell
+            activity={activity}
+            busy={debouncedBusy}
+            connection={debouncedConnection}
+            error={visibleError}
+            inspecting={inspecting}
+            onDraftChange={setDraft}
+            onSend={send}
+            onTitleCommit={updateTitle}
+            onToggleInspect={toggleInspect}
+            selectedSessionId={selectedSessionId}
+            title={selectedTitle}
+            titleValue={selectedSession?.profile.title ?? null}
+            timeline={timeline}
+            draft={draft}
+          />
         </GridItem>
         {inspecting ? (
           <GridItem area="inspect" tag="aside">
             <Pane chrome="panel" tone="raised" grow>
-              <InspectPanel runtime={runtime} />
+              <InspectPanel
+                runtime={runtime}
+                target={
+                  inspectTarget?.sessionId === selectedSessionId
+                    ? inspectTarget
+                    : null
+                }
+              />
             </Pane>
             <ResizeHandle
               aria-label="Resize inspect panel"
