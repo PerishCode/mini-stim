@@ -27,10 +27,7 @@ export async function readJsonResource<T>(path: string): Promise<T> {
 }
 
 export function testNamespace(testInfo: TestInfo): string {
-  return [
-    testInfo.project.name,
-    ...testInfo.titlePath.slice(1),
-  ]
+  return [testInfo.project.name, ...testInfo.titlePath.slice(1)]
     .join("_")
     .replace(/[^a-zA-Z0-9._-]+/g, "_")
     .replace(/^_+|_+$/g, "")
@@ -46,10 +43,7 @@ export async function mutableResource(
   sourcePath: string,
   outputName = sourcePath.split("/").at(-1) ?? "resource",
 ): Promise<string> {
-  const destination = outputPath(
-    testInfo,
-    join("resources", testNamespace(testInfo), outputName),
-  );
+  const destination = outputPath(testInfo, join("resources", testNamespace(testInfo), outputName));
   await mkdir(dirname(destination), { recursive: true });
   await copyFile(resourcePath(sourcePath), destination);
   return destination;

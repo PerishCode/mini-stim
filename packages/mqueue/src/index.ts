@@ -1,17 +1,17 @@
 import {
+  type CreateSessionResponse,
   createSession,
   getSession,
   listMessages,
   listSessions,
   runtimeSnapshot,
-  sendSession,
-  updateSession,
-  type CreateSessionResponse,
   type SendSessionResponse,
   type SessionDetail,
   type SessionMessage,
   type SessionRuntimeSnapshot,
   type SessionSummary,
+  sendSession,
+  updateSession,
 } from "@mini-stim/contracts";
 
 import {
@@ -30,7 +30,6 @@ import { createProjectionWriter } from "./projection";
 import { openSessionStream } from "./stream";
 import type {
   MessageConnectionState,
-  MessageDeltaPayload,
   MessageEvent,
   MessageMqueue,
   MessagePhase,
@@ -44,10 +43,6 @@ import type {
   SessionPayloads,
   SessionProjection,
   SessionSubOptions,
-  ToolCall,
-  ToolResult,
-  TimelineItem,
-  Turn,
 } from "./types";
 
 export type {
@@ -56,9 +51,9 @@ export type {
   MessageDeltaPayload,
   MessageEvent,
   MessageMqueue,
+  MessagePart,
   MessagePhase,
   MessageProjection,
-  MessagePart,
   MqueueError,
   PubAck,
   SantiMqueue,
@@ -67,15 +62,15 @@ export type {
   SessionAction,
   SessionEffect,
   SessionEvent,
-  SessionMqueue,
   SessionMessage,
+  SessionMqueue,
   SessionPayloads,
   SessionPhase,
   SessionProfile,
   SessionProjection,
   SessionRuntimeSnapshot,
-  SessionSummary,
   SessionSubOptions,
+  SessionSummary,
   SoulProfile,
   SoulSession,
   TimelineItem,
@@ -255,10 +250,7 @@ function createMqueueCore(target: Window): SantiMqueue {
         return;
       }
       case "create": {
-        const { session } = expectStatus(
-          await createSession(),
-          200,
-        ) as CreateSessionResponse;
+        const { session } = expectStatus(await createSession(), 200) as CreateSessionResponse;
         upsertSession(session);
         state.selectedSessionId = summarySessionId(session);
         state.messages = state.messagesBySessionId[summarySessionId(session)] ?? [];
@@ -268,10 +260,7 @@ function createMqueueCore(target: Window): SantiMqueue {
       }
       case "get": {
         const getPayload = payload as SessionPayloads["get"];
-        const detail = expectStatus(
-          await getSession(getPayload.sessionId),
-          200,
-        ) as SessionDetail;
+        const detail = expectStatus(await getSession(getPayload.sessionId), 200) as SessionDetail;
         upsertSession({ session: detail.session, profile: detail.profile });
         state.selectedSessionId = detail.session.id;
         state.messagesBySessionId[detail.session.id] = dedupeMessages(detail.messages);
@@ -346,10 +335,7 @@ function createMqueueCore(target: Window): SantiMqueue {
   async function sendMessage(sendPayload: SessionPayloads["send"]) {
     let sessionId = sendPayload.sessionId ?? state.selectedSessionId;
     if (!sessionId) {
-      const { session } = expectStatus(
-        await createSession(),
-        200,
-      ) as CreateSessionResponse;
+      const { session } = expectStatus(await createSession(), 200) as CreateSessionResponse;
       upsertSession(session);
       sessionId = summarySessionId(session);
       state.selectedSessionId = sessionId;
@@ -373,7 +359,10 @@ function createMqueueCore(target: Window): SantiMqueue {
   }
 
   function emitProjection() {
-    dispatchSession(target, sessionEvent("projection", "projection", cloneProjection(state), "mqueue"));
+    dispatchSession(
+      target,
+      sessionEvent("projection", "projection", cloneProjection(state), "mqueue"),
+    );
   }
 
   function emitMessageProjection(sessionId: string) {

@@ -17,11 +17,7 @@ export function ResizeHandle({
     <button
       {...props}
       type={type}
-      className={cx(
-        "msResizeHandle",
-        `msResizeHandle--placement-${placement}`,
-        className,
-      )}
+      className={cx("msResizeHandle", `msResizeHandle--placement-${placement}`, className)}
     />
   );
 }

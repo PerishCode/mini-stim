@@ -1,13 +1,11 @@
 import type {
   MessagePart,
-  Session,
   SessionMessage,
   SessionRuntimeSnapshot,
   SessionSummary,
   ToolCall,
   ToolResult,
   Turn,
-  TurnStatus,
   UpdateSessionRequest,
 } from "@mini-stim/contracts";
 
@@ -17,9 +15,9 @@ export type {
   Session,
   SessionEffect,
   SessionMessage,
+  SessionProfile,
   SessionRuntimeSnapshot,
   SessionSummary,
-  SessionProfile,
   SoulProfile,
   SoulSession,
   ToolCall,
@@ -38,12 +36,7 @@ export type SessionAction =
   | "update"
   | "send";
 
-export type SessionPhase =
-  | "intent"
-  | "accepted"
-  | "committed"
-  | "failed"
-  | "projection";
+export type SessionPhase = "intent" | "accepted" | "committed" | "failed" | "projection";
 
 export interface SessionPayloads {
   create: undefined;
@@ -182,10 +175,7 @@ export interface SessionMqueue {
       ? [payload?: SessionPayloads[Action]]
       : [payload: SessionPayloads[Action]]
   ): PubAck;
-  sub(
-    handler: (event: SessionEvent) => void,
-    options?: SessionSubOptions,
-  ): () => void;
+  sub(handler: (event: SessionEvent) => void, options?: SessionSubOptions): () => void;
   snapshot(): SessionProjection;
 }
 

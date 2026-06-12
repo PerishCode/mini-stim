@@ -7,15 +7,6 @@ type NoticeProps = ComponentPropsWithoutRef<"div"> & {
   tone?: "neutral" | "danger";
 };
 
-export function Notice({
-  className,
-  tone = "neutral",
-  ...props
-}: NoticeProps) {
-  return (
-    <div
-      {...props}
-      className={cx("msNotice", `msNotice--tone-${tone}`, className)}
-    />
-  );
+export function Notice({ className, tone = "neutral", ...props }: NoticeProps) {
+  return <div {...props} className={cx("msNotice", `msNotice--tone-${tone}`, className)} />;
 }

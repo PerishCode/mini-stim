@@ -15,14 +15,7 @@ type AvatarStyle = CSSProperties & {
   "--ms-avatar-color-c"?: string;
 };
 
-export function Avatar({
-  className,
-  label,
-  seed,
-  size = "md",
-  style,
-  ...props
-}: AvatarProps) {
+export function Avatar({ className, label, seed, size = "md", style, ...props }: AvatarProps) {
   const palette = avatarPalette(seed);
   const mergedStyle: AvatarStyle = {
     "--ms-avatar-color-a": palette[0],
@@ -37,7 +30,7 @@ export function Avatar({
       aria-hidden={label ? undefined : true}
       aria-label={label}
       className={cx("msAvatar", `msAvatar--size-${size}`, className)}
-      role={label ? "img" : undefined}
+      role="img"
       style={mergedStyle}
     >
       <span className="msAvatar__mark">{avatarInitial(label ?? seed)}</span>

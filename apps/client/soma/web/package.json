@@ -5,6 +5,7 @@
   "scripts": {
     "build": "tsc && vite build",
     "dev": "vite --host 127.0.0.1 --port 41420",
+    "lint": "biome check src tests package.json tsconfig.json tsconfig.test.json vitest.config.ts",
     "test": "vitest run --config vitest.config.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json"
   },
@@ -19,6 +20,7 @@
     "vite": "^8.0.16"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.0",
     "@types/react": "^19.2.16",
     "@types/react-dom": "^19.2.3",
     "sass": "^1.94.0",

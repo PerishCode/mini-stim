@@ -8,12 +8,7 @@ type ScrollAreaProps = ComponentPropsWithoutRef<"div"> & {
   grow?: boolean;
 };
 
-export function ScrollArea({
-  axis = "y",
-  className,
-  grow = false,
-  ...props
-}: ScrollAreaProps) {
+export function ScrollArea({ axis = "y", className, grow = false, ...props }: ScrollAreaProps) {
   return (
     <div
       {...props}

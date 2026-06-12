@@ -15,8 +15,7 @@ export function annotateIdentityGroups(groups: TurnGroup[]): AnnotatedTurnGroup[
     ...group,
     items: group.items.map((item) => {
       const identityKey = messageIdentityKey(item);
-      const showIdentity =
-        identityKey === null || identityKey !== previousIdentityKey;
+      const showIdentity = identityKey === null || identityKey !== previousIdentityKey;
       previousIdentityKey = identityKey;
       return {
         item,

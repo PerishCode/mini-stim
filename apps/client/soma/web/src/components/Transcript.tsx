@@ -10,24 +10,15 @@ export interface SoulIdentity {
   name: string;
 }
 
-export function Transcript(props: {
-  soulIdentity: SoulIdentity;
-  timeline: TurnGroup[];
-}) {
+export function Transcript(props: { soulIdentity: SoulIdentity; timeline: TurnGroup[] }) {
   const groups = annotateIdentityGroups(props.timeline);
-  const empty = !props.timeline.some(
-    (group) => group.items.length || group.turn,
-  );
+  const empty = !props.timeline.some((group) => group.items.length || group.turn);
   return (
     <ScrollArea grow>
       <Pane padding="xl">
         <Stack gap="lg">
           {groups.map((group) => (
-            <TurnGroupView
-              key={group.id}
-              group={group}
-              soulIdentity={props.soulIdentity}
-            />
+            <TurnGroupView key={group.id} group={group} soulIdentity={props.soulIdentity} />
           ))}
           {empty ? (
             <Notice>
@@ -40,10 +31,7 @@ export function Transcript(props: {
   );
 }
 
-function TurnGroupView(props: {
-  group: AnnotatedTurnGroup;
-  soulIdentity: SoulIdentity;
-}) {
+function TurnGroupView(props: { group: AnnotatedTurnGroup; soulIdentity: SoulIdentity }) {
   const { group, soulIdentity } = props;
   const turn = group.turn;
   return (
@@ -59,13 +47,17 @@ function TurnGroupView(props: {
       {turn?.status === "failed" ? (
         <Notice tone="danger">
           <Stack gap="xs">
-            <Text size="xs" tone="subtle">TURN FAILED</Text>
+            <Text size="xs" tone="subtle">
+              TURN FAILED
+            </Text>
             <Text>{turn.error_text ?? "The turn failed without an error message."}</Text>
           </Stack>
         </Notice>
       ) : null}
       {turn?.status === "running" && !group.items.length ? (
-        <Text size="sm" tone="subtle">Working…</Text>
+        <Text size="sm" tone="subtle">
+          Working…
+        </Text>
       ) : null}
     </Stack>
   );

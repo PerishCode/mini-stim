@@ -1,8 +1,4 @@
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-} from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 export type TextAreaAutosize =
   | boolean
@@ -48,10 +44,8 @@ export function useTextAreaAutosize(input: {
     }
 
     const computed = window.getComputedStyle(element);
-    const borderBox =
-      parseFloat(computed.borderTopWidth) + parseFloat(computed.borderBottomWidth);
-    const paddingBox =
-      parseFloat(computed.paddingTop) + parseFloat(computed.paddingBottom);
+    const borderBox = parseFloat(computed.borderTopWidth) + parseFloat(computed.borderBottomWidth);
+    const paddingBox = parseFloat(computed.paddingTop) + parseFloat(computed.paddingBottom);
     const lineHeight = parseFloat(computed.lineHeight);
 
     if (!Number.isFinite(lineHeight) || lineHeight <= 0) {
@@ -78,18 +72,14 @@ export function useTextAreaAutosize(input: {
     const selectionAtEnd =
       element.selectionStart === element.selectionEnd &&
       element.selectionEnd === element.value.length;
-    const pinnedToBottom =
-      element.scrollTop + element.clientHeight >= element.scrollHeight - 1;
+    const pinnedToBottom = element.scrollTop + element.clientHeight >= element.scrollHeight - 1;
 
     element.style.height = "auto";
     const overflowEnabled = element.scrollHeight > maxHeight;
     const overflowJustEnabled = overflowEnabled && !overflowActiveRef.current;
     element.style.overflowY = overflowEnabled ? "auto" : "hidden";
 
-    const targetHeight = Math.min(
-      Math.max(element.scrollHeight + borderBox, minHeight),
-      maxHeight,
-    );
+    const targetHeight = Math.min(Math.max(element.scrollHeight + borderBox, minHeight), maxHeight);
 
     element.style.height = `${targetHeight}px`;
     syncScrollAnchor(element, overflowEnabled, selectionAtEnd || pinnedToBottom);
@@ -134,7 +124,7 @@ export function useTextAreaAutosize(input: {
       }, 180);
       frameRef.current = null;
     });
-  }, [autosizeConfig, input.value]);
+  });
 
   return {
     autosizeConfig,
@@ -154,9 +144,7 @@ function resolveAutosize(input: TextAreaAutosize) {
   }
 
   const min = Number.isFinite(input.min) ? Math.max(1, Math.floor(input.min)) : 1;
-  const max = Number.isFinite(input.max)
-    ? Math.max(min, Math.floor(input.max))
-    : Math.max(min, 6);
+  const max = Number.isFinite(input.max) ? Math.max(min, Math.floor(input.max)) : Math.max(min, 6);
 
   return { min, max };
 }

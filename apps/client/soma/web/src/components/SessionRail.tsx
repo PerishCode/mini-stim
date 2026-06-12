@@ -27,21 +27,22 @@ export function SessionRail(props: {
         <Stack gap="sm">
           <Inline justify="between" align="start" gap="md">
             <Stack gap="xs">
-              <Heading tag="h1" size="lg" truncate>mini-stim</Heading>
-              <Text size="xs" tone="subtle">Local-first AI chat</Text>
+              <Heading tag="h1" size="lg" truncate>
+                mini-stim
+              </Heading>
+              <Text size="xs" tone="subtle">
+                Local-first AI chat
+              </Text>
             </Stack>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={props.busy}
-            onClick={props.onCreate}
-          >
-            <PlusIcon size="sm" />
-            New
-          </Button>
+            <Button size="sm" variant="outline" disabled={props.busy} onClick={props.onCreate}>
+              <PlusIcon size="sm" />
+              New
+            </Button>
           </Inline>
           <Inline justify="between" align="center">
-            <Text size="xs" tone="subtle">Conversations</Text>
+            <Text size="xs" tone="subtle">
+              Conversations
+            </Text>
             <Badge size="sm">{props.sessions.length}</Badge>
           </Inline>
         </Stack>
@@ -66,8 +67,17 @@ export function SessionRail(props: {
                       {label}
                     </Text>
                     <Inline tag="span" justify="between" align="center" grow gap="sm">
-                      <Timestamp value={session.session.updated_at} size="xs" tone="subtle" truncate />
-                      {selected ? <Badge size="sm" tone="accent">active</Badge> : null}
+                      <Timestamp
+                        value={session.session.updated_at}
+                        size="xs"
+                        tone="subtle"
+                        truncate
+                      />
+                      {selected ? (
+                        <Badge size="sm" tone="accent">
+                          active
+                        </Badge>
+                      ) : null}
                     </Inline>
                   </Stack>
                 </Button>
@@ -85,9 +95,6 @@ export function SessionRail(props: {
   );
 }
 
-function sessionLabel(
-  session: SessionSummary,
-  preview?: string,
-) {
+function sessionLabel(session: SessionSummary, preview?: string) {
   return session.profile.title?.trim() || preview || session.session.id;
 }

@@ -1,15 +1,9 @@
 import { readFile } from "node:fs/promises";
-
+import { mutableResource, outputPath, testNamespace, writeOutput } from "@e2e/lib/resource";
 import { expect, test } from "@playwright/test";
 
-import {
-  mutableResource,
-  outputPath,
-  testNamespace,
-  writeOutput,
-} from "@e2e/lib/resource";
-
 test("copies static resources into an isolated per-test output namespace", async ({
+  request: _request,
 }, testInfo) => {
   const copy = await mutableResource(testInfo, "payloads/send-text.json");
   const contents = await readFile(copy, "utf8");
@@ -20,6 +14,7 @@ test("copies static resources into an isolated per-test output namespace", async
 });
 
 test("writes generated artifacts under the Playwright output directory", async ({
+  request: _request,
 }, testInfo) => {
   const artifact = await writeOutput(testInfo, "artifacts/result.txt", "ok");
 

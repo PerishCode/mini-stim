@@ -46,17 +46,9 @@ export function Grid({
   );
 }
 
-export function GridItem({
-  area,
-  className,
-  tag = "div",
-  ...props
-}: GridItemProps) {
+export function GridItem({ area, className, tag = "div", ...props }: GridItemProps) {
   const Component = tag;
   return (
-    <Component
-      {...props}
-      className={cx("msGrid__item", `msGrid__item--area-${area}`, className)}
-    />
+    <Component {...props} className={cx("msGrid__item", `msGrid__item--area-${area}`, className)} />
   );
 }

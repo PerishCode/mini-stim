@@ -24,7 +24,7 @@ export function ChatShell(props: {
   return (
     <Pane chrome="panel" tone="subtle" grow>
       <SectionStackLayout
-        top={(
+        top={
           <ChatHeader
             activity={props.activity}
             busy={props.busy}
@@ -36,14 +36,9 @@ export function ChatShell(props: {
             title={props.title}
             titleValue={props.titleValue}
           />
-        )}
-        middle={(
-          <Transcript
-            soulIdentity={props.soulIdentity}
-            timeline={props.timeline}
-          />
-        )}
-        bottom={(
+        }
+        middle={<Transcript soulIdentity={props.soulIdentity} timeline={props.timeline} />}
+        bottom={
           <Composer
             value={props.draft}
             disabled={props.busy}
@@ -51,7 +46,7 @@ export function ChatShell(props: {
             onChange={props.onDraftChange}
             onSubmit={props.onSend}
           />
-        )}
+        }
       />
     </Pane>
   );

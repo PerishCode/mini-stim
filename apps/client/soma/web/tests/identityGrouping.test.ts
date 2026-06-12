@@ -1,7 +1,6 @@
-import { describe, expect, test } from "vitest";
 import type { TimelineItem, TurnGroup } from "@mini-stim/hooks";
-
 import { annotateIdentityGroups } from "@web/projections/identityGrouping";
+import { describe, expect, test } from "vitest";
 
 describe("annotateIdentityGroups", () => {
   test("elides consecutive messages from the same identity", () => {

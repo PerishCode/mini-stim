@@ -1,10 +1,7 @@
-import { type TextareaHTMLAttributes } from "react";
+import type { TextareaHTMLAttributes } from "react";
 
 import { cx } from "../../internal/cx";
-import {
-  type TextAreaAutosize,
-  useTextAreaAutosize,
-} from "./hooks/useTextAreaAutosize";
+import { type TextAreaAutosize, useTextAreaAutosize } from "./hooks/useTextAreaAutosize";
 import "./TextArea.scss";
 
 type TextAreaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
@@ -23,12 +20,11 @@ export function TextArea({
   value,
   ...props
 }: TextAreaProps) {
-  const { autosizeConfig, frameElementRef, resolvedRows, textareaRef } =
-    useTextAreaAutosize({
-      autosize,
-      rows,
-      value,
-    });
+  const { autosizeConfig, frameElementRef, resolvedRows, textareaRef } = useTextAreaAutosize({
+    autosize,
+    rows,
+    value,
+  });
 
   const textarea = (
     <textarea

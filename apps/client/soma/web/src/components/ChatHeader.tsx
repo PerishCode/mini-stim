@@ -1,14 +1,5 @@
+import { Badge, Button, Inline, Input, Pane, Stack, Text } from "@mini-stim/components";
 import { useEffect, useState } from "react";
-
-import {
-  Badge,
-  Button,
-  Input,
-  Inline,
-  Pane,
-  Stack,
-  Text,
-} from "@mini-stim/components";
 
 export function ChatHeader(props: {
   activity: string;
@@ -89,10 +80,14 @@ export function ChatHeader(props: {
         </Stack>
         <Inline gap="sm" align="center" wrap>
           {props.busy ? (
-            <Badge size="sm" tone="success">{props.activity}</Badge>
+            <Badge size="sm" tone="success">
+              {props.activity}
+            </Badge>
           ) : null}
           {props.connection === "error" ? (
-            <Badge size="sm" tone="danger">reconnecting</Badge>
+            <Badge size="sm" tone="danger">
+              reconnecting
+            </Badge>
           ) : null}
           <Button
             size="sm"

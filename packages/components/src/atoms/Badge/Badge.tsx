@@ -8,21 +8,11 @@ type BadgeProps = ComponentPropsWithoutRef<"span"> & {
   tone?: "neutral" | "accent" | "success" | "danger";
 };
 
-export function Badge({
-  className,
-  size = "md",
-  tone = "neutral",
-  ...props
-}: BadgeProps) {
+export function Badge({ className, size = "md", tone = "neutral", ...props }: BadgeProps) {
   return (
     <span
       {...props}
-      className={cx(
-        "msBadge",
-        `msBadge--size-${size}`,
-        `msBadge--tone-${tone}`,
-        className,
-      )}
+      className={cx("msBadge", `msBadge--size-${size}`, `msBadge--tone-${tone}`, className)}
     />
   );
 }

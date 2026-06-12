@@ -24,10 +24,7 @@ export function IdentityLine({
   ...props
 }: IdentityLineProps) {
   return (
-    <div
-      {...props}
-      className={cx("msIdentityLine", `msIdentityLine--size-${size}`, className)}
-    >
+    <div {...props} className={cx("msIdentityLine", `msIdentityLine--size-${size}`, className)}>
       <Avatar label={avatarLabel} seed={avatarSeed} size={size} />
       <span className="msIdentityLine__body">
         <span className="msIdentityLine__row">

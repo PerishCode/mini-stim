@@ -36,7 +36,9 @@ export function InspectPanel(props: {
 
           <Stack gap="sm">
             <Inline justify="between" align="center" gap="sm">
-              <Text size="xs" tone="subtle">SESSION MEMORY</Text>
+              <Text size="xs" tone="subtle">
+                SESSION MEMORY
+              </Text>
               {runtime.soul_session ? (
                 <Text size="xs" tone="subtle">
                   seen through seq {runtime.soul_session.last_seen_session_seq}
@@ -53,7 +55,9 @@ export function InspectPanel(props: {
           </Stack>
 
           <Stack gap="sm">
-            <Text size="xs" tone="subtle">COMPACTS</Text>
+            <Text size="xs" tone="subtle">
+              COMPACTS
+            </Text>
             {runtime.compacts.length ? (
               runtime.compacts.map((compact) => (
                 <Pane key={compact.id} border="around" padding="md" tone="panel">
@@ -76,7 +80,9 @@ export function InspectPanel(props: {
           </Stack>
 
           <Stack gap="sm">
-            <Text size="xs" tone="subtle">EFFECTS</Text>
+            <Text size="xs" tone="subtle">
+              EFFECTS
+            </Text>
             {runtime.effects.length ? (
               runtime.effects.map((effect) => (
                 <Inline key={effect.id} justify="between" align="center" wrap gap="sm">
@@ -98,16 +104,17 @@ export function InspectPanel(props: {
   );
 }
 
-function SelectedTarget(props: {
-  target: InspectTarget;
-  selected: RuntimeTargetSelection | null;
-}) {
+function SelectedTarget(props: { target: InspectTarget; selected: RuntimeTargetSelection | null }) {
   const { selected, target } = props;
   return (
     <Stack gap="sm">
       <Inline justify="between" align="center" gap="sm">
-        <Text size="xs" tone="subtle">SELECTED</Text>
-        <Text size="xs" tone="subtle">{target.kind}</Text>
+        <Text size="xs" tone="subtle">
+          SELECTED
+        </Text>
+        <Text size="xs" tone="subtle">
+          {target.kind}
+        </Text>
       </Inline>
       {selected ? (
         <SelectedTargetBody selected={selected} />
@@ -177,14 +184,18 @@ function SelectedTargetBody(props: { selected: RuntimeTargetSelection }) {
       <Pane border="around" padding="md" tone="panel">
         <Stack gap="sm">
           <Inline justify="between" align="center" wrap gap="sm">
-            <Text size="sm" tone="strong">{toolCall.tool_name}</Text>
+            <Text size="sm" tone="strong">
+              {toolCall.tool_name}
+            </Text>
             <Timestamp value={toolCall.created_at} size="xs" tone="subtle" />
           </Inline>
           <CodeBlock>{formatJson(toolCall.arguments)}</CodeBlock>
           {toolResult ? (
             <CodeBlock>{toolResult.error_text ?? formatJson(toolResult.output)}</CodeBlock>
           ) : (
-            <Text size="sm" tone="muted">No tool result has been recorded yet.</Text>
+            <Text size="sm" tone="muted">
+              No tool result has been recorded yet.
+            </Text>
           )}
         </Stack>
       </Pane>
@@ -238,27 +249,19 @@ function selectRuntimeTarget(
     return turn ? { kind: "turn", turn } : null;
   }
   if (target.kind === "message") {
-    const message = runtime.messages.find(
-      (item) => item.message.id === target.messageId,
-    );
+    const message = runtime.messages.find((item) => item.message.id === target.messageId);
     return message ? { kind: "message", message } : null;
   }
   if (target.kind === "tool_call") {
-    const toolCall = runtime.tool_calls.find(
-      (item) => item.id === target.toolCallId,
-    );
+    const toolCall = runtime.tool_calls.find((item) => item.id === target.toolCallId);
     if (!toolCall) {
       return null;
     }
-    const toolResult = runtime.tool_results.find(
-      (item) => item.tool_call_id === toolCall.id,
-    );
+    const toolResult = runtime.tool_results.find((item) => item.tool_call_id === toolCall.id);
     return { kind: "tool_call", toolCall, toolResult };
   }
   if (target.kind === "tool_result") {
-    const toolResult = runtime.tool_results.find(
-      (item) => item.id === target.toolResultId,
-    );
+    const toolResult = runtime.tool_results.find((item) => item.id === target.toolResultId);
     return toolResult ? { kind: "tool_result", toolResult } : null;
   }
   return null;

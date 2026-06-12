@@ -28,12 +28,7 @@ export function TimelineItemView(props: {
     const showHeader = showIdentity || pending;
     return (
       <Pressable onClick={() => selectInspectTarget(target)}>
-        <Surface
-          align={roleAlign(role)}
-          tone={roleTone(role)}
-          padding="lg"
-          width="content"
-        >
+        <Surface align={roleAlign(role)} tone={roleTone(role)} padding="lg" width="content">
           <Stack gap="sm">
             {showHeader ? (
               <Inline justify="between" align="center" wrap gap="sm">
@@ -46,7 +41,9 @@ export function TimelineItemView(props: {
                   />
                 ) : null}
                 {pending ? (
-                  <Text size="xs" tone="subtle">generating…</Text>
+                  <Text size="xs" tone="subtle">
+                    generating…
+                  </Text>
                 ) : (
                   <Timestamp value={item.createdAt} size="xs" tone="subtle" />
                 )}
@@ -68,9 +65,15 @@ export function TimelineItemView(props: {
         <Surface tone={failed ? "danger" : "inset"} padding="sm" width="content">
           <Stack gap="xs">
             <Inline align="center" gap="sm" wrap>
-              <Text size="xs" tone="subtle">Used</Text>
-              <Text size="sm" tone="strong">{item.toolCall.tool_name}</Text>
-              <Text size="xs" tone="subtle">{status}</Text>
+              <Text size="xs" tone="subtle">
+                Used
+              </Text>
+              <Text size="sm" tone="strong">
+                {item.toolCall.tool_name}
+              </Text>
+              <Text size="xs" tone="subtle">
+                {status}
+              </Text>
             </Inline>
             <Timestamp value={item.createdAt} size="xs" tone="subtle" />
           </Stack>
@@ -85,7 +88,9 @@ export function TimelineItemView(props: {
       <Surface tone={failed ? "danger" : "inset"} padding="sm" width="content">
         <Stack gap="xs">
           <Inline align="center" gap="sm" wrap>
-            <Text size="xs" tone="subtle">Tool result</Text>
+            <Text size="xs" tone="subtle">
+              Tool result
+            </Text>
             <Text size="sm" tone="strong">
               {item.toolCall?.tool_name ?? "unknown tool"}
             </Text>
@@ -142,11 +147,7 @@ function roleAlign(role: string) {
   return "start";
 }
 
-function identityForMessage(
-  role: string,
-  actorId: string,
-  soulIdentity: SoulIdentity,
-) {
+function identityForMessage(role: string, actorId: string, soulIdentity: SoulIdentity) {
   if (role === "account") {
     return {
       avatarSeed: `account:${actorId}`,
@@ -161,7 +162,11 @@ function identityForMessage(
   }
   return {
     avatarSeed: soulIdentity.avatarSeed,
-    marker: <Badge size="sm" tone="accent">verified</Badge>,
+    marker: (
+      <Badge size="sm" tone="accent">
+        verified
+      </Badge>
+    ),
     name: soulIdentity.name,
   };
 }

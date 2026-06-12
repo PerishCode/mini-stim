@@ -1,6 +1,4 @@
-import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { AppRoot, Grid, GridItem, Pane, ResizeHandle } from "@mini-stim/components";
-import { uiStorage } from "@mini-stim/storage";
 import {
   type SessionSummary,
   useDebouncedValue,
@@ -11,17 +9,16 @@ import {
   useSessionPending,
   useSessionPreviews,
   useSessionRuntime,
-  useSessionTurnTimeline,
   useSessions,
+  useSessionTurnTimeline,
 } from "@mini-stim/hooks";
+import { uiStorage } from "@mini-stim/storage";
+import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useState } from "react";
 
 import { ChatShell } from "./components/ChatShell";
 import { InspectPanel } from "./components/InspectPanel";
 import { SessionRail } from "./components/SessionRail";
-import {
-  subscribeInspectTarget,
-  type InspectTarget,
-} from "./events/inspect";
+import { type InspectTarget, subscribeInspectTarget } from "./events/inspect";
 
 const DEFAULT_RAIL_WIDTH = 304;
 const DEFAULT_INSPECT_WIDTH = 352;
@@ -126,9 +123,7 @@ export function App() {
     [timeline],
   );
   const sessionErrorMessage =
-    sessionError && !inPlaceErrors.has(sessionError.message)
-      ? sessionError.message
-      : null;
+    sessionError && !inPlaceErrors.has(sessionError.message) ? sessionError.message : null;
   const visibleError = error ?? sessionErrorMessage;
   const debouncedConnection = useDebouncedValue(connection, { debounceMs: 150 });
   const selectedTitle = useMemo(() => {
@@ -201,10 +196,7 @@ export function App() {
     beginResize("inspect", event);
   }
 
-  function beginResize(
-    target: "inspect" | "rail",
-    event: ReactPointerEvent<HTMLButtonElement>,
-  ) {
+  function beginResize(target: "inspect" | "rail", event: ReactPointerEvent<HTMLButtonElement>) {
     event.preventDefault();
     const startX = event.clientX;
     const startWidth =
@@ -215,10 +207,7 @@ export function App() {
 
     function handlePointerMove(moveEvent: PointerEvent) {
       const delta = moveEvent.clientX - startX;
-      nextWidth = clampWidth(
-        target === "rail" ? startWidth + delta : startWidth - delta,
-        target,
-      );
+      nextWidth = clampWidth(target === "rail" ? startWidth + delta : startWidth - delta, target);
       setLayout((current) => ({
         ...current,
         railWidthPx: target === "rail" ? nextWidth : current.railWidthPx,
@@ -293,11 +282,7 @@ export function App() {
             <Pane chrome="panel" tone="raised" grow>
               <InspectPanel
                 runtime={runtime}
-                target={
-                  inspectTarget?.sessionId === selectedSessionId
-                    ? inspectTarget
-                    : null
-                }
+                target={inspectTarget?.sessionId === selectedSessionId ? inspectTarget : null}
               />
             </Pane>
             <ResizeHandle
