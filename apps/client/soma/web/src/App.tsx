@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AppRoot, Grid, GridItem } from "@mini-stim/components";
+import { uiStorage } from "@mini-stim/storage";
 import {
   type SessionSummary,
   useDebouncedValue,
@@ -29,20 +30,30 @@ export function App() {
   const previews = useSessionPreviews();
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [inspecting, setInspecting] = useState(false);
+  const [inspecting, setInspecting] = useState(() => uiStorage.read().inspect.open);
 
-  // The inspect panel is a view over the selected session; switching
-  // sessions returns to the transcript. Opening it refreshes the snapshot
-  // so memory/compacts/effects reflect the turns since selection.
+  // Inspect is a remembered view over the selected session. Keeping it open
+  // across session changes refreshes the snapshot for the newly selected
+  // session instead of returning to the transcript.
   useEffect(() => {
-    setInspecting(false);
-  }, [selectedSessionId]);
-
-  function toggleInspect() {
-    if (!inspecting && selectedSessionId) {
+    if (inspecting && selectedSessionId) {
       actions.refreshRuntime(selectedSessionId);
     }
-    setInspecting((current) => !current);
+  }, [actions, inspecting, selectedSessionId]);
+
+  function toggleInspect() {
+    const next = !inspecting;
+    if (next && selectedSessionId) {
+      actions.refreshRuntime(selectedSessionId);
+    }
+    setInspecting(next);
+    uiStorage.update((current) => ({
+      ...current,
+      inspect: {
+        ...current.inspect,
+        open: next,
+      },
+    }));
   }
 
   const busy = pending > 0;

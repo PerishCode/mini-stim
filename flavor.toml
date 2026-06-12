@@ -11,6 +11,7 @@ include = [
   "packages/components/src/**/*.ts",
   "packages/components/src/**/*.tsx",
   "packages/contracts/src/index.ts",
+  "packages/storage/src/**/*.ts",
   "packages/hooks/src/**/*.ts",
   "packages/hooks/src/**/*.tsx",
   "packages/mqueue/src/**/*.ts",

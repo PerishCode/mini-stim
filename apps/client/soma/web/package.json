@@ -10,6 +10,7 @@
   "dependencies": {
     "@mini-stim/components": "workspace:*",
     "@mini-stim/hooks": "workspace:*",
+    "@mini-stim/storage": "workspace:*",
     "@vitejs/plugin-react": "^6.0.2",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
