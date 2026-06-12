@@ -101,7 +101,7 @@ export function ChatHeader(props: {
             type="button"
             onClick={props.onToggleInspect}
           >
-            {props.inspecting ? "Transcript" : "Inspect"}
+            {props.inspecting ? "Close Inspect" : "Inspect"}
           </Button>
         </Inline>
       </Inline>

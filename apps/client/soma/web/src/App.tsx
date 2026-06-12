@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { AppRoot, Grid, GridItem } from "@mini-stim/components";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { AppRoot, Grid, GridItem, Pane } from "@mini-stim/components";
 import { uiStorage } from "@mini-stim/storage";
 import {
   type SessionSummary,
@@ -16,9 +16,11 @@ import {
 } from "@mini-stim/hooks";
 
 import { ChatShell } from "./components/ChatShell";
+import { InspectPanel } from "./components/InspectPanel";
 import { SessionRail } from "./components/SessionRail";
 
 export function App() {
+  const [preferences] = useState(() => uiStorage.read());
   const sessions = useSessions();
   const selectedSessionId = useSelectedSessionId();
   const timeline = useSessionTurnTimeline();
@@ -30,7 +32,7 @@ export function App() {
   const previews = useSessionPreviews();
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [inspecting, setInspecting] = useState(() => uiStorage.read().inspect.open);
+  const [inspecting, setInspecting] = useState(preferences.inspect.open);
 
   // Inspect is a remembered view over the selected session. Keeping it open
   // across session changes refreshes the snapshot for the newly selected
@@ -103,6 +105,10 @@ export function App() {
     () => sessions.find((session) => session.session.id === selectedSessionId) ?? null,
     [selectedSessionId, sessions],
   );
+  const gridStyle = useMemo(
+    () => layoutStyle(preferences.desktopLayout),
+    [preferences.desktopLayout],
+  );
 
   function createNewSession() {
     setError(null);
@@ -154,7 +160,12 @@ export function App() {
 
   return (
     <AppRoot>
-      <Grid template="sidebar-main" gap="shell" grow>
+      <Grid
+        template={inspecting ? "sidebar-main-inspect" : "sidebar-main"}
+        gap="shell"
+        grow
+        style={gridStyle}
+      >
         <GridItem area="sidebar" tag="aside">
         <SessionRail
           busy={busy}
@@ -176,7 +187,6 @@ export function App() {
           onSend={send}
           onTitleCommit={updateTitle}
           onToggleInspect={toggleInspect}
-          runtime={runtime}
           selectedSessionId={selectedSessionId}
           title={selectedTitle}
           titleValue={selectedSession?.profile.title ?? null}
@@ -184,6 +194,13 @@ export function App() {
           draft={draft}
         />
         </GridItem>
+        {inspecting ? (
+          <GridItem area="inspect" tag="aside">
+            <Pane chrome="panel" tone="raised" grow>
+              <InspectPanel runtime={runtime} />
+            </Pane>
+          </GridItem>
+        ) : null}
       </Grid>
     </AppRoot>
   );
@@ -191,4 +208,18 @@ export function App() {
 
 function sessionLabel(session: SessionSummary) {
   return session.profile.title?.trim() || session.session.id;
+}
+
+function layoutStyle(layout: {
+  railWidthPx: number | null;
+  inspectWidthPx: number | null;
+}): CSSProperties {
+  const style: Record<string, string> = {};
+  if (layout.railWidthPx) {
+    style["--ms-grid-sidebar-width"] = `${layout.railWidthPx}px`;
+  }
+  if (layout.inspectWidthPx) {
+    style["--ms-grid-inspect-width"] = `${layout.inspectWidthPx}px`;
+  }
+  return style as CSSProperties;
 }

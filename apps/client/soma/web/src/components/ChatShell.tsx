@@ -1,9 +1,7 @@
 import { Pane, SectionStackLayout } from "@mini-stim/components";
-import type { SessionRuntimeSnapshot } from "@mini-stim/hooks";
 
 import { ChatHeader } from "./ChatHeader";
 import { Composer } from "./Composer";
-import { InspectPanel } from "./InspectPanel";
 import { Transcript } from "./Transcript";
 
 export function ChatShell(props: {
@@ -16,7 +14,6 @@ export function ChatShell(props: {
   onSend: () => void;
   onTitleCommit: (title: string | null) => void;
   onToggleInspect: () => void;
-  runtime: SessionRuntimeSnapshot | null;
   selectedSessionId: string | null;
   title: string;
   titleValue: string | null;
@@ -39,13 +36,7 @@ export function ChatShell(props: {
             titleValue={props.titleValue}
           />
         )}
-        middle={
-          props.inspecting ? (
-            <InspectPanel runtime={props.runtime} />
-          ) : (
-            <Transcript timeline={props.timeline} />
-          )
-        }
+        middle={<Transcript timeline={props.timeline} />}
         bottom={(
           <Composer
             value={props.draft}

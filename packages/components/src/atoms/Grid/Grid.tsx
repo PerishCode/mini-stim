@@ -6,11 +6,11 @@ import "./Grid.scss";
 type GridProps = ComponentPropsWithoutRef<"div"> & {
   gap?: "none" | "shell" | "sm" | "md";
   grow?: boolean;
-  template?: "sidebar-main";
+  template?: "sidebar-main" | "sidebar-main-inspect";
 };
 
 type GridItemProps = ComponentPropsWithoutRef<"div"> & {
-  area: "sidebar" | "main";
+  area: "inspect" | "main" | "sidebar";
   tag?: "aside" | "div" | "main" | "section";
 };
 
