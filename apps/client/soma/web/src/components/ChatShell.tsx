@@ -41,7 +41,7 @@ export function ChatShell(props: {
         bottom={
           <Composer
             value={props.draft}
-            disabled={props.busy}
+            disabled={props.busy || !props.selectedSessionId}
             error={props.error}
             onChange={props.onDraftChange}
             onSubmit={props.onSend}

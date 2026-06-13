@@ -1,4 +1,12 @@
-import { Button, Inline, Notice, SendIcon, Stack, Text, TextArea } from "@mini-stim/components";
+import {
+  Button,
+  FieldActionLayout,
+  Notice,
+  SendIcon,
+  Stack,
+  Text,
+  TextArea,
+} from "@mini-stim/components";
 
 export function Composer(props: {
   disabled?: boolean;
@@ -20,7 +28,19 @@ export function Composer(props: {
             <Text>{props.error}</Text>
           </Notice>
         ) : null}
-        <Inline align="stretch" gap="sm">
+        <FieldActionLayout
+          action={
+            <Button
+              type="submit"
+              tone="accent"
+              size="lg"
+              disabled={props.disabled || !props.value.trim()}
+            >
+              <SendIcon size="sm" />
+              Send
+            </Button>
+          }
+        >
           <Stack grow gap="none">
             <TextArea
               autosize={{ min: 1, max: 6 }}
@@ -32,16 +52,7 @@ export function Composer(props: {
               onChange={(event) => props.onChange(event.currentTarget.value)}
             />
           </Stack>
-          <Button
-            type="submit"
-            tone="accent"
-            size="lg"
-            disabled={props.disabled || !props.value.trim()}
-          >
-            <SendIcon size="sm" />
-            Send
-          </Button>
-        </Inline>
+        </FieldActionLayout>
       </Stack>
     </form>
   );

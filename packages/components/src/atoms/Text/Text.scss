@@ -33,6 +33,8 @@ $text-tones: (
   }
 
   &--truncate {
+    display: block;
+    max-width: 100%;
     @include truncate-single-line;
   }
 }

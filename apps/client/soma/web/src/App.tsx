@@ -43,6 +43,12 @@ export function App() {
   const [inspecting, setInspecting] = useState(preferences.inspect.open);
   const [inspectTarget, setInspectTarget] = useState<InspectTarget | null>(null);
 
+  useEffect(() => {
+    if (!selectedSessionId && sessions.length) {
+      actions.selectAndGet(sessions[0].session.id);
+    }
+  }, [actions, selectedSessionId, sessions]);
+
   // Inspect is a remembered view over the selected session. Keeping it open
   // across session changes refreshes the snapshot for the newly selected
   // session instead of returning to the transcript.
@@ -160,7 +166,7 @@ export function App() {
 
   function send() {
     const text = draft.trim();
-    if (!text || busy) {
+    if (!text || busy || !selectedSessionId) {
       return;
     }
     setError(null);
