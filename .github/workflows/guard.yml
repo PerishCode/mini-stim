@@ -33,7 +33,7 @@ jobs:
 
       - name: Install flavor
         run: |
-          curl -fsSL https://flavor.perish.uk/install.sh | sh
+          curl -fsSL https://flavor.perish.uk/install.sh | sh -s -- install --channel beta --version v0.3.4-beta.1
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           "$HOME/.local/bin/flavor" --version
 
