@@ -1,4 +1,10 @@
-import type { ComponentPropsWithoutRef, ComponentPropsWithRef, ReactNode } from "react";
+import type {
+  ComponentPropsWithoutRef,
+  KeyboardEventHandler,
+  MouseEventHandler,
+  ReactNode,
+  Ref,
+} from "react";
 
 import { Avatar } from "../../atoms/Avatar/Avatar";
 import { cx } from "../../internal/cx";
@@ -14,8 +20,11 @@ type AnchoredContentGroupProps = ComponentPropsWithoutRef<"section"> & {
   side?: AnchoredContentGroupSide;
 };
 
-type AnchoredContentGroupItemProps = ComponentPropsWithRef<"button"> & {
+type AnchoredContentGroupItemProps = ComponentPropsWithoutRef<"div"> & {
   align?: "start" | "center" | "end";
+  element?: "button" | "div";
+  innerRef?: Ref<HTMLElement>;
+  type?: ComponentPropsWithoutRef<"button">["type"];
 };
 
 type AnchoredContentGroupDividerProps = ComponentPropsWithoutRef<"div"> & {
@@ -54,22 +63,59 @@ export function AnchoredContentGroup({
 
 export function AnchoredContentGroupItem({
   align = "start",
+  element = "button",
   children,
   className,
+  innerRef,
+  onClick,
+  onKeyDown,
+  tabIndex,
   type = "button",
   ...props
 }: AnchoredContentGroupItemProps) {
+  const itemClassName = cx(
+    "msAnchoredContentGroup__item",
+    `msAnchoredContentGroup__item--align-${align}`,
+    className,
+  );
+  const itemBody = <span className="msAnchoredContentGroup__itemBody">{children}</span>;
+
+  if (element === "div") {
+    return (
+      // biome-ignore lint/a11y/useSemanticElements: Markdown message bodies can contain anchors, so this cannot be a native button.
+      <div
+        {...props}
+        className={itemClassName}
+        onClick={onClick}
+        onKeyDown={(event) => {
+          onKeyDown?.(event);
+          if (event.defaultPrevented) {
+            return;
+          }
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            event.currentTarget.click();
+          }
+        }}
+        ref={innerRef as Ref<HTMLDivElement>}
+        role="button"
+        tabIndex={tabIndex ?? 0}
+      >
+        {itemBody}
+      </div>
+    );
+  }
+
   return (
     <button
-      {...props}
-      className={cx(
-        "msAnchoredContentGroup__item",
-        `msAnchoredContentGroup__item--align-${align}`,
-        className,
-      )}
+      {...(props as ComponentPropsWithoutRef<"button">)}
+      className={itemClassName}
+      onClick={onClick as unknown as MouseEventHandler<HTMLButtonElement>}
+      onKeyDown={onKeyDown as unknown as KeyboardEventHandler<HTMLButtonElement>}
+      ref={innerRef as Ref<HTMLButtonElement>}
       type={type}
     >
-      <span className="msAnchoredContentGroup__itemBody">{children}</span>
+      {itemBody}
     </button>
   );
 }

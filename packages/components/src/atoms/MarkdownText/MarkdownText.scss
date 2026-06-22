@@ -1,0 +1,133 @@
+.msMarkdownText {
+  min-width: 0;
+  color: var(--ms-color-text);
+  font-size: var(--ms-font-size-md);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+
+  &--tone-strong {
+    color: var(--ms-color-text-strong);
+  }
+
+  > :first-child {
+    margin-block-start: 0;
+  }
+
+  > :last-child {
+    margin-block-end: 0;
+  }
+
+  p {
+    margin-block: 0;
+  }
+
+  p + p,
+  p + ul,
+  p + ol,
+  p + blockquote,
+  p + .msCodeBlock,
+  ul + p,
+  ol + p,
+  blockquote + p,
+  .msCodeBlock + p,
+  .msMarkdownText__tableScroll + p {
+    margin-block-start: var(--ms-space-2);
+  }
+
+  ul,
+  ol {
+    margin-block: var(--ms-space-1) 0;
+    padding-inline-start: 1.25em;
+  }
+
+  li {
+    margin-block: 0;
+    padding-inline-start: 0.2em;
+  }
+
+  li + li {
+    margin-block-start: var(--ms-space-1);
+  }
+
+  li > p {
+    margin-block: 0;
+  }
+
+  li > ul,
+  li > ol {
+    margin-block-start: var(--ms-space-1);
+    padding-inline-start: 1.15em;
+  }
+
+  li::marker {
+    color: var(--ms-color-text-subtle);
+  }
+
+  blockquote {
+    margin: var(--ms-space-2) 0;
+    border-inline-start: 2px solid color-mix(in srgb, var(--ms-color-border) 84%, transparent);
+    padding-inline-start: var(--ms-space-3);
+    color: var(--ms-color-text-muted);
+  }
+
+  a {
+    color: var(--ms-color-surface-accent-text);
+    text-decoration-color: color-mix(in srgb, currentColor 44%, transparent);
+    text-decoration-line: underline;
+    text-underline-offset: 0.14em;
+  }
+
+  a:hover {
+    text-decoration-color: currentColor;
+  }
+
+  .msCodeBlock {
+    margin-block: var(--ms-space-2);
+    max-height: min(18rem, 46vh);
+  }
+
+  .msCodeText {
+    display: inline;
+    border: 0;
+    background: color-mix(in srgb, var(--ms-color-code-bg) 42%, transparent);
+    padding: 0 0.18em;
+    font-size: 0.94em;
+    line-height: inherit;
+    vertical-align: baseline;
+    white-space: normal;
+  }
+
+  &__tableScroll {
+    max-width: 100%;
+    overflow-x: auto;
+    margin-block: var(--ms-space-2);
+  }
+
+  table {
+    width: max-content;
+    min-width: min(100%, 24rem);
+    border-collapse: collapse;
+    font-size: var(--ms-font-size-sm);
+  }
+
+  th,
+  td {
+    border: 1px solid color-mix(in srgb, var(--ms-color-border) 70%, transparent);
+    padding: var(--ms-space-1) var(--ms-space-2);
+    text-align: start;
+    vertical-align: top;
+  }
+
+  th {
+    background: color-mix(in srgb, var(--ms-color-surface-muted-bg) 54%, transparent);
+    color: var(--ms-color-text-strong);
+    font-weight: 680;
+  }
+
+  input[type="checkbox"] {
+    width: 0.85em;
+    height: 0.85em;
+    margin: 0 0.35em 0 0;
+    vertical-align: -0.08em;
+  }
+}

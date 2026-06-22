@@ -18,6 +18,7 @@ export { Heading } from "./atoms/Heading/Heading";
 export { IconButton } from "./atoms/IconButton/IconButton";
 export { Inline } from "./atoms/Inline/Inline";
 export { Input } from "./atoms/Input/Input";
+export { MarkdownText } from "./atoms/MarkdownText/MarkdownText";
 export { Notice } from "./atoms/Notice/Notice";
 export { Pane } from "./atoms/Pane/Pane";
 export { Panel } from "./atoms/Panel/Panel";

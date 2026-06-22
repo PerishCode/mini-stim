@@ -35,7 +35,7 @@ export function Transcript(props: { soulIdentity: SoulIdentity; timeline: TurnGr
   });
 
   return (
-    <Stack ref={transcriptRef} gap="lg" grow={empty}>
+    <Stack ref={transcriptRef} gap="sm" grow={empty}>
       {groups.map((group) => (
         <TranscriptGroupView
           key={group.id}

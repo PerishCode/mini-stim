@@ -1,4 +1,9 @@
-import { AnchoredContentGroupItem, Text, useAppComponentRef } from "@mini-stim/components";
+import {
+  AnchoredContentGroupItem,
+  MarkdownText,
+  Text,
+  useAppComponentRef,
+} from "@mini-stim/components";
 import type { TimelineItem } from "@mini-stim/hooks";
 
 import { STIM_APP_NAMESPACE } from "../appNamespace";
@@ -26,7 +31,7 @@ export function TimelineItemView(props: {
       return (
         <AnchoredContentGroupItem
           align={align}
-          ref={itemRef}
+          innerRef={itemRef}
           onClick={() => selectInspectTarget(target)}
         >
           <ToolCallWhisper item={item} showTimestamp={false} />
@@ -36,7 +41,7 @@ export function TimelineItemView(props: {
       return (
         <AnchoredContentGroupItem
           align={align}
-          ref={itemRef}
+          innerRef={itemRef}
           onClick={() => selectInspectTarget(target)}
         >
           <ToolResultWhisper item={item} showTimestamp={false} />
@@ -57,12 +62,13 @@ function MessageTimelineItem(props: {
   return (
     <AnchoredContentGroupItem
       align={props.align}
-      ref={props.itemRef}
+      element="div"
+      innerRef={props.itemRef}
       onClick={() => selectInspectTarget(props.target)}
     >
-      <Text tone={role === "account" ? "strong" : "default"}>
+      <MarkdownText tone={role === "account" ? "strong" : "default"}>
         {props.item.message.content_text}
-      </Text>
+      </MarkdownText>
       {pending ? (
         <Text size="xs" tone="subtle">
           generating…
