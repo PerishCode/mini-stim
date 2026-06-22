@@ -7,9 +7,9 @@ type TextProps = ComponentPropsWithoutRef<"span"> & {
   // `dateTime` is only meaningful on tag="time"; allow it without widening the
   // whole prop surface to a polymorphic union.
   dateTime?: string;
-  size?: "xs" | "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg" | "xl";
   tag?: "p" | "span" | "small" | "time";
-  tone?: "default" | "strong" | "muted" | "subtle";
+  tone?: "default" | "strong" | "muted" | "subtle" | "embossed";
   truncate?: boolean;
 };
 

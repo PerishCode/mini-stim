@@ -29,6 +29,16 @@
 
   @include focus-ring;
 
+  &--size-sm {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  &--size-md {
+    width: 2.625rem;
+    height: 2.625rem;
+  }
+
   &--tone-accent {
     --ms-icon-button-bg: var(--ms-color-accent);
     --ms-icon-button-border: var(--ms-color-accent-border);

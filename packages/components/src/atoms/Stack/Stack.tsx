@@ -1,9 +1,9 @@
-import type { ComponentPropsWithoutRef } from "react";
+import type { ComponentPropsWithRef } from "react";
 
 import { cx } from "../../internal/cx";
 import "./Stack.scss";
 
-type StackProps = ComponentPropsWithoutRef<"div"> & {
+type StackProps = ComponentPropsWithRef<"div"> & {
   align?: "start" | "center" | "stretch";
   gap?: "none" | "xs" | "sm" | "md" | "lg";
   grow?: boolean;

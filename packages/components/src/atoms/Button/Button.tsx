@@ -1,9 +1,9 @@
-import type { ButtonHTMLAttributes } from "react";
+import type { ComponentPropsWithRef } from "react";
 
 import { cx } from "../../internal/cx";
 import "./Button.scss";
 
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+type ButtonProps = ComponentPropsWithRef<"button"> & {
   block?: boolean;
   justify?: "center" | "start" | "between";
   size?: "sm" | "md" | "lg";

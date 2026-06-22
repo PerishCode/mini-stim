@@ -1,16 +1,26 @@
-export { AppRoot } from "./atoms/AppRoot/AppRoot";
+export {
+  type AppComponentKind,
+  type AppComponentMetadataValue,
+  type AppComponentRegistration,
+  type AppInspectionConfig,
+  AppRoot,
+  INTERNAL_APP_NAMESPACE,
+  useAppComponentRef,
+} from "./atoms/AppRoot/AppRoot";
 export { Avatar } from "./atoms/Avatar/Avatar";
 export { Badge } from "./atoms/Badge/Badge";
 export { Button } from "./atoms/Button/Button";
 export { CodeBlock } from "./atoms/CodeBlock/CodeBlock";
+export { CodeText } from "./atoms/CodeText/CodeText";
+export { DockShell } from "./atoms/DockShell/DockShell";
 export { Grid, GridItem } from "./atoms/Grid/Grid";
-export { GridRows } from "./atoms/GridRows/GridRows";
 export { Heading } from "./atoms/Heading/Heading";
 export { IconButton } from "./atoms/IconButton/IconButton";
 export { Inline } from "./atoms/Inline/Inline";
 export { Input } from "./atoms/Input/Input";
 export { Notice } from "./atoms/Notice/Notice";
 export { Pane } from "./atoms/Pane/Pane";
+export { Panel } from "./atoms/Panel/Panel";
 export { Pressable } from "./atoms/Pressable/Pressable";
 export { ResizeHandle } from "./atoms/ResizeHandle/ResizeHandle";
 export { ScrollArea } from "./atoms/ScrollArea/ScrollArea";
@@ -22,6 +32,7 @@ export { Timestamp } from "./atoms/Timestamp/Timestamp";
 export { Icon } from "./icons/Icon/Icon";
 export { PlusIcon } from "./icons/PlusIcon";
 export { SendIcon } from "./icons/SendIcon";
+export { SessionsIcon } from "./icons/SessionsIcon";
+export { SoulsIcon } from "./icons/SoulsIcon";
 export { FieldActionLayout } from "./patterns/FieldActionLayout/FieldActionLayout";
 export { IdentityLine } from "./patterns/IdentityLine/IdentityLine";
-export { SectionStackLayout } from "./patterns/SectionStackLayout/SectionStackLayout";

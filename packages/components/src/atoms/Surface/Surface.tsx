@@ -1,9 +1,9 @@
-import type { ComponentPropsWithoutRef } from "react";
+import type { ComponentPropsWithRef } from "react";
 
 import { cx } from "../../internal/cx";
 import "./Surface.scss";
 
-type SurfaceProps = ComponentPropsWithoutRef<"div"> & {
+type SurfaceProps = ComponentPropsWithRef<"div"> & {
   align?: "start" | "center" | "end" | "stretch";
   padding?: "sm" | "md" | "lg" | "xl";
   tone?: "default" | "accent" | "muted" | "inset" | "success" | "warning" | "danger";

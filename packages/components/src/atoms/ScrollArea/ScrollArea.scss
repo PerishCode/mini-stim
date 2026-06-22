@@ -10,9 +10,15 @@ $scroll-overflows: (
   ),
 );
 
+$scroll-tones: (
+  "none": transparent,
+  "inset": var(--ms-color-surface-inset-bg),
+);
+
 .msScrollArea {
   min-width: 0;
   min-height: 0;
+  background: var(--ms-scroll-area-bg);
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
 
@@ -26,6 +32,12 @@ $scroll-overflows: (
       @each $property, $value in $declarations {
         #{$property}: $value;
       }
+    }
+  }
+
+  @each $name, $value in $scroll-tones {
+    &--tone-#{$name} {
+      --ms-scroll-area-bg: #{$value};
     }
   }
 }

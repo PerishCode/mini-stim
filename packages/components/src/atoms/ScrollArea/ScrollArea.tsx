@@ -6,15 +6,23 @@ import "./ScrollArea.scss";
 type ScrollAreaProps = ComponentPropsWithoutRef<"div"> & {
   axis?: "y" | "x" | "both";
   grow?: boolean;
+  tone?: "none" | "inset";
 };
 
-export function ScrollArea({ axis = "y", className, grow = false, ...props }: ScrollAreaProps) {
+export function ScrollArea({
+  axis = "y",
+  className,
+  grow = false,
+  tone = "none",
+  ...props
+}: ScrollAreaProps) {
   return (
     <div
       {...props}
       className={cx(
         "msScrollArea",
         `msScrollArea--${axis}`,
+        `msScrollArea--tone-${tone}`,
         grow && "msScrollArea--grow",
         className,
       )}

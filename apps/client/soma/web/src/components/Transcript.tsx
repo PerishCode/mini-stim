@@ -1,6 +1,7 @@
-import { Notice, Pane, ScrollArea, Stack, Text } from "@mini-stim/components";
+import { Notice, Stack, Text, useAppComponentRef } from "@mini-stim/components";
 import type { TurnGroup } from "@mini-stim/hooks";
 
+import { STIM_APP_NAMESPACE } from "../appNamespace";
 import type { AnnotatedTurnGroup } from "../projections/identityGrouping";
 import { annotateIdentityGroups } from "../projections/identityGrouping";
 import { TimelineItemView } from "./TimelineItemView";
@@ -13,21 +14,33 @@ export interface SoulIdentity {
 export function Transcript(props: { soulIdentity: SoulIdentity; timeline: TurnGroup[] }) {
   const groups = annotateIdentityGroups(props.timeline);
   const empty = !props.timeline.some((group) => group.items.length || group.turn);
+  const transcriptRef = useAppComponentRef({
+    domain: "message",
+    id: "transcript",
+    kind: "section",
+    label: "Transcript",
+    namespace: STIM_APP_NAMESPACE,
+    projection: "timeline",
+    surface: "chat shell",
+  });
+
   return (
-    <ScrollArea grow>
-      <Pane padding="xl">
-        <Stack gap="lg">
-          {groups.map((group) => (
-            <TurnGroupView key={group.id} group={group} soulIdentity={props.soulIdentity} />
-          ))}
-          {empty ? (
-            <Notice>
-              <Text tone="muted">Start a session to see the transcript build here.</Text>
-            </Notice>
-          ) : null}
-        </Stack>
-      </Pane>
-    </ScrollArea>
+    <Stack ref={transcriptRef} gap="lg" grow>
+      {groups.map((group) => (
+        <TurnGroupView key={group.id} group={group} soulIdentity={props.soulIdentity} />
+      ))}
+      {empty ? <TranscriptEmpty /> : null}
+    </Stack>
+  );
+}
+
+function TranscriptEmpty() {
+  return (
+    <Stack grow align="center" justify="center" gap="none">
+      <Text tag="p" size="xl" tone="embossed">
+        Message Santi
+      </Text>
+    </Stack>
   );
 }
 

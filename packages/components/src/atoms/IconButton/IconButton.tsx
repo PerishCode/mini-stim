@@ -1,11 +1,12 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ComponentPropsWithRef, ReactNode } from "react";
 
 import { cx } from "../../internal/cx";
 import "./IconButton.scss";
 
-type IconButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+type IconButtonProps = ComponentPropsWithRef<"button"> & {
   children: ReactNode;
   label: string;
+  size?: "sm" | "md";
   tone?: "neutral" | "accent";
 };
 
@@ -13,6 +14,7 @@ export function IconButton({
   children,
   className,
   label,
+  size = "md",
   tone = "neutral",
   type = "button",
   ...props
@@ -21,7 +23,12 @@ export function IconButton({
     <button
       {...props}
       type={type}
-      className={cx("msIconButton", `msIconButton--tone-${tone}`, className)}
+      className={cx(
+        "msIconButton",
+        `msIconButton--size-${size}`,
+        `msIconButton--tone-${tone}`,
+        className,
+      )}
       aria-label={label}
       title={label}
     >

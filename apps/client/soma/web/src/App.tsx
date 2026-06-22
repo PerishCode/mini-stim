@@ -1,4 +1,4 @@
-import { AppRoot, Grid, GridItem, Pane, ResizeHandle } from "@mini-stim/components";
+import { AppRoot, DockShell, Grid, GridItem, ResizeHandle } from "@mini-stim/components";
 import {
   type SessionSummary,
   useDebouncedValue,
@@ -15,10 +15,13 @@ import {
 import { uiStorage } from "@mini-stim/storage";
 import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useState } from "react";
 
+import { STIM_APP_NAMESPACE } from "./appNamespace";
 import { ChatShell } from "./components/ChatShell";
 import { InspectPanel } from "./components/InspectPanel";
+import { NavigationDock } from "./components/NavigationDock";
 import { SessionRail } from "./components/SessionRail";
 import { type InspectTarget, subscribeInspectTarget } from "./events/inspect";
+import type { NavigationMode } from "./navigationMode";
 
 const DEFAULT_RAIL_WIDTH = 304;
 const DEFAULT_INSPECT_WIDTH = 352;
@@ -42,6 +45,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [inspecting, setInspecting] = useState(preferences.inspect.open);
   const [inspectTarget, setInspectTarget] = useState<InspectTarget | null>(null);
+  const [navigationMode, setNavigationMode] = useState<NavigationMode>("sessions");
 
   useEffect(() => {
     if (!selectedSessionId && sessions.length) {
@@ -80,17 +84,28 @@ export function App() {
     [actions, selectedSessionId],
   );
 
-  function toggleInspect() {
-    const next = !inspecting;
-    if (next && selectedSessionId) {
+  function openInspect() {
+    setInspectTarget(null);
+    if (selectedSessionId) {
       actions.refreshRuntime(selectedSessionId);
     }
-    setInspecting(next);
+    setInspecting(true);
     uiStorage.update((current) => ({
       ...current,
       inspect: {
         ...current.inspect,
-        open: next,
+        open: true,
+      },
+    }));
+  }
+
+  function closeInspect() {
+    setInspecting(false);
+    uiStorage.update((current) => ({
+      ...current,
+      inspect: {
+        ...current.inspect,
+        open: false,
       },
     }));
   }
@@ -240,72 +255,79 @@ export function App() {
   }
 
   return (
-    <AppRoot>
-      <Grid
-        template={inspecting ? "sidebar-main-inspect" : "sidebar-main"}
-        gap="shell"
-        grow
-        sidebarWidthPx={layout.railWidthPx}
-        inspectWidthPx={layout.inspectWidthPx}
-      >
-        <GridItem area="sidebar" tag="aside">
-          <SessionRail
-            busy={busy}
-            onCreate={createNewSession}
-            onSelect={selectSession}
-            previews={previews}
-            selectedSessionId={selectedSessionId}
-            sessions={sessions}
-          />
-          <ResizeHandle
-            aria-label="Resize sessions panel"
-            aria-pressed={resizing === "rail"}
-            placement="end"
-            onPointerDown={beginRailResize}
-          />
-        </GridItem>
-        <GridItem area="main" tag="main">
-          <ChatShell
-            activity={activity}
-            busy={debouncedBusy}
-            connection={debouncedConnection}
-            error={visibleError}
-            inspecting={inspecting}
-            onDraftChange={setDraft}
-            onSend={send}
-            onTitleCommit={updateTitle}
-            onToggleInspect={toggleInspect}
-            selectedSessionId={selectedSessionId}
-            title={selectedTitle}
-            titleValue={selectedSession?.profile.title ?? null}
-            timeline={timeline}
-            soulIdentity={soulIdentity}
-            draft={draft}
-          />
-        </GridItem>
-        {inspecting ? (
-          <GridItem area="inspect" tag="aside">
-            <Pane chrome="panel" tone="raised" grow>
-              <InspectPanel
-                runtime={runtime}
-                target={inspectTarget?.sessionId === selectedSessionId ? inspectTarget : null}
+    <AppRoot inspection={{ namespace: STIM_APP_NAMESPACE, options: { labels: true } }}>
+      <DockShell.Root>
+        <DockShell.Dock>
+          <NavigationDock mode={navigationMode} onModeChange={setNavigationMode} />
+        </DockShell.Dock>
+        <DockShell.Grid>
+          <Grid
+            template={inspecting ? "sidebar-main-inspect" : "sidebar-main"}
+            gap="shell"
+            grow
+            sidebarWidthPx={layout.railWidthPx}
+            inspectWidthPx={layout.inspectWidthPx}
+          >
+            <GridItem area="sidebar" tag="aside">
+              <SessionRail
+                mode={navigationMode}
+                onCreate={createNewSession}
+                onSelect={selectSession}
+                previews={previews}
+                selectedSessionId={selectedSessionId}
+                sessions={sessions}
+                soulIdentity={soulIdentity}
               />
-            </Pane>
-            <ResizeHandle
-              aria-label="Resize inspect panel"
-              aria-pressed={resizing === "inspect"}
-              placement="start"
-              onPointerDown={beginInspectResize}
-            />
-          </GridItem>
-        ) : null}
-      </Grid>
+              <ResizeHandle
+                aria-label="Resize sessions panel"
+                aria-pressed={resizing === "rail"}
+                placement="end"
+                onPointerDown={beginRailResize}
+              />
+            </GridItem>
+            <GridItem area="main" tag="main">
+              <ChatShell
+                activity={activity}
+                busy={debouncedBusy}
+                connection={debouncedConnection}
+                error={visibleError}
+                inspecting={inspecting}
+                onDraftChange={setDraft}
+                onOpenInspect={openInspect}
+                onSend={send}
+                onTitleCommit={updateTitle}
+                selectedSessionId={selectedSessionId}
+                title={selectedTitle}
+                titleValue={selectedSession?.profile.title ?? null}
+                timeline={timeline}
+                soulIdentity={soulIdentity}
+                draft={draft}
+              />
+            </GridItem>
+            {inspecting ? (
+              <GridItem area="inspect" tag="aside">
+                <InspectPanel
+                  onClose={closeInspect}
+                  runtime={runtime}
+                  target={inspectTarget?.sessionId === selectedSessionId ? inspectTarget : null}
+                />
+                <ResizeHandle
+                  aria-label="Resize inspect panel"
+                  aria-pressed={resizing === "inspect"}
+                  placement="start"
+                  onPointerDown={beginInspectResize}
+                />
+              </GridItem>
+            ) : null}
+          </Grid>
+        </DockShell.Grid>
+      </DockShell.Root>
     </AppRoot>
   );
 }
 
 function sessionLabel(session: SessionSummary) {
-  return session.profile.title?.trim() || session.session.id;
+  return session.profile.title?.trim() || "Untitled chat";
 }
 
 function clampWidth(width: number, target: "inspect" | "rail") {
