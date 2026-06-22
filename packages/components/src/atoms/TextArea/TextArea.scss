@@ -42,6 +42,7 @@
   background: var(--ms-color-input-bg);
   color: var(--ms-color-text);
   padding: var(--ms-space-3);
+  font-size: var(--ms-font-size-md);
   line-height: 1.45;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
   @include transition(background-color, border-color, box-shadow);
@@ -71,7 +72,8 @@
     min-height: 3rem;
     border-color: var(--ms-color-dock-border);
     background: var(--ms-color-input-dock-bg);
-    padding: var(--ms-space-3);
+    padding-block: 0.9375rem 0.8125rem;
+    padding-inline: var(--ms-space-3);
     line-height: 1.5;
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.9),
