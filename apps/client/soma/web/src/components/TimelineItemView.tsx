@@ -1,14 +1,4 @@
-import {
-  Badge,
-  IdentityLine,
-  Inline,
-  Pressable,
-  Stack,
-  Surface,
-  Text,
-  Timestamp,
-  useAppComponentRef,
-} from "@mini-stim/components";
+import { AnchoredContentGroupItem, Text, useAppComponentRef } from "@mini-stim/components";
 import type { TimelineItem } from "@mini-stim/hooks";
 
 import { STIM_APP_NAMESPACE } from "../appNamespace";
@@ -20,86 +10,65 @@ import {
   truncateMiddle,
 } from "./domains/tool-call/model/toolCallModel";
 import { ToolCallWhisper, ToolResultWhisper } from "./domains/tool-call/transcript/ToolCallWhisper";
-import type { SoulIdentity } from "./Transcript";
 
 export function TimelineItemView(props: {
+  align?: "start" | "center" | "end";
   item: TimelineItem;
-  showIdentity: boolean;
-  soulIdentity: SoulIdentity;
 }) {
-  const { item, showIdentity, soulIdentity } = props;
+  const { align = "start", item } = props;
   const target = targetForItem(item);
   const itemRef = useAppComponentRef(registrationForItem(item));
 
   switch (item.kind) {
     case "message":
-      return (
-        <MessageTimelineItem
-          item={item}
-          itemRef={itemRef}
-          showIdentity={showIdentity}
-          soulIdentity={soulIdentity}
-          target={target}
-        />
-      );
+      return <MessageTimelineItem align={align} item={item} itemRef={itemRef} target={target} />;
     case "tool_call":
       return (
-        <Pressable ref={itemRef} onClick={() => selectInspectTarget(target)}>
-          <ToolCallWhisper item={item} />
-        </Pressable>
+        <AnchoredContentGroupItem
+          align={align}
+          ref={itemRef}
+          onClick={() => selectInspectTarget(target)}
+        >
+          <ToolCallWhisper item={item} showTimestamp={false} />
+        </AnchoredContentGroupItem>
       );
     case "tool_result":
       return (
-        <Pressable ref={itemRef} onClick={() => selectInspectTarget(target)}>
-          <ToolResultWhisper item={item} />
-        </Pressable>
+        <AnchoredContentGroupItem
+          align={align}
+          ref={itemRef}
+          onClick={() => selectInspectTarget(target)}
+        >
+          <ToolResultWhisper item={item} showTimestamp={false} />
+        </AnchoredContentGroupItem>
       );
   }
 }
 
 function MessageTimelineItem(props: {
+  align: "start" | "center" | "end";
   item: Extract<TimelineItem, { kind: "message" }>;
   itemRef: (element: HTMLElement | null) => void;
-  showIdentity: boolean;
-  soulIdentity: SoulIdentity;
   target: ReturnType<typeof targetForItem>;
 }) {
   const role = props.item.message.message.actor_type;
   const pending = props.item.message.message.state === "pending";
-  const identity = identityForMessage(
-    role,
-    props.item.message.message.actor_id,
-    props.soulIdentity,
-  );
-  const showHeader = props.showIdentity || pending;
 
   return (
-    <Pressable ref={props.itemRef} onClick={() => selectInspectTarget(props.target)}>
-      <Surface align={roleAlign(role)} tone={roleTone(role)} padding="lg" width="content">
-        <Stack gap="sm">
-          {showHeader ? (
-            <Inline justify="between" align="center" wrap gap="sm">
-              {props.showIdentity ? (
-                <IdentityLine
-                  avatarSeed={identity.avatarSeed}
-                  marker={identity.marker}
-                  name={identity.name}
-                  size="sm"
-                />
-              ) : null}
-              {pending ? (
-                <Text size="xs" tone="subtle">
-                  generating…
-                </Text>
-              ) : (
-                <Timestamp value={props.item.createdAt} size="xs" tone="subtle" />
-              )}
-            </Inline>
-          ) : null}
-          <Text>{props.item.message.content_text}</Text>
-        </Stack>
-      </Surface>
-    </Pressable>
+    <AnchoredContentGroupItem
+      align={props.align}
+      ref={props.itemRef}
+      onClick={() => selectInspectTarget(props.target)}
+    >
+      <Text tone={role === "account" ? "strong" : "default"}>
+        {props.item.message.content_text}
+      </Text>
+      {pending ? (
+        <Text size="xs" tone="subtle">
+          generating…
+        </Text>
+      ) : null}
+    </AnchoredContentGroupItem>
   );
 }
 
@@ -182,53 +151,6 @@ function targetForItem(item: TimelineItem) {
         sessionId: item.sessionId,
         toolResultId: item.toolResult.id,
       } as const;
-  }
-}
-
-function roleTone(role: string) {
-  switch (role) {
-    case "account":
-      return "accent";
-    case "system":
-      return "warning";
-    default:
-      return "muted";
-  }
-}
-
-function roleAlign(role: string) {
-  switch (role) {
-    case "account":
-      return "end";
-    case "system":
-      return "center";
-    default:
-      return "start";
-  }
-}
-
-function identityForMessage(role: string, actorId: string, soulIdentity: SoulIdentity) {
-  switch (role) {
-    case "account":
-      return {
-        avatarSeed: `account:${actorId}`,
-        name: "You",
-      };
-    case "system":
-      return {
-        avatarSeed: "system",
-        name: "System",
-      };
-    default:
-      return {
-        avatarSeed: soulIdentity.avatarSeed,
-        marker: (
-          <Badge size="sm" tone="accent">
-            verified
-          </Badge>
-        ),
-        name: soulIdentity.name,
-      };
   }
 }
 

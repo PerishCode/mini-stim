@@ -17,20 +17,22 @@ type ToolResultItem = Extract<TimelineItem, { kind: "tool_result" }>;
 const COMMAND_LIMIT = 92;
 const OUTPUT_LIMIT = 120;
 
-export function ToolCallWhisper(props: { item: ToolCallItem }) {
+export function ToolCallWhisper(props: { item: ToolCallItem; showTimestamp?: boolean }) {
   return (
     <ToolWhisperBody
       createdAt={props.item.createdAt}
+      showTimestamp={props.showTimestamp}
       toolCall={props.item.toolCall}
       toolResult={props.item.toolResult ?? null}
     />
   );
 }
 
-export function ToolResultWhisper(props: { item: ToolResultItem }) {
+export function ToolResultWhisper(props: { item: ToolResultItem; showTimestamp?: boolean }) {
   return (
     <ToolWhisperBody
       createdAt={props.item.createdAt}
+      showTimestamp={props.showTimestamp}
       toolCall={props.item.toolCall ?? null}
       toolResult={props.item.toolResult}
     />
@@ -39,6 +41,7 @@ export function ToolResultWhisper(props: { item: ToolResultItem }) {
 
 function ToolWhisperBody(props: {
   createdAt: string;
+  showTimestamp?: boolean;
   toolCall: ToolCallRecord | null;
   toolResult: ToolResultRecord | null;
 }) {
@@ -59,7 +62,9 @@ function ToolWhisperBody(props: {
               {failed ? "failed" : "completed"}
             </Text>
           </Inline>
-          <Timestamp value={props.createdAt} size="xs" tone="subtle" />
+          {props.showTimestamp === false ? null : (
+            <Timestamp value={props.createdAt} size="xs" tone="subtle" />
+          )}
         </Stack>
       </Surface>
     );
@@ -72,6 +77,7 @@ function ToolWhisperBody(props: {
       return (
         <ShellToolWhisper
           createdAt={props.createdAt}
+          showTimestamp={props.showTimestamp}
           toolCall={props.toolCall}
           toolResult={props.toolResult}
         />
@@ -80,6 +86,7 @@ function ToolWhisperBody(props: {
       return (
         <UnknownToolWhisper
           createdAt={props.createdAt}
+          showTimestamp={props.showTimestamp}
           toolCall={props.toolCall}
           toolResult={props.toolResult}
         />
@@ -89,6 +96,7 @@ function ToolWhisperBody(props: {
 
 function ShellToolWhisper(props: {
   createdAt: string;
+  showTimestamp?: boolean;
   toolCall: ToolCallRecord;
   toolResult: ToolResultRecord | null;
 }) {
@@ -118,7 +126,9 @@ function ShellToolWhisper(props: {
             {outputLabel}: {truncateMiddle(output, OUTPUT_LIMIT)}
           </Text>
         ) : null}
-        <Timestamp value={props.createdAt} size="xs" tone="subtle" />
+        {props.showTimestamp === false ? null : (
+          <Timestamp value={props.createdAt} size="xs" tone="subtle" />
+        )}
       </Stack>
     </Surface>
   );
@@ -126,6 +136,7 @@ function ShellToolWhisper(props: {
 
 function UnknownToolWhisper(props: {
   createdAt: string;
+  showTimestamp?: boolean;
   toolCall: ToolCallRecord;
   toolResult: ToolResultRecord | null;
 }) {
@@ -144,7 +155,9 @@ function UnknownToolWhisper(props: {
             {status}
           </Text>
         </Inline>
-        <Timestamp value={props.createdAt} size="xs" tone="subtle" />
+        {props.showTimestamp === false ? null : (
+          <Timestamp value={props.createdAt} size="xs" tone="subtle" />
+        )}
       </Stack>
     </Surface>
   );

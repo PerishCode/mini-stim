@@ -35,5 +35,10 @@ export { PlusIcon } from "./icons/PlusIcon";
 export { SendIcon } from "./icons/SendIcon";
 export { SessionsIcon } from "./icons/SessionsIcon";
 export { SoulsIcon } from "./icons/SoulsIcon";
+export {
+  AnchoredContentGroup,
+  AnchoredContentGroupDivider,
+  AnchoredContentGroupItem,
+} from "./patterns/AnchoredContentGroup/AnchoredContentGroup";
 export { FieldActionLayout } from "./patterns/FieldActionLayout/FieldActionLayout";
 export { IdentityLine } from "./patterns/IdentityLine/IdentityLine";
