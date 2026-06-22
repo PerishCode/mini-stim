@@ -38,20 +38,20 @@
   }
 
   &--size-sm {
-    width: 1.5rem;
-    height: 1.5rem;
+    width: 1.125rem;
+    height: 1.125rem;
     font-size: var(--ms-font-size-xs);
   }
 
   &--size-md {
-    width: 2rem;
-    height: 2rem;
+    width: 1.5rem;
+    height: 1.5rem;
     font-size: var(--ms-font-size-sm);
   }
 
   &--size-lg {
-    width: 2.5rem;
-    height: 2.5rem;
+    width: 1.875rem;
+    height: 1.875rem;
     font-size: var(--ms-font-size-md);
   }
 }

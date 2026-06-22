@@ -1,9 +1,9 @@
 import {
-  Button,
+  ChevronRightIcon,
+  IconButton,
   Inline,
   Pane,
   Panel,
-  Stack,
   Text,
   useAppComponentRef,
 } from "@mini-stim/components";
@@ -11,7 +11,7 @@ import type { SessionRuntimeSnapshot } from "@mini-stim/hooks";
 import type { ReactNode } from "react";
 
 import { STIM_APP_NAMESPACE } from "../appNamespace";
-import type { InspectTarget } from "../events/inspect";
+import { closeInspectPanel, type InspectTarget } from "../events/inspect";
 import { MessageInspectPanel } from "./domains/message/InspectPanel/MessageInspectPanel";
 import { SessionInspectPanel } from "./domains/session/InspectPanel/SessionInspectPanel";
 import { ToolCallInspectPanel } from "./domains/tool-call/InspectPanel/ToolCallInspectPanel";
@@ -32,7 +32,6 @@ const inspectDomainRegistry = {
 } satisfies Record<InspectDomain, InspectDomainPanel>;
 
 export function InspectPanel(props: {
-  onClose: () => void;
   runtime: SessionRuntimeSnapshot | null;
   target: InspectTarget | null;
 }) {
@@ -54,17 +53,17 @@ export function InspectPanel(props: {
     <Panel.Root ref={panelRef}>
       <Panel.Header>
         <Inline justify="between" align="center" gap="md">
-          <Stack gap="none">
-            <Text size="xs" tone="subtle">
-              INSPECT
+          <Inline gap="sm" align="center" wrap>
+            <Text size="lg" tone="strong">
+              Inspect
             </Text>
-            <Text size="sm" tone="strong">
+            <Text size="xs" tone="subtle">
               {inspectDomainTitle(domain)}
             </Text>
-          </Stack>
-          <Button size="sm" variant="ghost" onClick={props.onClose}>
-            Close Inspect
-          </Button>
+          </Inline>
+          <IconButton label="Close Inspect" size="sm" variant="ghost" onClick={closeInspectPanel}>
+            <ChevronRightIcon size="sm" />
+          </IconButton>
         </Inline>
       </Panel.Header>
       <Panel.Body tone="inset" scroll>

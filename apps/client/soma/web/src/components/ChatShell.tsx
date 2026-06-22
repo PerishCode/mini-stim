@@ -12,7 +12,6 @@ export function ChatShell(props: {
   error: string | null;
   inspecting: boolean;
   onDraftChange: (value: string) => void;
-  onOpenInspect: () => void;
   onSend: () => void;
   onTitleCommit: (title: string | null) => void;
   selectedSessionId: string | null;
@@ -40,7 +39,6 @@ export function ChatShell(props: {
           busy={props.busy}
           connection={props.connection}
           inspecting={props.inspecting}
-          onOpenInspect={props.onOpenInspect}
           onTitleCommit={props.onTitleCommit}
           selectedSessionId={props.selectedSessionId}
           title={props.title}

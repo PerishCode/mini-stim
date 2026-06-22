@@ -26,7 +26,7 @@ export function MessageInspectPanel(props: { messageId: string; runtime: Session
     props.runtime.messages.find((item) => item.message.id === props.messageId) ?? null;
 
   return (
-    <Stack ref={panelRef} gap="lg" grow>
+    <Stack ref={panelRef} gap="lg">
       <Text size="xs" tone="subtle">
         MESSAGE
       </Text>

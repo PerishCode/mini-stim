@@ -51,6 +51,28 @@ Only after that translation should the idea appear in product UI.
 This is how visual taste becomes a maintainable system instead of a sequence of
  one-off page edits.
 
+## 2.1 Density and scale
+
+`mini-stim` should default to a compact work-surface density.
+
+The desired proportion is closer to a browser surface viewed around 75% than to
+large default web-app chrome. This is a system scale decision, not a user zoom
+workaround.
+
+When density changes, scale these together:
+
+- typography tokens
+- spacing tokens
+- icon and avatar sizes
+- badge and control heights
+- shell, panel, composer, rail, and Inspect geometry
+- inspection overlay labels
+
+Do not shrink only spacing while leaving type and symbols large. That creates a
+compressed but disproportionate surface. Do not shrink only font size while
+leaving chrome large either. The target is a coherent ratio: readable text in a
+denser tool surface.
+
 ## 3. Design pairing workflow
 
 Design work in `mini-stim` should treat the current local product surface as a

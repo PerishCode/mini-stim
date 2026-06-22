@@ -19,7 +19,7 @@ export function SessionInspectPanel(props: { runtime: SessionRuntimeSnapshot }) 
   const memory = runtime.soul_session?.session_memory.trim() ?? "";
 
   return (
-    <Stack gap="lg" grow>
+    <Stack gap="lg">
       <InspectSection
         title="SESSION"
         aside={<Timestamp value={runtime.session.created_at} size="xs" tone="subtle" />}

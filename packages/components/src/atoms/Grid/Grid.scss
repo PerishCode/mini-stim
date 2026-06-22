@@ -6,8 +6,8 @@ $grid-gaps: (
 );
 
 .msGrid {
-  --ms-grid-sidebar-width: 19rem;
-  --ms-grid-inspect-width: 22rem;
+  --ms-grid-sidebar-width: 17rem;
+  --ms-grid-inspect-width: 20rem;
 
   display: grid;
   width: 100%;
@@ -21,7 +21,7 @@ $grid-gaps: (
   }
 
   &--template-sidebar-main {
-    grid-template-columns: minmax(16.5rem, 19rem) minmax(0, 1fr);
+    grid-template-columns: minmax(15rem, 17rem) minmax(0, 1fr);
     grid-template-areas: "sidebar main";
 
     @media (max-width: 48rem) {
@@ -33,11 +33,31 @@ $grid-gaps: (
     }
   }
 
+  &--template-main {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "main";
+  }
+
+  &--template-main-inspect {
+    grid-template-columns:
+      minmax(22rem, 1fr)
+      minmax(16rem, var(--ms-grid-inspect-width));
+    grid-template-areas: "main inspect";
+
+    @media (max-width: 48rem) {
+      grid-template-columns: 1fr;
+      grid-template-rows: minmax(0, 1fr) minmax(12rem, 32vh);
+      grid-template-areas:
+        "main"
+        "inspect";
+    }
+  }
+
   &--template-sidebar-main-inspect {
     grid-template-columns:
-      minmax(16.5rem, var(--ms-grid-sidebar-width))
-      minmax(24rem, 1fr)
-      minmax(18rem, var(--ms-grid-inspect-width));
+      minmax(15rem, var(--ms-grid-sidebar-width))
+      minmax(22rem, 1fr)
+      minmax(16rem, var(--ms-grid-inspect-width));
     grid-template-areas: "sidebar main inspect";
 
     @media (max-width: 48rem) {

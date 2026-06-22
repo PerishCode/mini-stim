@@ -18,6 +18,7 @@ export { Heading } from "./atoms/Heading/Heading";
 export { IconButton } from "./atoms/IconButton/IconButton";
 export { Inline } from "./atoms/Inline/Inline";
 export { Input } from "./atoms/Input/Input";
+export { MarkdownText } from "./atoms/MarkdownText/MarkdownText";
 export { Notice } from "./atoms/Notice/Notice";
 export { Pane } from "./atoms/Pane/Pane";
 export { Panel } from "./atoms/Panel/Panel";
@@ -29,10 +30,16 @@ export { Surface } from "./atoms/Surface/Surface";
 export { Text } from "./atoms/Text/Text";
 export { TextArea } from "./atoms/TextArea/TextArea";
 export { Timestamp } from "./atoms/Timestamp/Timestamp";
+export { ChevronRightIcon } from "./icons/ChevronRightIcon";
 export { Icon } from "./icons/Icon/Icon";
 export { PlusIcon } from "./icons/PlusIcon";
 export { SendIcon } from "./icons/SendIcon";
 export { SessionsIcon } from "./icons/SessionsIcon";
 export { SoulsIcon } from "./icons/SoulsIcon";
+export {
+  AnchoredContentGroup,
+  AnchoredContentGroupDivider,
+  AnchoredContentGroupItem,
+} from "./patterns/AnchoredContentGroup/AnchoredContentGroup";
 export { FieldActionLayout } from "./patterns/FieldActionLayout/FieldActionLayout";
 export { IdentityLine } from "./patterns/IdentityLine/IdentityLine";

@@ -13,14 +13,30 @@ import {
   useSessionTurnTimeline,
 } from "@mini-stim/hooks";
 import { uiStorage } from "@mini-stim/storage";
-import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useState } from "react";
+import {
+  type PointerEvent as ReactPointerEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import { STIM_APP_NAMESPACE } from "./appNamespace";
 import { ChatShell } from "./components/ChatShell";
 import { InspectPanel } from "./components/InspectPanel";
 import { NavigationDock } from "./components/NavigationDock";
 import { SessionRail } from "./components/SessionRail";
-import { type InspectTarget, subscribeInspectTarget } from "./events/inspect";
+import {
+  type InspectEvent,
+  type InspectTarget,
+  subscribeInspect,
+  toggleInspectPanel,
+} from "./events/inspect";
+import {
+  type NavigationEvent,
+  subscribeNavigation,
+  toggleNavigationPanel,
+} from "./events/navigation";
 import type { NavigationMode } from "./navigationMode";
 
 const DEFAULT_RAIL_WIDTH = 304;
@@ -45,7 +61,29 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [inspecting, setInspecting] = useState(preferences.inspect.open);
   const [inspectTarget, setInspectTarget] = useState<InspectTarget | null>(null);
-  const [navigationMode, setNavigationMode] = useState<NavigationMode>("sessions");
+  const [navigation, setNavigation] = useState(preferences.navigation);
+
+  const commitNavigation = useCallback((updater: (current: NavigationState) => NavigationState) => {
+    setNavigation((current) => {
+      const next = updater(current);
+      uiStorage.update((stored) => ({
+        ...stored,
+        navigation: next,
+      }));
+      return next;
+    });
+  }, []);
+
+  const commitInspectOpen = useCallback((open: boolean) => {
+    setInspecting(open);
+    uiStorage.update((current) => ({
+      ...current,
+      inspect: {
+        ...current.inspect,
+        open,
+      },
+    }));
+  }, []);
 
   useEffect(() => {
     if (!selectedSessionId && sessions.length) {
@@ -64,51 +102,51 @@ export function App() {
 
   useEffect(
     () =>
-      subscribeInspectTarget(({ target }) => {
-        setError(null);
-        setInspectTarget(target);
-        setInspecting(true);
-        if (target.sessionId !== selectedSessionId) {
-          actions.selectAndGet(target.sessionId);
-        } else {
-          actions.refreshRuntime(target.sessionId);
-        }
-        uiStorage.update((current) => ({
-          ...current,
-          inspect: {
-            ...current.inspect,
-            open: true,
-          },
-        }));
+      subscribeInspect((event) => {
+        handleInspectEvent(event, {
+          actions,
+          commitInspectOpen,
+          inspecting,
+          selectedSessionId,
+          setError,
+          setInspectTarget,
+        });
       }),
-    [actions, selectedSessionId],
+    [actions, commitInspectOpen, inspecting, selectedSessionId],
   );
 
-  function openInspect() {
-    setInspectTarget(null);
-    if (selectedSessionId) {
-      actions.refreshRuntime(selectedSessionId);
-    }
-    setInspecting(true);
-    uiStorage.update((current) => ({
-      ...current,
-      inspect: {
-        ...current.inspect,
-        open: true,
-      },
-    }));
-  }
+  useEffect(
+    () =>
+      subscribeNavigation((event) => {
+        commitNavigation((current) => nextNavigationState(current, event));
+      }),
+    [commitNavigation],
+  );
 
-  function closeInspect() {
-    setInspecting(false);
-    uiStorage.update((current) => ({
-      ...current,
-      inspect: {
-        ...current.inspect,
-        open: false,
-      },
-    }));
-  }
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented || event.altKey || event.shiftKey) {
+        return;
+      }
+      if (!event.metaKey && !event.ctrlKey) {
+        return;
+      }
+
+      switch (event.key.toLowerCase()) {
+        case "b":
+          event.preventDefault();
+          toggleNavigationPanel();
+          return;
+        case "i":
+          event.preventDefault();
+          toggleInspectPanel();
+          return;
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const busy = pending > 0;
   const debouncedBusy = useDebouncedValue(busy, { debounceMs: 150 });
@@ -255,36 +293,38 @@ export function App() {
   }
 
   return (
-    <AppRoot inspection={{ namespace: STIM_APP_NAMESPACE, options: { labels: true } }}>
+    <AppRoot inspection={{ namespace: STIM_APP_NAMESPACE, options: { labels: false } }}>
       <DockShell.Root>
         <DockShell.Dock>
-          <NavigationDock mode={navigationMode} onModeChange={setNavigationMode} />
+          <NavigationDock mode={navigation.mode} open={navigation.open} />
         </DockShell.Dock>
         <DockShell.Grid>
           <Grid
-            template={inspecting ? "sidebar-main-inspect" : "sidebar-main"}
+            template={gridTemplate(navigation.open, inspecting)}
             gap="shell"
             grow
-            sidebarWidthPx={layout.railWidthPx}
+            sidebarWidthPx={navigation.open ? layout.railWidthPx : null}
             inspectWidthPx={layout.inspectWidthPx}
           >
-            <GridItem area="sidebar" tag="aside">
-              <SessionRail
-                mode={navigationMode}
-                onCreate={createNewSession}
-                onSelect={selectSession}
-                previews={previews}
-                selectedSessionId={selectedSessionId}
-                sessions={sessions}
-                soulIdentity={soulIdentity}
-              />
-              <ResizeHandle
-                aria-label="Resize sessions panel"
-                aria-pressed={resizing === "rail"}
-                placement="end"
-                onPointerDown={beginRailResize}
-              />
-            </GridItem>
+            {navigation.open ? (
+              <GridItem area="sidebar" tag="aside">
+                <SessionRail
+                  mode={navigation.mode}
+                  onCreate={createNewSession}
+                  onSelect={selectSession}
+                  previews={previews}
+                  selectedSessionId={selectedSessionId}
+                  sessions={sessions}
+                  soulIdentity={soulIdentity}
+                />
+                <ResizeHandle
+                  aria-label="Resize sessions panel"
+                  aria-pressed={resizing === "rail"}
+                  placement="end"
+                  onPointerDown={beginRailResize}
+                />
+              </GridItem>
+            ) : null}
             <GridItem area="main" tag="main">
               <ChatShell
                 activity={activity}
@@ -293,7 +333,6 @@ export function App() {
                 error={visibleError}
                 inspecting={inspecting}
                 onDraftChange={setDraft}
-                onOpenInspect={openInspect}
                 onSend={send}
                 onTitleCommit={updateTitle}
                 selectedSessionId={selectedSessionId}
@@ -307,7 +346,6 @@ export function App() {
             {inspecting ? (
               <GridItem area="inspect" tag="aside">
                 <InspectPanel
-                  onClose={closeInspect}
                   runtime={runtime}
                   target={inspectTarget?.sessionId === selectedSessionId ? inspectTarget : null}
                 />
@@ -333,4 +371,82 @@ function sessionLabel(session: SessionSummary) {
 function clampWidth(width: number, target: "inspect" | "rail") {
   const range = target === "rail" ? RAIL_WIDTH_RANGE : INSPECT_WIDTH_RANGE;
   return Math.round(Math.min(range.max, Math.max(range.min, width)));
+}
+
+type NavigationState = {
+  mode: NavigationMode;
+  open: boolean;
+};
+
+function nextNavigationState(current: NavigationState, event: NavigationEvent) {
+  switch (event.type) {
+    case "navigation:mode-selected":
+      if (current.mode === event.mode) {
+        return {
+          ...current,
+          open: !current.open,
+        };
+      }
+      return {
+        mode: event.mode,
+        open: true,
+      };
+    case "navigation:panel-toggled":
+      return {
+        ...current,
+        open: !current.open,
+      };
+  }
+}
+
+function handleInspectEvent(
+  event: InspectEvent,
+  context: {
+    actions: ReturnType<typeof useSessionActions>;
+    commitInspectOpen: (open: boolean) => void;
+    inspecting: boolean;
+    selectedSessionId: string | null;
+    setError: (value: string | null) => void;
+    setInspectTarget: (value: InspectTarget | null) => void;
+  },
+) {
+  switch (event.type) {
+    case "inspect:target:selected":
+      context.setError(null);
+      context.setInspectTarget(event.target);
+      context.commitInspectOpen(true);
+      if (event.target.sessionId !== context.selectedSessionId) {
+        context.actions.selectAndGet(event.target.sessionId);
+      } else {
+        context.actions.refreshRuntime(event.target.sessionId);
+      }
+      return;
+    case "inspect:panel:opened":
+      context.setError(null);
+      context.commitInspectOpen(true);
+      if (context.selectedSessionId) {
+        context.actions.refreshRuntime(context.selectedSessionId);
+      }
+      return;
+    case "inspect:panel:closed":
+      context.commitInspectOpen(false);
+      return;
+    case "inspect:panel:toggled": {
+      const nextOpen = !context.inspecting;
+      context.commitInspectOpen(nextOpen);
+      if (nextOpen && context.selectedSessionId) {
+        context.actions.refreshRuntime(context.selectedSessionId);
+      }
+    }
+  }
+}
+
+function gridTemplate(navigationOpen: boolean, inspecting: boolean) {
+  if (navigationOpen && inspecting) {
+    return "sidebar-main-inspect";
+  }
+  if (navigationOpen) {
+    return "sidebar-main";
+  }
+  return inspecting ? "main-inspect" : "main";
 }

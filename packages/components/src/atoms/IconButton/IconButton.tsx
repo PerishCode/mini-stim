@@ -8,6 +8,7 @@ type IconButtonProps = ComponentPropsWithRef<"button"> & {
   label: string;
   size?: "sm" | "md";
   tone?: "neutral" | "accent";
+  variant?: "solid" | "ghost";
 };
 
 export function IconButton({
@@ -17,6 +18,7 @@ export function IconButton({
   size = "md",
   tone = "neutral",
   type = "button",
+  variant = "solid",
   ...props
 }: IconButtonProps) {
   return (
@@ -27,6 +29,7 @@ export function IconButton({
         "msIconButton",
         `msIconButton--size-${size}`,
         `msIconButton--tone-${tone}`,
+        `msIconButton--variant-${variant}`,
         className,
       )}
       aria-label={label}
