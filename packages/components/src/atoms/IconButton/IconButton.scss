@@ -29,6 +29,15 @@
 
   @include focus-ring;
 
+  &--variant-ghost {
+    --ms-icon-button-bg: transparent;
+    --ms-icon-button-border: transparent;
+    --ms-icon-button-text: var(--ms-color-text-muted);
+    --ms-icon-button-hover-bg: var(--ms-color-ghost-hover-bg);
+    --ms-icon-button-hover-border: transparent;
+    box-shadow: none;
+  }
+
   &--size-sm {
     width: 1.75rem;
     height: 1.75rem;
@@ -45,6 +54,15 @@
     --ms-icon-button-text: var(--ms-color-accent-text);
     --ms-icon-button-hover-bg: var(--ms-color-accent-hover);
     --ms-icon-button-hover-border: var(--ms-color-accent-hover);
+  }
+
+  &--variant-ghost.msIconButton--tone-accent {
+    --ms-icon-button-bg: transparent;
+    --ms-icon-button-border: transparent;
+    --ms-icon-button-text: var(--ms-color-accent);
+    --ms-icon-button-hover-bg: var(--ms-color-ghost-hover-bg);
+    --ms-icon-button-hover-border: transparent;
+    box-shadow: none;
   }
 
   &[aria-pressed="mixed"] {

@@ -29,6 +29,7 @@ export { Surface } from "./atoms/Surface/Surface";
 export { Text } from "./atoms/Text/Text";
 export { TextArea } from "./atoms/TextArea/TextArea";
 export { Timestamp } from "./atoms/Timestamp/Timestamp";
+export { ChevronRightIcon } from "./icons/ChevronRightIcon";
 export { Icon } from "./icons/Icon/Icon";
 export { PlusIcon } from "./icons/PlusIcon";
 export { SendIcon } from "./icons/SendIcon";

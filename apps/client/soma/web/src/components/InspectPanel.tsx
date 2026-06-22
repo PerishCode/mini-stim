@@ -1,4 +1,12 @@
-import { Button, Inline, Pane, Panel, Text, useAppComponentRef } from "@mini-stim/components";
+import {
+  ChevronRightIcon,
+  IconButton,
+  Inline,
+  Pane,
+  Panel,
+  Text,
+  useAppComponentRef,
+} from "@mini-stim/components";
 import type { SessionRuntimeSnapshot } from "@mini-stim/hooks";
 import type { ReactNode } from "react";
 
@@ -53,9 +61,9 @@ export function InspectPanel(props: {
               {inspectDomainTitle(domain)}
             </Text>
           </Inline>
-          <Button size="sm" variant="ghost" onClick={closeInspectPanel}>
-            Close Inspect
-          </Button>
+          <IconButton label="Close Inspect" size="sm" variant="ghost" onClick={closeInspectPanel}>
+            <ChevronRightIcon size="sm" />
+          </IconButton>
         </Inline>
       </Panel.Header>
       <Panel.Body tone="inset" scroll>
