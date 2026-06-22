@@ -3,7 +3,7 @@ import type { SessionRuntimeSnapshot } from "@mini-stim/hooks";
 import type { ReactNode } from "react";
 
 import { STIM_APP_NAMESPACE } from "../appNamespace";
-import type { InspectTarget } from "../events/inspect";
+import { closeInspectPanel, type InspectTarget } from "../events/inspect";
 import { MessageInspectPanel } from "./domains/message/InspectPanel/MessageInspectPanel";
 import { SessionInspectPanel } from "./domains/session/InspectPanel/SessionInspectPanel";
 import { ToolCallInspectPanel } from "./domains/tool-call/InspectPanel/ToolCallInspectPanel";
@@ -24,7 +24,6 @@ const inspectDomainRegistry = {
 } satisfies Record<InspectDomain, InspectDomainPanel>;
 
 export function InspectPanel(props: {
-  onClose: () => void;
   runtime: SessionRuntimeSnapshot | null;
   target: InspectTarget | null;
 }) {
@@ -54,7 +53,7 @@ export function InspectPanel(props: {
               {inspectDomainTitle(domain)}
             </Text>
           </Inline>
-          <Button size="sm" variant="ghost" onClick={props.onClose}>
+          <Button size="sm" variant="ghost" onClick={closeInspectPanel}>
             Close Inspect
           </Button>
         </Inline>

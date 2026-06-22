@@ -10,13 +10,13 @@ import {
 import { useEffect, useState } from "react";
 
 import { STIM_APP_NAMESPACE } from "../appNamespace";
+import { openInspectPanel } from "../events/inspect";
 
 export function ChatHeader(props: {
   activity: string;
   busy: boolean;
   connection: string;
   inspecting: boolean;
-  onOpenInspect: () => void;
   onTitleCommit: (title: string | null) => void;
   selectedSessionId: string | null;
   title: string;
@@ -113,7 +113,7 @@ export function ChatHeader(props: {
             variant="ghost"
             disabled={!props.selectedSessionId}
             type="button"
-            onClick={props.onOpenInspect}
+            onClick={openInspectPanel}
           >
             Inspect
           </Button>

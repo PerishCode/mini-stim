@@ -26,7 +26,12 @@ import { ChatShell } from "./components/ChatShell";
 import { InspectPanel } from "./components/InspectPanel";
 import { NavigationDock } from "./components/NavigationDock";
 import { SessionRail } from "./components/SessionRail";
-import { type InspectTarget, subscribeInspectTarget } from "./events/inspect";
+import {
+  type InspectEvent,
+  type InspectTarget,
+  subscribeInspect,
+  toggleInspectPanel,
+} from "./events/inspect";
 import {
   type NavigationEvent,
   subscribeNavigation,
@@ -69,6 +74,17 @@ export function App() {
     });
   }, []);
 
+  const commitInspectOpen = useCallback((open: boolean) => {
+    setInspecting(open);
+    uiStorage.update((current) => ({
+      ...current,
+      inspect: {
+        ...current.inspect,
+        open,
+      },
+    }));
+  }, []);
+
   useEffect(() => {
     if (!selectedSessionId && sessions.length) {
       actions.selectAndGet(sessions[0].session.id);
@@ -86,24 +102,17 @@ export function App() {
 
   useEffect(
     () =>
-      subscribeInspectTarget(({ target }) => {
-        setError(null);
-        setInspectTarget(target);
-        setInspecting(true);
-        if (target.sessionId !== selectedSessionId) {
-          actions.selectAndGet(target.sessionId);
-        } else {
-          actions.refreshRuntime(target.sessionId);
-        }
-        uiStorage.update((current) => ({
-          ...current,
-          inspect: {
-            ...current.inspect,
-            open: true,
-          },
-        }));
+      subscribeInspect((event) => {
+        handleInspectEvent(event, {
+          actions,
+          commitInspectOpen,
+          inspecting,
+          selectedSessionId,
+          setError,
+          setInspectTarget,
+        });
       }),
-    [actions, selectedSessionId],
+    [actions, commitInspectOpen, inspecting, selectedSessionId],
   );
 
   useEffect(
@@ -119,43 +128,25 @@ export function App() {
       if (event.defaultPrevented || event.altKey || event.shiftKey) {
         return;
       }
-      if (event.key.toLowerCase() !== "b" || (!event.metaKey && !event.ctrlKey)) {
+      if (!event.metaKey && !event.ctrlKey) {
         return;
       }
 
-      event.preventDefault();
-      toggleNavigationPanel();
+      switch (event.key.toLowerCase()) {
+        case "b":
+          event.preventDefault();
+          toggleNavigationPanel();
+          return;
+        case "i":
+          event.preventDefault();
+          toggleInspectPanel();
+          return;
+      }
     }
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
-
-  function openInspect() {
-    setInspectTarget(null);
-    if (selectedSessionId) {
-      actions.refreshRuntime(selectedSessionId);
-    }
-    setInspecting(true);
-    uiStorage.update((current) => ({
-      ...current,
-      inspect: {
-        ...current.inspect,
-        open: true,
-      },
-    }));
-  }
-
-  function closeInspect() {
-    setInspecting(false);
-    uiStorage.update((current) => ({
-      ...current,
-      inspect: {
-        ...current.inspect,
-        open: false,
-      },
-    }));
-  }
 
   const busy = pending > 0;
   const debouncedBusy = useDebouncedValue(busy, { debounceMs: 150 });
@@ -342,7 +333,6 @@ export function App() {
                 error={visibleError}
                 inspecting={inspecting}
                 onDraftChange={setDraft}
-                onOpenInspect={openInspect}
                 onSend={send}
                 onTitleCommit={updateTitle}
                 selectedSessionId={selectedSessionId}
@@ -356,7 +346,6 @@ export function App() {
             {inspecting ? (
               <GridItem area="inspect" tag="aside">
                 <InspectPanel
-                  onClose={closeInspect}
                   runtime={runtime}
                   target={inspectTarget?.sessionId === selectedSessionId ? inspectTarget : null}
                 />
@@ -407,6 +396,48 @@ function nextNavigationState(current: NavigationState, event: NavigationEvent) {
         ...current,
         open: !current.open,
       };
+  }
+}
+
+function handleInspectEvent(
+  event: InspectEvent,
+  context: {
+    actions: ReturnType<typeof useSessionActions>;
+    commitInspectOpen: (open: boolean) => void;
+    inspecting: boolean;
+    selectedSessionId: string | null;
+    setError: (value: string | null) => void;
+    setInspectTarget: (value: InspectTarget | null) => void;
+  },
+) {
+  switch (event.type) {
+    case "inspect:target:selected":
+      context.setError(null);
+      context.setInspectTarget(event.target);
+      context.commitInspectOpen(true);
+      if (event.target.sessionId !== context.selectedSessionId) {
+        context.actions.selectAndGet(event.target.sessionId);
+      } else {
+        context.actions.refreshRuntime(event.target.sessionId);
+      }
+      return;
+    case "inspect:panel:opened":
+      context.setError(null);
+      context.commitInspectOpen(true);
+      if (context.selectedSessionId) {
+        context.actions.refreshRuntime(context.selectedSessionId);
+      }
+      return;
+    case "inspect:panel:closed":
+      context.commitInspectOpen(false);
+      return;
+    case "inspect:panel:toggled": {
+      const nextOpen = !context.inspecting;
+      context.commitInspectOpen(nextOpen);
+      if (nextOpen && context.selectedSessionId) {
+        context.actions.refreshRuntime(context.selectedSessionId);
+      }
+    }
   }
 }
 
