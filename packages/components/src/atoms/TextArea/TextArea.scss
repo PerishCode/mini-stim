@@ -66,13 +66,20 @@
   &--variant-composer {
     --ms-textarea-frame-border: var(--ms-color-dock-border);
     --ms-textarea-frame-bg: var(--ms-color-input-dock-bg);
+    --ms-textarea-border-width: 1px;
+    --ms-textarea-optical-center-offset: 1px;
+    --ms-textarea-single-line-block-space: calc(
+      (3rem - (var(--ms-textarea-border-width) * 2) - (var(--ms-font-size-md) * 1.5)) / 2
+    );
     --ms-textarea-frame-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.9),
       0 1px 0 var(--ms-color-border-faint);
     min-height: 3rem;
     border-color: var(--ms-color-dock-border);
     background: var(--ms-color-input-dock-bg);
-    padding-block: 0.9375rem 0.8125rem;
+    padding-block:
+      calc(var(--ms-textarea-single-line-block-space) + var(--ms-textarea-optical-center-offset))
+      calc(var(--ms-textarea-single-line-block-space) - var(--ms-textarea-optical-center-offset));
     padding-inline: var(--ms-space-3);
     line-height: 1.5;
     box-shadow:

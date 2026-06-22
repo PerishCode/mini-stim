@@ -4,8 +4,10 @@
     sans-serif;
   --ms-font-family-mono:
     "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-  --ms-font-size-xs: 0.625rem;
-  --ms-font-size-sm: 0.6875rem;
-  --ms-font-size-md: 0.75rem;
-  --ms-font-size-lg: 0.8125rem;
+  --ms-font-scale: 0.8;
+  --ms-font-size-md: calc(0.9375rem * var(--ms-font-scale));
+  --ms-font-step: 1px;
+  --ms-font-size-xs: calc(var(--ms-font-size-md) - (var(--ms-font-step) * 2));
+  --ms-font-size-sm: calc(var(--ms-font-size-md) - var(--ms-font-step));
+  --ms-font-size-lg: calc(var(--ms-font-size-md) + var(--ms-font-step));
 }
