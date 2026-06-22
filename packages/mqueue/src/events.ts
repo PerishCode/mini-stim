@@ -15,8 +15,8 @@ import type {
   MqueueError,
   SessionAction,
   SessionEvent,
-  SessionPhase,
   SessionPayloads,
+  SessionPhase,
   SessionProjection,
   StreamEvent,
   TimelineItem,
@@ -117,10 +117,7 @@ export function parseStreamEvent(raw: Event): StreamEvent | null {
   }
 }
 
-export function transientMessage(
-  sessionId: string,
-  payload: MessageDeltaPayload,
-): SessionMessage {
+export function transientMessage(sessionId: string, payload: MessageDeltaPayload): SessionMessage {
   const createdAt = new Date().toISOString();
   return {
     relation: {
@@ -206,10 +203,7 @@ export function cloneMessageProjection(value: MessageProjection): MessageProject
       ]),
     ),
     turnsBySessionId: Object.fromEntries(
-      Object.entries(value.turnsBySessionId).map(([sessionId, turns]) => [
-        sessionId,
-        [...turns],
-      ]),
+      Object.entries(value.turnsBySessionId).map(([sessionId, turns]) => [sessionId, [...turns]]),
     ),
     toolCallsBySessionId: Object.fromEntries(
       Object.entries(value.toolCallsBySessionId).map(([sessionId, calls]) => [
@@ -261,11 +255,7 @@ const STREAM_MESSAGE_PREFIX = "stream_";
  * items (just-started turns) still produce an empty group so the UI can
  * show a running envelope immediately.
  */
-export function turnGroups(
-  sessionId: string,
-  items: TimelineItem[],
-  turns: Turn[],
-): TurnGroup[] {
+export function turnGroups(sessionId: string, items: TimelineItem[], turns: Turn[]): TurnGroup[] {
   const sortedTurns = dedupeTurns(turns);
   const turnsById = new Map(sortedTurns.map((turn) => [turn.id, turn]));
   const groupsByTurnId = new Map<string, TurnGroup>();
@@ -353,14 +343,14 @@ function attributeItem(
 }
 
 export function dedupeToolCalls(calls: ToolCall[]): ToolCall[] {
-  return [...new Map(calls.map((call) => [call.id, call])).values()].sort(
-    (left, right) => left.created_at.localeCompare(right.created_at),
+  return [...new Map(calls.map((call) => [call.id, call])).values()].sort((left, right) =>
+    left.created_at.localeCompare(right.created_at),
   );
 }
 
 export function dedupeToolResults(results: ToolResult[]): ToolResult[] {
-  return [...new Map(results.map((result) => [result.id, result])).values()].sort(
-    (left, right) => left.created_at.localeCompare(right.created_at),
+  return [...new Map(results.map((result) => [result.id, result])).values()].sort((left, right) =>
+    left.created_at.localeCompare(right.created_at),
   );
 }
 
@@ -401,10 +391,7 @@ export function timelineItems(
   );
 }
 
-export function expectStatus(
-  response: { status: number; data: unknown },
-  status: number,
-): unknown {
+export function expectStatus(response: { status: number; data: unknown }, status: number): unknown {
   if (response.status === status) {
     return response.data;
   }

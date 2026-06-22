@@ -1,28 +1,38 @@
-import { useEffect, useState } from "react";
-
 import {
   Badge,
   Button,
-  Input,
   Inline,
-  Pane,
+  Input,
   Stack,
   Text,
+  useAppComponentRef,
 } from "@mini-stim/components";
+import { useEffect, useState } from "react";
+
+import { STIM_APP_NAMESPACE } from "../appNamespace";
 
 export function ChatHeader(props: {
   activity: string;
   busy: boolean;
   connection: string;
   inspecting: boolean;
+  onOpenInspect: () => void;
   onTitleCommit: (title: string | null) => void;
-  onToggleInspect: () => void;
   selectedSessionId: string | null;
   title: string;
   titleValue: string | null;
 }) {
   const [draft, setDraft] = useState(props.title);
   const [editing, setEditing] = useState(false);
+  const headerRef = useAppComponentRef({
+    domain: "chat",
+    id: "chat-header",
+    kind: "section",
+    label: "Chat Header",
+    namespace: STIM_APP_NAMESPACE,
+    projection: "header",
+    surface: "chat shell",
+  });
 
   useEffect(() => {
     if (!editing) {
@@ -45,67 +55,71 @@ export function ChatHeader(props: {
   }
 
   return (
-    <Pane padding="lg">
-      <Inline justify="between" align="start" wrap gap="md">
-        <Stack gap="none" grow>
-          {editing ? (
-            <Input
-              autoFocus
-              value={draft}
-              variant="title"
-              onBlur={commit}
-              onChange={(event) => setDraft(event.currentTarget.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  event.currentTarget.blur();
-                }
-                if (event.key === "Escape") {
-                  setEditing(false);
-                  setDraft(props.title);
-                }
-              }}
-            />
-          ) : (
-            <Button
-              block
-              justify="start"
-              size="sm"
-              title={props.title}
-              variant="ghost"
-              disabled={!props.selectedSessionId}
-              type="button"
-              onClick={() => {
-                if (props.selectedSessionId) {
-                  setEditing(true);
-                }
-              }}
-            >
-              <Text size="lg" tone="strong" truncate>
-                {props.title}
-              </Text>
-            </Button>
-          )}
-        </Stack>
-        <Inline gap="sm" align="center" wrap>
-          {props.busy ? (
-            <Badge size="sm" tone="success">{props.activity}</Badge>
-          ) : null}
-          {props.connection === "error" ? (
-            <Badge size="sm" tone="danger">reconnecting</Badge>
-          ) : null}
+    <Inline ref={headerRef} justify="between" align="start" wrap gap="md">
+      <Stack gap="none" grow>
+        {editing ? (
+          <Input
+            autoFocus
+            value={draft}
+            variant="title"
+            onBlur={commit}
+            onChange={(event) => setDraft(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                event.currentTarget.blur();
+              }
+              if (event.key === "Escape") {
+                setEditing(false);
+                setDraft(props.title);
+              }
+            }}
+          />
+        ) : (
           <Button
+            block
+            justify="start"
             size="sm"
-            variant={props.inspecting ? "outline" : "ghost"}
+            title={props.title}
+            variant="ghost"
             disabled={!props.selectedSessionId}
             type="button"
-            onClick={props.onToggleInspect}
+            onClick={() => {
+              if (props.selectedSessionId) {
+                setEditing(true);
+              }
+            }}
           >
-            {props.inspecting ? "Transcript" : "Inspect"}
+            <Text size="lg" tone="strong" truncate>
+              {props.title}
+            </Text>
           </Button>
-        </Inline>
+        )}
+      </Stack>
+      <Inline gap="sm" align="center" wrap>
+        {props.busy ? (
+          <Badge size="sm" tone="success">
+            {props.activity}
+          </Badge>
+        ) : null}
+        {props.connection === "error" ? (
+          <Badge size="sm" tone="danger">
+            reconnecting
+          </Badge>
+        ) : null}
+        {props.inspecting ? null : (
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={!props.selectedSessionId}
+            type="button"
+            onClick={props.onOpenInspect}
+          >
+            Inspect
+          </Button>
+        )}
       </Inline>
-    </Pane>
+    </Inline>
   );
 }
 

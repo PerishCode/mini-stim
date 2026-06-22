@@ -1,9 +1,9 @@
-import type { ComponentPropsWithoutRef } from "react";
+import type { ComponentPropsWithRef } from "react";
 
 import { cx } from "../../internal/cx";
 import "./Inline.scss";
 
-type InlineProps = ComponentPropsWithoutRef<"div"> & {
+type InlineProps = ComponentPropsWithRef<"div"> & {
   align?: "start" | "center" | "end" | "stretch";
   gap?: "xs" | "sm" | "md" | "lg";
   grow?: boolean;

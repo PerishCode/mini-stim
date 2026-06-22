@@ -119,6 +119,13 @@ plane and must stay limited to cell lifecycle facts.
   missing prerequisite directly and stop that path. Do not spend time inventing
   fallbacks or exploring unrelated environment workarounds unless the user asks.
 - Keep hard cuts acceptable. Add compatibility only for a real external surface.
+- Cargo and Node external dependencies must use exact stable versions only:
+  full version numbers such as `1.2.3`, no caret, tilde, range, wildcard, or
+  partial-version requirements. Workspace/local references remain workspace
+  indices or path/workspace entries (`workspace:*`, `workspace = true`, or
+  `path = ...`). Except for specifically documented defective releases, keep
+  dependencies on the latest stable version and update the lockfile in the same
+  change.
 
 ## Browser Automation Rules
 
@@ -364,7 +371,6 @@ Current conventions:
 - `cargo fmt --all --check`
 - `flavor check --root . --config flavor.toml`
 - `cargo test --workspace`
-- `pnpm -r --if-present typecheck`
 - `pnpm -r --if-present build`
 - `SANTI_DB=.tmp/manual.sqlite cargo run -p mini-stim-server-soma -- serve`
 - `cargo run -p mini-stim-client-soma -- dev`

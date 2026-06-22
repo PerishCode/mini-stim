@@ -92,6 +92,7 @@ $button-sizes: (
     --ms-button-text: var(--ms-color-accent-text);
     --ms-button-hover-bg: var(--ms-color-accent-hover);
     --ms-button-hover-border: var(--ms-color-accent-hover);
+    --ms-button-hover-shadow: var(--ms-shadow-selected);
   }
 
   &--variant-outline {
@@ -146,6 +147,7 @@ $button-sizes: (
     --ms-button-hover-bg: var(--ms-color-selected-hover-bg);
     --ms-button-hover-border: var(--ms-color-rail-active-border);
     --ms-button-hover-shadow: var(--ms-shadow-card);
+    box-shadow: var(--ms-shadow-selected);
 
     &::before {
       content: "";

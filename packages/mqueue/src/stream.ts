@@ -2,10 +2,10 @@ import { parseStreamEvent } from "./events";
 import type {
   MessageDeltaPayload,
   SessionMessage,
+  StreamPayload,
   ToolCall,
   ToolResult,
   Turn,
-  StreamPayload,
 } from "./types";
 
 export interface SessionStreamHandlers {
@@ -24,10 +24,7 @@ export interface SessionStreamHandlers {
   turnFailed(payload: { type: "turn_failed"; turn_id: string; error: string }): void;
 }
 
-export function openSessionStream(
-  sessionId: string,
-  handlers: SessionStreamHandlers,
-): EventSource {
+export function openSessionStream(sessionId: string, handlers: SessionStreamHandlers): EventSource {
   const source = new EventSource(`/api/v1/sessions/${sessionId}/events`);
   source.addEventListener("open", handlers.open);
   source.addEventListener("error", handlers.error);

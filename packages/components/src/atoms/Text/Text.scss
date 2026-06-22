@@ -5,6 +5,7 @@ $text-sizes: (
   "sm": var(--ms-font-size-sm),
   "md": var(--ms-font-size-md),
   "lg": var(--ms-font-size-lg),
+  "xl": calc(var(--ms-font-size-lg) * 2),
 );
 
 $text-tones: (
@@ -12,6 +13,7 @@ $text-tones: (
   "strong": var(--ms-color-text-strong),
   "muted": var(--ms-color-text-muted),
   "subtle": var(--ms-color-text-subtle),
+  "embossed": color-mix(in srgb, var(--ms-color-surface-inset-bg) 68%, var(--ms-color-canvas-shade)),
 );
 
 .msText {
@@ -33,6 +35,19 @@ $text-tones: (
   }
 
   &--truncate {
+    display: block;
+    max-width: 100%;
     @include truncate-single-line;
+  }
+
+  &--tone-embossed {
+    font-family: Georgia, "Times New Roman", ui-serif, serif;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.5),
+      0 -1px 0 rgba(88, 75, 58, 0.22),
+      0 8px 18px rgba(95, 83, 66, 0.08);
+    user-select: none;
   }
 }

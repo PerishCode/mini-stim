@@ -1,0 +1,58 @@
+.msIdentityLine {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ms-space-2);
+  min-width: 0;
+
+  &__body {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.0625rem;
+    min-width: 0;
+  }
+
+  &__row {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--ms-space-2);
+    min-width: 0;
+  }
+
+  &__name {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--ms-color-text-strong);
+    font-weight: 680;
+    line-height: 1.1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__marker {
+    display: inline-flex;
+    flex: 0 0 auto;
+  }
+
+  &__meta {
+    min-width: 0;
+    color: var(--ms-color-text-subtle);
+    line-height: 1.15;
+  }
+
+  &--size-sm {
+    .msIdentityLine__name,
+    .msIdentityLine__meta {
+      font-size: var(--ms-font-size-xs);
+    }
+  }
+
+  &--size-md {
+    .msIdentityLine__name {
+      font-size: var(--ms-font-size-sm);
+    }
+
+    .msIdentityLine__meta {
+      font-size: var(--ms-font-size-xs);
+    }
+  }
+}

@@ -19,11 +19,25 @@ pub struct ErrorResponse {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Session {
     pub id: String,
-    pub title: Option<String>,
     pub parent_session_id: Option<String>,
     pub fork_point: Option<i64>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct SessionProfile {
+    pub session_id: String,
+    pub title: Option<String>,
+    pub desc: Option<String>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct SessionSummary {
+    pub session: Session,
+    pub profile: SessionProfile,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -38,6 +52,17 @@ pub struct Account {
 pub struct Soul {
     pub id: String,
     pub memory: String,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct SoulProfile {
+    pub soul_id: String,
+    pub nickname: String,
+    pub avatar_ref: Option<String>,
+    pub avatar_seed: String,
+    pub desc: Option<String>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
 }
@@ -248,12 +273,13 @@ pub struct ProviderInputMessage {
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CreateSessionResponse {
-    pub session: Session,
+    pub session: SessionSummary,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SessionDetail {
     pub session: Session,
+    pub profile: SessionProfile,
     pub messages: Vec<SessionMessage>,
 }
 
@@ -278,8 +304,9 @@ impl SendSessionRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SendSessionResponse {
-    pub session: Session,
+    pub session: SessionSummary,
     pub soul_session: SoulSession,
+    pub soul_profile: SoulProfile,
     pub turn: Turn,
     pub user_message: SessionMessage,
     pub assistant_message: SessionMessage,
@@ -330,7 +357,9 @@ pub enum SantiStreamPayload {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SessionRuntimeSnapshot {
     pub session: Session,
+    pub profile: SessionProfile,
     pub soul_session: Option<SoulSession>,
+    pub soul_profile: Option<SoulProfile>,
     pub messages: Vec<SessionMessage>,
     pub turns: Vec<Turn>,
     pub tool_calls: Vec<ToolCall>,

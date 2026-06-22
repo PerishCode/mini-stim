@@ -5,20 +5,24 @@
   "scripts": {
     "build": "tsc && vite build",
     "dev": "vite --host 127.0.0.1 --port 41420",
-    "typecheck": "tsc --noEmit"
+    "lint": "biome check .",
+    "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
     "@mini-stim/components": "workspace:*",
     "@mini-stim/hooks": "workspace:*",
-    "@vitejs/plugin-react": "^6.0.2",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "typescript": "^6.0.3",
-    "vite": "^8.0.16"
+    "@mini-stim/storage": "workspace:*",
+    "@vitejs/plugin-react": "6.0.2",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "typescript": "6.0.3",
+    "vite": "8.0.16"
   },
   "devDependencies": {
-    "@types/react": "^19.2.16",
-    "@types/react-dom": "^19.2.3",
-    "sass": "^1.94.0"
+    "@biomejs/biome": "2.5.0",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "sass": "1.101.0",
+    "vitest": "4.1.8"
   }
 }

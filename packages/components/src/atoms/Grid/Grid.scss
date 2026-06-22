@@ -6,6 +6,9 @@ $grid-gaps: (
 );
 
 .msGrid {
+  --ms-grid-sidebar-width: 19rem;
+  --ms-grid-inspect-width: 22rem;
+
   display: grid;
   width: 100%;
   height: 100%;
@@ -19,10 +22,31 @@ $grid-gaps: (
 
   &--template-sidebar-main {
     grid-template-columns: minmax(16.5rem, 19rem) minmax(0, 1fr);
+    grid-template-areas: "sidebar main";
 
     @media (max-width: 48rem) {
       grid-template-columns: 1fr;
       grid-template-rows: minmax(13rem, 34vh) minmax(0, 1fr);
+      grid-template-areas:
+        "sidebar"
+        "main";
+    }
+  }
+
+  &--template-sidebar-main-inspect {
+    grid-template-columns:
+      minmax(16.5rem, var(--ms-grid-sidebar-width))
+      minmax(24rem, 1fr)
+      minmax(18rem, var(--ms-grid-inspect-width));
+    grid-template-areas: "sidebar main inspect";
+
+    @media (max-width: 48rem) {
+      grid-template-columns: 1fr;
+      grid-template-rows: minmax(13rem, 28vh) minmax(0, 1fr) minmax(12rem, 32vh);
+      grid-template-areas:
+        "sidebar"
+        "main"
+        "inspect";
     }
   }
 
@@ -33,12 +57,23 @@ $grid-gaps: (
   }
 
   &__item {
+    position: relative;
     display: flex;
     min-width: 0;
     min-height: 0;
 
     &--area-main {
+      grid-area: main;
       overflow: hidden;
+    }
+
+    &--area-inspect {
+      grid-area: inspect;
+      overflow: hidden;
+    }
+
+    &--area-sidebar {
+      grid-area: sidebar;
     }
   }
 }

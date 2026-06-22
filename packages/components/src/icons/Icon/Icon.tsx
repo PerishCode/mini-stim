@@ -1,5 +1,5 @@
-import type { SVGProps } from "react";
 import type { LucideIcon } from "lucide-react";
+import type { SVGProps } from "react";
 
 import { cx } from "../../internal/cx";
 import "./Icon.scss";

@@ -14,7 +14,8 @@ use futures_core::Stream;
 use santi_core::{
     CreateSessionResponse, ErrorResponse, HealthResponse, SantiService, SantiServiceConfig,
     SantiStreamEvent, SantiStreamPayload, SendSessionRequest, SendSessionResponse, Session,
-    SessionDetail, SessionRuntimeSnapshot, UpdateSessionRequest, prefixed_id, timestamp_now,
+    SessionDetail, SessionProfile, SessionRuntimeSnapshot, SessionSummary, SoulProfile,
+    UpdateSessionRequest, prefixed_id, timestamp_now,
 };
 use santi_provider::{OpenAIProvider, OpenAIProviderConfig};
 use tower_http::{
@@ -22,6 +23,8 @@ use tower_http::{
     trace::TraceLayer,
 };
 use utoipa::OpenApi;
+
+mod bucket;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
@@ -129,6 +132,10 @@ fn router(service: SantiService) -> Router {
             "/api/v1/sessions/{session_id}/runtime",
             get(runtime_snapshot),
         )
+        .route(
+            "/api/v1/bucket/{soul_id}/{session_id}/{*key}",
+            get(bucket::get_bucket_object),
+        )
         .layer(TraceLayer::new_for_http())
         .layer(
             CorsLayer::new()
@@ -168,11 +175,11 @@ async fn create_session(
 #[utoipa::path(
     get,
     path = "/api/v1/sessions",
-    responses((status = 200, body = [Session]), (status = 500, body = ErrorResponse))
+    responses((status = 200, body = [SessionSummary]), (status = 500, body = ErrorResponse))
 )]
 async fn list_sessions(
     State(service): State<SantiService>,
-) -> Result<Json<Vec<Session>>, ApiError> {
+) -> Result<Json<Vec<SessionSummary>>, ApiError> {
     service
         .list_sessions()
         .map(Json)
@@ -206,7 +213,7 @@ async fn get_session(
     params(("session_id" = String, Path)),
     request_body = UpdateSessionRequest,
     responses(
-        (status = 200, body = Session),
+        (status = 200, body = SessionSummary),
         (status = 404, body = ErrorResponse),
         (status = 500, body = ErrorResponse)
     )
@@ -215,7 +222,7 @@ async fn update_session(
     State(service): State<SantiService>,
     Path(session_id): Path<String>,
     Json(request): Json<UpdateSessionRequest>,
-) -> Result<Json<Session>, ApiError> {
+) -> Result<Json<SessionSummary>, ApiError> {
     service
         .update_session(&session_id, request)
         .map_err(ApiError::internal)?
@@ -344,14 +351,14 @@ fn sse_event_name(payload: &SantiStreamPayload) -> &'static str {
     }
 }
 
-struct ApiError {
+pub(crate) struct ApiError {
     status: StatusCode,
     code: &'static str,
     message: String,
 }
 
 impl ApiError {
-    fn internal(message: String) -> Self {
+    pub(crate) fn internal(message: String) -> Self {
         Self {
             status: StatusCode::INTERNAL_SERVER_ERROR,
             code: "internal",
@@ -359,11 +366,33 @@ impl ApiError {
         }
     }
 
-    fn not_found(message: impl Into<String>) -> Self {
+    pub(crate) fn not_found(message: impl Into<String>) -> Self {
         Self {
             status: StatusCode::NOT_FOUND,
             code: "not-found",
             message: message.into(),
+        }
+    }
+
+    pub(crate) fn bad_request(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::BAD_REQUEST,
+            code: "bad-request",
+            message: message.into(),
+        }
+    }
+
+    pub(crate) fn from_service(message: String) -> Self {
+        match message.as_str() {
+            "session not found" | "soul not found" => Self::not_found(message),
+            _ if message.contains("object key")
+                || message.contains("object uri")
+                || message.contains("path segment")
+                || message.contains("path separators") =>
+            {
+                Self::bad_request(message)
+            }
+            _ => Self::internal(message),
         }
     }
 }
@@ -391,7 +420,8 @@ impl IntoResponse for ApiError {
         update_session,
         list_messages,
         send_session,
-        runtime_snapshot
+        runtime_snapshot,
+        bucket::get_bucket_object
     ),
     components(schemas(
         CreateSessionResponse,
@@ -401,7 +431,10 @@ impl IntoResponse for ApiError {
         SendSessionResponse,
         Session,
         SessionDetail,
+        SessionProfile,
         SessionRuntimeSnapshot,
+        SessionSummary,
+        SoulProfile,
         UpdateSessionRequest,
         santi_core::ActorType,
         santi_core::Compact,

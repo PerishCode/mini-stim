@@ -1,0 +1,48 @@
+.msDockShell {
+  --ms-dock-shell-width: 3rem;
+  --ms-dock-shell-dock-padding-block-start: var(--ms-space-2);
+  --ms-dock-shell-dock-padding-block-end: var(--ms-space-1);
+  --ms-dock-shell-dock-padding-inline: calc(var(--ms-space-1) / 2);
+  --ms-dock-shell-dock-bg: var(--ms-color-dock-bg);
+  --ms-dock-shell-dock-edge: color-mix(in srgb, var(--ms-color-canvas-shade) 14%, transparent);
+
+  display: grid;
+  grid-template-columns: var(--ms-dock-shell-width) minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+
+  &__dock,
+  &__grid {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  &__dock {
+    align-items: stretch;
+    justify-content: center;
+    width: var(--ms-dock-shell-width);
+    height: 100%;
+    padding-block: var(--ms-dock-shell-dock-padding-block-start)
+      var(--ms-dock-shell-dock-padding-block-end);
+    padding-inline: var(--ms-dock-shell-dock-padding-inline);
+    background: var(--ms-dock-shell-dock-bg);
+    box-shadow: inset -1px 0 0 var(--ms-dock-shell-dock-edge);
+  }
+
+  &__dock > * {
+    width: 100%;
+  }
+
+  &__grid {
+    padding: var(--ms-shell-padding);
+  }
+
+  @media (max-width: 48rem) {
+    &__grid {
+      padding: var(--ms-space-2);
+    }
+  }
+}

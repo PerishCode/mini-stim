@@ -1,14 +1,14 @@
-import type { ComponentPropsWithoutRef } from "react";
+import type { ComponentPropsWithRef } from "react";
 
 import { cx } from "../../internal/cx";
 import "./Pane.scss";
 
-type PaneProps = ComponentPropsWithoutRef<"div"> & {
+type PaneProps = ComponentPropsWithRef<"div"> & {
   border?: "none" | "right" | "top" | "bottom" | "around";
   chrome?: "none" | "panel";
   grow?: boolean;
   padding?: "none" | "sm" | "md" | "lg" | "xl";
-  tone?: "canvas" | "panel" | "raised" | "subtle";
+  tone?: "canvas" | "panel" | "workspace" | "raised" | "subtle";
 };
 
 export function Pane({

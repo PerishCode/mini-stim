@@ -1,0 +1,14 @@
+{
+  "name": "@mini-stim/e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "biome check .",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.0",
+    "@playwright/test": "1.60.0",
+    "@types/node": "25.9.3"
+  }
+}

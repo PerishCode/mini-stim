@@ -13,15 +13,15 @@ use crate::service_prompt::{
 };
 use crate::{
     ActorType, CreateSessionResponse, MessageContent, MessageState, SantiStore, SantiStreamEvent,
-    SantiStreamPayload, SendSessionRequest, SendSessionResponse, Session, SessionDetail,
-    SessionRuntimeSnapshot, UpdateSessionRequest, prefixed_id, timestamp_now,
+    SantiStreamPayload, SendSessionRequest, SendSessionResponse, SessionDetail,
+    SessionRuntimeSnapshot, SessionSummary, UpdateSessionRequest, prefixed_id, timestamp_now,
 };
 
 #[derive(Clone)]
 pub struct SantiService {
-    store: SantiStore,
+    pub(crate) store: SantiStore,
     provider: Arc<dyn ProviderClient>,
-    config: SantiServiceConfig,
+    pub(crate) config: SantiServiceConfig,
     stream_events: broadcast::Sender<SantiStreamEvent>,
 }
 
@@ -57,7 +57,7 @@ impl SantiService {
         })
     }
 
-    pub fn list_sessions(&self) -> Result<Vec<Session>, String> {
+    pub fn list_sessions(&self) -> Result<Vec<SessionSummary>, String> {
         self.store.list_sessions()
     }
 
@@ -66,6 +66,11 @@ impl SantiService {
             return Ok(None);
         };
         Ok(Some(SessionDetail {
+            profile: self
+                .store
+                .runtime_snapshot(session_id)?
+                .map(|snapshot| snapshot.profile)
+                .ok_or_else(|| "session disappeared".to_string())?,
             session,
             messages: self.store.session_messages(session_id)?,
         }))
@@ -75,7 +80,7 @@ impl SantiService {
         &self,
         session_id: &str,
         request: UpdateSessionRequest,
-    ) -> Result<Option<Session>, String> {
+    ) -> Result<Option<SessionSummary>, String> {
         self.store.update_session_title(session_id, request.title)
     }
 
@@ -187,18 +192,23 @@ impl SantiService {
             },
         );
 
-        let session = self
-            .store
-            .session(session_id)?
-            .ok_or_else(|| "session disappeared".to_string())?;
-        let soul_session = self
+        let snapshot = self
             .store
             .runtime_snapshot(session_id)?
-            .and_then(|snapshot| snapshot.soul_session)
             .ok_or_else(|| "soul_session disappeared".to_string())?;
+        let soul_session = snapshot
+            .soul_session
+            .ok_or_else(|| "soul_session disappeared".to_string())?;
+        let soul_profile = snapshot
+            .soul_profile
+            .ok_or_else(|| "soul_profile disappeared".to_string())?;
         Ok(SendSessionResponse {
-            session,
+            session: SessionSummary {
+                session: snapshot.session,
+                profile: snapshot.profile,
+            },
             soul_session,
+            soul_profile,
             turn: completed_turn,
             user_message,
             assistant_message,
@@ -346,7 +356,7 @@ impl SantiService {
                 tool_call: tool_call.clone(),
             },
         );
-        let dispatch = self.dispatch_tool(soul_session_id, &call);
+        let dispatch = self.dispatch_tool(session_id, soul_session_id, &call);
         let (output, error_text) = match dispatch {
             Ok(output) => (Some(output), None),
             Err(error) => (None, Some(error)),
@@ -374,6 +384,7 @@ impl SantiService {
 
     fn dispatch_tool(
         &self,
+        session_id: &str,
         soul_session_id: &str,
         call: &ProviderFunctionCall,
     ) -> Result<Value, String> {
@@ -392,13 +403,13 @@ impl SantiService {
             }
             "shell" => {
                 let args = parse_tool_args::<ShellArgs>(&call.arguments)?;
-                self.run_shell(args)
+                self.run_shell(session_id, args)
             }
             name => Err(format!("unsupported tool: {name}")),
         }
     }
 
-    fn run_shell(&self, args: ShellArgs) -> Result<Value, String> {
+    fn run_shell(&self, session_id: &str, args: ShellArgs) -> Result<Value, String> {
         std::fs::create_dir_all(self.soul_memory_dir()).map_err(|error| error.to_string())?;
         let cwd = args
             .cwd
@@ -409,7 +420,10 @@ impl SantiService {
         let output = command
             .current_dir(&cwd)
             .env("SANTI_SOUL_MEMORY_DIR", self.soul_memory_dir())
-            .env("SANTI_SESSION_MEMORY_DIR", self.config.runtime_root.clone())
+            .env(
+                "SANTI_SESSION_MEMORY_DIR",
+                self.session_memory_dir(session_id),
+            )
             .output()
             .map_err(|error| format!("failed to run shell: {error}"))?;
         Ok(json!({

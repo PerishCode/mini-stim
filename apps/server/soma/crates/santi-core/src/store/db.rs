@@ -1,8 +1,9 @@
 use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::{
-    ActorType, Compact, Session, SessionEffect, SessionMessage, Soul, SoulSession,
-    SoulSessionEntry, SoulSessionTargetType, ToolCall, ToolResult, Turn, timestamp_now,
+    ActorType, Compact, Session, SessionEffect, SessionMessage, SessionProfile, SessionSummary,
+    Soul, SoulProfile, SoulSession, SoulSessionEntry, SoulSessionTargetType, ToolCall, ToolResult,
+    Turn, timestamp_now,
 };
 
 use super::rows::*;
@@ -78,13 +79,52 @@ pub(super) fn session_by_id(
 ) -> Result<Option<Session>, String> {
     conn.query_row(
         r#"
-        SELECT id, title, parent_session_id, fork_point, created_at, updated_at
+        SELECT id, parent_session_id, fork_point, created_at, updated_at
         FROM sessions
         WHERE id = ?1
         LIMIT 1
         "#,
         params![session_id],
         map_session_row,
+    )
+    .optional()
+    .map_err(|error| error.to_string())
+}
+
+pub(super) fn session_profile_by_id(
+    conn: &Connection,
+    session_id: &str,
+) -> Result<Option<SessionProfile>, String> {
+    conn.query_row(
+        r#"
+        SELECT session_id, title, desc, created_at, updated_at
+        FROM session_profiles
+        WHERE session_id = ?1
+        LIMIT 1
+        "#,
+        params![session_id],
+        map_session_profile_row,
+    )
+    .optional()
+    .map_err(|error| error.to_string())
+}
+
+pub(super) fn session_summary_by_id(
+    conn: &Connection,
+    session_id: &str,
+) -> Result<Option<SessionSummary>, String> {
+    conn.query_row(
+        r#"
+        SELECT
+          s.id, s.parent_session_id, s.fork_point, s.created_at, s.updated_at,
+          p.session_id, p.title, p.desc, p.created_at, p.updated_at
+        FROM sessions s
+        JOIN session_profiles p ON p.session_id = s.id
+        WHERE s.id = ?1
+        LIMIT 1
+        "#,
+        params![session_id],
+        map_session_summary_row,
     )
     .optional()
     .map_err(|error| error.to_string())
@@ -102,6 +142,24 @@ pub(super) fn soul_by_id(conn: &Connection, soul_id: &str) -> Result<Option<Soul
                 updated_at: row.get(3)?,
             })
         },
+    )
+    .optional()
+    .map_err(|error| error.to_string())
+}
+
+pub(super) fn soul_profile_by_id(
+    conn: &Connection,
+    soul_id: &str,
+) -> Result<Option<SoulProfile>, String> {
+    conn.query_row(
+        r#"
+        SELECT soul_id, nickname, avatar_ref, avatar_seed, desc, created_at, updated_at
+        FROM soul_profiles
+        WHERE soul_id = ?1
+        LIMIT 1
+        "#,
+        params![soul_id],
+        map_soul_profile_row,
     )
     .optional()
     .map_err(|error| error.to_string())
@@ -433,14 +491,4 @@ pub(super) fn session_message_to_provider(
             content,
         })
     }
-}
-
-pub(super) fn collect_rows<T>(
-    rows: impl Iterator<Item = rusqlite::Result<T>>,
-) -> Result<Vec<T>, String> {
-    let mut items = Vec::new();
-    for row in rows {
-        items.push(row.map_err(|error| error.to_string())?);
-    }
-    Ok(items)
 }

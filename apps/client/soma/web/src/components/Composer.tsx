@@ -1,4 +1,15 @@
-import { Button, Inline, Notice, SendIcon, Stack, Text, TextArea } from "@mini-stim/components";
+import {
+  Button,
+  FieldActionLayout,
+  Notice,
+  SendIcon,
+  Stack,
+  Text,
+  TextArea,
+  useAppComponentRef,
+} from "@mini-stim/components";
+
+import { STIM_APP_NAMESPACE } from "../appNamespace";
 
 export function Composer(props: {
   disabled?: boolean;
@@ -7,8 +18,19 @@ export function Composer(props: {
   onSubmit: () => void;
   value: string;
 }) {
+  const composerRef = useAppComponentRef({
+    domain: "message",
+    id: "composer",
+    kind: "control",
+    label: "Composer",
+    namespace: STIM_APP_NAMESPACE,
+    projection: "input",
+    surface: "chat shell",
+  });
+
   return (
     <form
+      ref={composerRef}
       onSubmit={(event) => {
         event.preventDefault();
         props.onSubmit();
@@ -20,18 +42,8 @@ export function Composer(props: {
             <Text>{props.error}</Text>
           </Notice>
         ) : null}
-          <Inline align="stretch" gap="sm">
-            <Stack grow gap="none">
-              <TextArea
-                autosize={{ min: 1, max: 6 }}
-                value={props.value}
-                disabled={props.disabled}
-                placeholder="Message mini-stim and press Enter"
-                resize="none"
-                variant="composer"
-                onChange={(event) => props.onChange(event.currentTarget.value)}
-              />
-            </Stack>
+        <FieldActionLayout
+          action={
             <Button
               type="submit"
               tone="accent"
@@ -41,7 +53,29 @@ export function Composer(props: {
               <SendIcon size="sm" />
               Send
             </Button>
-          </Inline>
+          }
+        >
+          <Stack grow gap="none">
+            <TextArea
+              autosize={{ min: 1, max: 6 }}
+              value={props.value}
+              disabled={props.disabled}
+              placeholder="Message Santi"
+              resize="none"
+              variant="composer"
+              onChange={(event) => props.onChange(event.currentTarget.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) {
+                  return;
+                }
+                event.preventDefault();
+                if (!props.disabled && props.value.trim()) {
+                  props.onSubmit();
+                }
+              }}
+            />
+          </Stack>
+        </FieldActionLayout>
       </Stack>
     </form>
   );

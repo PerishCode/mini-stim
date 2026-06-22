@@ -23,10 +23,7 @@ import type {
  * must keep the per-session message list, flat timeline, and turn-grouped
  * timeline consistent with each other.
  */
-export function createProjectionWriter(
-  state: SessionProjection,
-  messageState: MessageProjection,
-) {
+export function createProjectionWriter(state: SessionProjection, messageState: MessageProjection) {
   return {
     applyDelta,
     markTurnFailed,

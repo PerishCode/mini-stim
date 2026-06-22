@@ -1,29 +1,28 @@
 import {
+  installSantiMqueue,
+  type MessageConnectionState,
+  type MessagePart,
+  type MessageProjection,
+  type MqueueError,
+  type PubAck,
+  type SantiMqueue,
+  type SantiWindow,
+  type SessionMessage,
+  type SessionProjection,
+  type SessionRuntimeSnapshot,
+  type SessionSummary,
+  type TurnGroup,
+} from "@mini-stim/mqueue";
+import {
   createContext,
+  type ReactNode,
   useContext,
   useEffect,
   useMemo,
   useRef,
   useState,
   useSyncExternalStore,
-  type ReactNode,
 } from "react";
-import {
-  installSantiMqueue,
-  type MessageConnectionState,
-  type MessagePart,
-  type MqueueError,
-  type PubAck,
-  type SantiMqueue,
-  type SantiWindow,
-  type MessageProjection,
-  type Session,
-  type SessionMessage,
-  type SessionProjection,
-  type SessionRuntimeSnapshot,
-  type TimelineItem,
-  type TurnGroup,
-} from "@mini-stim/mqueue";
 
 export type {
   Compact,
@@ -37,6 +36,7 @@ export type {
   SessionMessage,
   SessionProjection,
   SessionRuntimeSnapshot,
+  SessionSummary,
   SoulSession,
   TimelineItem,
   Turn,
@@ -82,11 +82,7 @@ export function SantiMqueueProvider({
     }
   }, [autoList, mqueue]);
 
-  return (
-    <SantiMqueueContext.Provider value={mqueue}>
-      {children}
-    </SantiMqueueContext.Provider>
-  );
+  return <SantiMqueueContext.Provider value={mqueue}>{children}</SantiMqueueContext.Provider>;
 }
 
 export function useSantiMqueue(): SantiMqueue {
@@ -100,14 +96,10 @@ export function useSantiMqueue(): SantiMqueue {
 export function useSessionProjection(): SessionProjection {
   const mqueue = useSantiMqueue();
   const store = useMemo(() => createSessionStore(mqueue), [mqueue]);
-  return useSyncExternalStore(
-    store.subscribe,
-    store.getSnapshot,
-    store.getSnapshot,
-  );
+  return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
 }
 
-export function useSessions(): Session[] {
+export function useSessions(): SessionSummary[] {
   return useSessionProjection().sessions;
 }
 
@@ -129,11 +121,7 @@ export function useSessionTurnTimeline(sessionId?: string | null): TurnGroup[] {
   const selectedSessionId = useSelectedSessionId();
   const store = useMemo(() => createMessageStore(mqueue), [mqueue]);
   const resolvedSessionId = sessionId ?? selectedSessionId;
-  const projection = useSyncExternalStore(
-    store.subscribe,
-    store.getSnapshot,
-    store.getSnapshot,
-  );
+  const projection = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   if (!resolvedSessionId) {
     return [];
   }
@@ -149,13 +137,9 @@ export function useSessionPreviews(): Record<string, string> {
   const projection = useSessionProjection();
   return useMemo(() => {
     const previews: Record<string, string> = {};
-    for (const [sessionId, messages] of Object.entries(
-      projection.messagesBySessionId,
-    )) {
+    for (const [sessionId, messages] of Object.entries(projection.messagesBySessionId)) {
       const first = messages.find(
-        (message) =>
-          message.message.actor_type === "account" &&
-          message.content_text.trim(),
+        (message) => message.message.actor_type === "account" && message.content_text.trim(),
       );
       if (first) {
         previews[sessionId] = first.content_text.trim();
@@ -165,9 +149,7 @@ export function useSessionPreviews(): Record<string, string> {
   }, [projection]);
 }
 
-export function useSessionRuntime(
-  sessionId?: string | null,
-): SessionRuntimeSnapshot | null {
+export function useSessionRuntime(sessionId?: string | null): SessionRuntimeSnapshot | null {
   const projection = useSessionProjection();
   const resolvedSessionId = sessionId ?? projection.selectedSessionId;
   if (!resolvedSessionId) {
@@ -214,11 +196,7 @@ export function useMessageConnection(sessionId?: string | null): MessageConnecti
   const selectedSessionId = useSelectedSessionId();
   const store = useMemo(() => createMessageStore(mqueue), [mqueue]);
   const resolvedSessionId = sessionId ?? selectedSessionId;
-  const projection = useSyncExternalStore(
-    store.subscribe,
-    store.getSnapshot,
-    store.getSnapshot,
-  );
+  const projection = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   if (!resolvedSessionId) {
     return "closed";
   }
@@ -256,10 +234,8 @@ export function useSessionActions(): SessionActions {
       create: () => mqueue.session.pub("create"),
       get: (sessionId: string) => mqueue.session.pub("get", { sessionId }),
       list: () => mqueue.session.pub("list"),
-      refreshRuntime: (sessionId: string) =>
-        mqueue.session.pub("runtime", { sessionId }),
-      select: (sessionId: string | null) =>
-        mqueue.session.pub("select", { sessionId }),
+      refreshRuntime: (sessionId: string) => mqueue.session.pub("runtime", { sessionId }),
+      select: (sessionId: string | null) => mqueue.session.pub("select", { sessionId }),
       selectAndGet: (sessionId: string) => [
         mqueue.session.pub("select", { sessionId }),
         mqueue.session.pub("get", { sessionId }),
@@ -276,8 +252,7 @@ export function useSessionActions(): SessionActions {
 
 function installBrowserMqueue(target?: Window & SantiWindow): SantiMqueue {
   const resolvedTarget =
-    target ??
-    (typeof window === "undefined" ? undefined : (window as Window & SantiWindow));
+    target ?? (typeof window === "undefined" ? undefined : (window as Window & SantiWindow));
   if (!resolvedTarget) {
     throw new Error("SantiMqueueProvider requires a browser window or mqueue prop");
   }

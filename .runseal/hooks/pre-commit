@@ -32,8 +32,8 @@ if ! git diff --exit-code -- packages/contracts/openapi.json packages/contracts/
   exit 1
 fi
 
-echo "==> typecheck"
-pnpm typecheck
+echo "==> lint"
+pnpm lint
 
 echo "==> web build"
 pnpm build

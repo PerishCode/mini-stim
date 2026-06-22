@@ -148,8 +148,5 @@ jobs:
       - name: Generate contracts
         run: runseal :codegen
 
-      - name: Typecheck
-        run: pnpm typecheck
-
       - name: Build
         run: pnpm build

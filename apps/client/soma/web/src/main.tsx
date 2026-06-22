@@ -5,7 +5,12 @@ import { SantiMqueueProvider } from "@mini-stim/hooks";
 
 import { App } from "./App";
 
-createRoot(document.getElementById("root")!).render(
+const root = document.getElementById("root");
+if (!root) {
+  throw new Error("mini-stim root element is missing");
+}
+
+createRoot(root).render(
   <React.StrictMode>
     <SantiMqueueProvider>
       <App />

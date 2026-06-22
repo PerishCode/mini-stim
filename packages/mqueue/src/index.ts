@@ -1,17 +1,17 @@
 import {
+  type CreateSessionResponse,
   createSession,
   getSession,
   listMessages,
   listSessions,
   runtimeSnapshot,
-  sendSession,
-  updateSession,
-  type CreateSessionResponse,
   type SendSessionResponse,
-  type Session,
   type SessionDetail,
   type SessionMessage,
   type SessionRuntimeSnapshot,
+  type SessionSummary,
+  sendSession,
+  updateSession,
 } from "@mini-stim/contracts";
 
 import {
@@ -30,7 +30,6 @@ import { createProjectionWriter } from "./projection";
 import { openSessionStream } from "./stream";
 import type {
   MessageConnectionState,
-  MessageDeltaPayload,
   MessageEvent,
   MessageMqueue,
   MessagePhase,
@@ -44,10 +43,6 @@ import type {
   SessionPayloads,
   SessionProjection,
   SessionSubOptions,
-  ToolCall,
-  ToolResult,
-  TimelineItem,
-  Turn,
 } from "./types";
 
 export type {
@@ -56,9 +51,9 @@ export type {
   MessageDeltaPayload,
   MessageEvent,
   MessageMqueue,
+  MessagePart,
   MessagePhase,
   MessageProjection,
-  MessagePart,
   MqueueError,
   PubAck,
   SantiMqueue,
@@ -67,13 +62,16 @@ export type {
   SessionAction,
   SessionEffect,
   SessionEvent,
-  SessionMqueue,
   SessionMessage,
+  SessionMqueue,
   SessionPayloads,
   SessionPhase,
+  SessionProfile,
   SessionProjection,
   SessionRuntimeSnapshot,
   SessionSubOptions,
+  SessionSummary,
+  SoulProfile,
   SoulSession,
   TimelineItem,
   ToolCall,
@@ -246,30 +244,24 @@ function createMqueueCore(target: Window): SantiMqueue {
   ) {
     switch (action) {
       case "list": {
-        const sessions = expectStatus(await listSessions(), 200) as Session[];
+        const sessions = expectStatus(await listSessions(), 200) as SessionSummary[];
         state.sessions = sessions;
         dispatchSession(target, sessionEvent(action, "committed", { sessions }, "http"));
         return;
       }
       case "create": {
-        const { session } = expectStatus(
-          await createSession(),
-          200,
-        ) as CreateSessionResponse;
+        const { session } = expectStatus(await createSession(), 200) as CreateSessionResponse;
         upsertSession(session);
-        state.selectedSessionId = session.id;
-        state.messages = state.messagesBySessionId[session.id] ?? [];
-        connectSessionEvents(session.id);
+        state.selectedSessionId = summarySessionId(session);
+        state.messages = state.messagesBySessionId[summarySessionId(session)] ?? [];
+        connectSessionEvents(summarySessionId(session));
         dispatchSession(target, sessionEvent(action, "committed", { session }, "http"));
         return;
       }
       case "get": {
         const getPayload = payload as SessionPayloads["get"];
-        const detail = expectStatus(
-          await getSession(getPayload.sessionId),
-          200,
-        ) as SessionDetail;
-        upsertSession(detail.session);
+        const detail = expectStatus(await getSession(getPayload.sessionId), 200) as SessionDetail;
+        upsertSession({ session: detail.session, profile: detail.profile });
         state.selectedSessionId = detail.session.id;
         state.messagesBySessionId[detail.session.id] = dedupeMessages(detail.messages);
         state.messages = detail.messages;
@@ -284,10 +276,10 @@ function createMqueueCore(target: Window): SantiMqueue {
         const session = expectStatus(
           await updateSession(updatePayload.sessionId, { title: updatePayload.title }),
           200,
-        ) as Session;
+        ) as SessionSummary;
         upsertSession(session);
-        if (state.selectedSessionId === session.id) {
-          state.messages = state.messagesBySessionId[session.id] ?? [];
+        if (state.selectedSessionId === summarySessionId(session)) {
+          state.messages = state.messagesBySessionId[summarySessionId(session)] ?? [];
         }
         dispatchSession(target, sessionEvent(action, "committed", { session }, "http"));
         return;
@@ -331,44 +323,46 @@ function createMqueueCore(target: Window): SantiMqueue {
     }
   }
 
-  function upsertSession(session: Session) {
-    const existing = state.sessions.filter((item) => item.id !== session.id);
+  function upsertSession(session: SessionSummary) {
+    const existing = state.sessions.filter(
+      (item) => summarySessionId(item) !== summarySessionId(session),
+    );
     state.sessions = [session, ...existing].sort((left, right) =>
-      right.updated_at.localeCompare(left.updated_at),
+      right.session.updated_at.localeCompare(left.session.updated_at),
     );
   }
 
   async function sendMessage(sendPayload: SessionPayloads["send"]) {
     let sessionId = sendPayload.sessionId ?? state.selectedSessionId;
     if (!sessionId) {
-      const { session } = expectStatus(
-        await createSession(),
-        200,
-      ) as CreateSessionResponse;
+      const { session } = expectStatus(await createSession(), 200) as CreateSessionResponse;
       upsertSession(session);
-      sessionId = session.id;
-      state.selectedSessionId = session.id;
-      connectSessionEvents(session.id);
+      sessionId = summarySessionId(session);
+      state.selectedSessionId = sessionId;
+      connectSessionEvents(sessionId);
     }
     const response = expectStatus(
       await sendSession(sessionId, { content: sendPayload.content }),
       200,
     ) as SendSessionResponse;
     upsertSession(response.session);
-    state.selectedSessionId = response.session.id;
-    upsertMessages(response.session.id, [
+    state.selectedSessionId = summarySessionId(response.session);
+    upsertMessages(summarySessionId(response.session), [
       response.user_message,
       response.assistant_message,
     ]);
-    upsertTurns(response.session.id, [response.turn]);
-    upsertTools(response.session.id, response.tool_calls, response.tool_results);
-    state.messages = state.messagesBySessionId[response.session.id];
-    emitMessageProjection(response.session.id);
+    upsertTurns(summarySessionId(response.session), [response.turn]);
+    upsertTools(summarySessionId(response.session), response.tool_calls, response.tool_results);
+    state.messages = state.messagesBySessionId[summarySessionId(response.session)];
+    emitMessageProjection(summarySessionId(response.session));
     return response;
   }
 
   function emitProjection() {
-    dispatchSession(target, sessionEvent("projection", "projection", cloneProjection(state), "mqueue"));
+    dispatchSession(
+      target,
+      sessionEvent("projection", "projection", cloneProjection(state), "mqueue"),
+    );
   }
 
   function emitMessageProjection(sessionId: string) {
@@ -456,10 +450,7 @@ function createMqueueCore(target: Window): SantiMqueue {
     emitMessageProjection(sessionId);
   }
 
-
-
-
-
-
-
+  function summarySessionId(summary: SessionSummary): string {
+    return summary.session.id;
+  }
 }

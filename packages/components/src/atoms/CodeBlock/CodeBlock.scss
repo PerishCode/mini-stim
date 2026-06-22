@@ -11,4 +11,51 @@
   font-size: var(--ms-font-size-sm);
   line-height: 1.45;
   white-space: pre-wrap;
+
+  code {
+    font: inherit;
+  }
+
+  .token.comment,
+  .token.prolog,
+  .token.doctype,
+  .token.cdata {
+    color: var(--ms-color-code-comment);
+  }
+
+  .token.function,
+  .token.command {
+    color: var(--ms-color-code-function);
+    font-weight: 650;
+  }
+
+  .token.keyword,
+  .token.builtin,
+  .token.boolean {
+    color: var(--ms-color-code-keyword);
+    font-weight: 620;
+  }
+
+  .token.operator,
+  .token.entity,
+  .token.url {
+    color: var(--ms-color-code-operator);
+  }
+
+  .token.punctuation {
+    color: var(--ms-color-code-punctuation);
+  }
+
+  .token.string,
+  .token.regex,
+  .token.char {
+    color: var(--ms-color-code-string);
+  }
+
+  .token.variable,
+  .token.number,
+  .token.constant,
+  .token.property {
+    color: var(--ms-color-code-variable);
+  }
 }

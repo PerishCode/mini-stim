@@ -29,9 +29,8 @@ body,
 body {
   margin: 0;
   background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.82), transparent 21rem),
-    radial-gradient(circle at bottom right, rgba(179, 197, 214, 0.22), transparent 18rem),
-    linear-gradient(180deg, #edf2f7 0%, var(--ms-color-canvas) 100%);
+    linear-gradient(135deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0) 42%),
+    linear-gradient(180deg, var(--ms-color-canvas-hi) 0%, var(--ms-color-canvas) 100%);
   color: var(--ms-color-text);
   font-family: var(--ms-font-family-sans);
   overflow: hidden;

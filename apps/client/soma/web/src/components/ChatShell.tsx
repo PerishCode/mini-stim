@@ -1,9 +1,8 @@
-import { Pane, SectionStackLayout } from "@mini-stim/components";
-import type { SessionRuntimeSnapshot } from "@mini-stim/hooks";
+import { Panel, useAppComponentRef } from "@mini-stim/components";
 
+import { STIM_APP_NAMESPACE } from "../appNamespace";
 import { ChatHeader } from "./ChatHeader";
 import { Composer } from "./Composer";
-import { InspectPanel } from "./InspectPanel";
 import { Transcript } from "./Transcript";
 
 export function ChatShell(props: {
@@ -13,49 +12,53 @@ export function ChatShell(props: {
   error: string | null;
   inspecting: boolean;
   onDraftChange: (value: string) => void;
+  onOpenInspect: () => void;
   onSend: () => void;
   onTitleCommit: (title: string | null) => void;
-  onToggleInspect: () => void;
-  runtime: SessionRuntimeSnapshot | null;
   selectedSessionId: string | null;
+  soulIdentity: Parameters<typeof Transcript>[0]["soulIdentity"];
   title: string;
   titleValue: string | null;
   timeline: Parameters<typeof Transcript>[0]["timeline"];
   draft: string;
 }) {
+  const shellRef = useAppComponentRef({
+    domain: "chat",
+    id: "chat-shell",
+    kind: "panel",
+    label: "Chat Shell",
+    namespace: STIM_APP_NAMESPACE,
+    projection: "primary panel",
+    surface: "workspace",
+  });
+
   return (
-    <Pane chrome="panel" tone="subtle" grow>
-      <SectionStackLayout
-        top={(
-          <ChatHeader
-            activity={props.activity}
-            busy={props.busy}
-            connection={props.connection}
-            inspecting={props.inspecting}
-            onTitleCommit={props.onTitleCommit}
-            onToggleInspect={props.onToggleInspect}
-            selectedSessionId={props.selectedSessionId}
-            title={props.title}
-            titleValue={props.titleValue}
-          />
-        )}
-        middle={
-          props.inspecting ? (
-            <InspectPanel runtime={props.runtime} />
-          ) : (
-            <Transcript timeline={props.timeline} />
-          )
-        }
-        bottom={(
-          <Composer
-            value={props.draft}
-            disabled={props.busy}
-            error={props.error}
-            onChange={props.onDraftChange}
-            onSubmit={props.onSend}
-          />
-        )}
-      />
-    </Pane>
+    <Panel.Root ref={shellRef}>
+      <Panel.Header>
+        <ChatHeader
+          activity={props.activity}
+          busy={props.busy}
+          connection={props.connection}
+          inspecting={props.inspecting}
+          onOpenInspect={props.onOpenInspect}
+          onTitleCommit={props.onTitleCommit}
+          selectedSessionId={props.selectedSessionId}
+          title={props.title}
+          titleValue={props.titleValue}
+        />
+      </Panel.Header>
+      <Panel.Body tone="inset" scroll>
+        <Transcript soulIdentity={props.soulIdentity} timeline={props.timeline} />
+      </Panel.Body>
+      <Panel.Footer>
+        <Composer
+          value={props.draft}
+          disabled={props.busy || !props.selectedSessionId}
+          error={props.error}
+          onChange={props.onDraftChange}
+          onSubmit={props.onSend}
+        />
+      </Panel.Footer>
+    </Panel.Root>
   );
 }
