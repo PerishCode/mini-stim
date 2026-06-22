@@ -34,7 +34,7 @@
 .msTextArea {
   display: block;
   width: 100%;
-  min-height: 5.25rem;
+  min-height: 4.5rem;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
   border: 1px solid var(--ms-color-input-border);
@@ -68,10 +68,10 @@
     --ms-textarea-frame-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.9),
       0 1px 0 var(--ms-color-border-faint);
-    min-height: 3.5rem;
+    min-height: 3rem;
     border-color: var(--ms-color-dock-border);
     background: var(--ms-color-input-dock-bg);
-    padding: var(--ms-space-4);
+    padding: var(--ms-space-3);
     line-height: 1.5;
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.9),

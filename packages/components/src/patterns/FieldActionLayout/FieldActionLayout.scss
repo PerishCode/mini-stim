@@ -1,5 +1,5 @@
 .msFieldActionLayout {
-  --ms-field-action-layout-action-width: 5.5rem;
+  --ms-field-action-layout-action-width: 5rem;
 
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--ms-field-action-layout-action-width);
@@ -35,6 +35,6 @@
   }
 
   &--action-width-lg {
-    --ms-field-action-layout-action-width: 5.5rem;
+    --ms-field-action-layout-action-width: 5rem;
   }
 }

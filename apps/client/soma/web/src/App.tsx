@@ -13,7 +13,13 @@ import {
   useSessionTurnTimeline,
 } from "@mini-stim/hooks";
 import { uiStorage } from "@mini-stim/storage";
-import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useState } from "react";
+import {
+  type PointerEvent as ReactPointerEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import { STIM_APP_NAMESPACE } from "./appNamespace";
 import { ChatShell } from "./components/ChatShell";
@@ -21,6 +27,11 @@ import { InspectPanel } from "./components/InspectPanel";
 import { NavigationDock } from "./components/NavigationDock";
 import { SessionRail } from "./components/SessionRail";
 import { type InspectTarget, subscribeInspectTarget } from "./events/inspect";
+import {
+  type NavigationEvent,
+  subscribeNavigation,
+  toggleNavigationPanel,
+} from "./events/navigation";
 import type { NavigationMode } from "./navigationMode";
 
 const DEFAULT_RAIL_WIDTH = 304;
@@ -45,7 +56,18 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [inspecting, setInspecting] = useState(preferences.inspect.open);
   const [inspectTarget, setInspectTarget] = useState<InspectTarget | null>(null);
-  const [navigationMode, setNavigationMode] = useState<NavigationMode>("sessions");
+  const [navigation, setNavigation] = useState(preferences.navigation);
+
+  const commitNavigation = useCallback((updater: (current: NavigationState) => NavigationState) => {
+    setNavigation((current) => {
+      const next = updater(current);
+      uiStorage.update((stored) => ({
+        ...stored,
+        navigation: next,
+      }));
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (!selectedSessionId && sessions.length) {
@@ -83,6 +105,31 @@ export function App() {
       }),
     [actions, selectedSessionId],
   );
+
+  useEffect(
+    () =>
+      subscribeNavigation((event) => {
+        commitNavigation((current) => nextNavigationState(current, event));
+      }),
+    [commitNavigation],
+  );
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented || event.altKey || event.shiftKey) {
+        return;
+      }
+      if (event.key.toLowerCase() !== "b" || (!event.metaKey && !event.ctrlKey)) {
+        return;
+      }
+
+      event.preventDefault();
+      toggleNavigationPanel();
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   function openInspect() {
     setInspectTarget(null);
@@ -255,36 +302,38 @@ export function App() {
   }
 
   return (
-    <AppRoot inspection={{ namespace: STIM_APP_NAMESPACE, options: { labels: true } }}>
+    <AppRoot inspection={{ namespace: STIM_APP_NAMESPACE, options: { labels: false } }}>
       <DockShell.Root>
         <DockShell.Dock>
-          <NavigationDock mode={navigationMode} onModeChange={setNavigationMode} />
+          <NavigationDock mode={navigation.mode} open={navigation.open} />
         </DockShell.Dock>
         <DockShell.Grid>
           <Grid
-            template={inspecting ? "sidebar-main-inspect" : "sidebar-main"}
+            template={gridTemplate(navigation.open, inspecting)}
             gap="shell"
             grow
-            sidebarWidthPx={layout.railWidthPx}
+            sidebarWidthPx={navigation.open ? layout.railWidthPx : null}
             inspectWidthPx={layout.inspectWidthPx}
           >
-            <GridItem area="sidebar" tag="aside">
-              <SessionRail
-                mode={navigationMode}
-                onCreate={createNewSession}
-                onSelect={selectSession}
-                previews={previews}
-                selectedSessionId={selectedSessionId}
-                sessions={sessions}
-                soulIdentity={soulIdentity}
-              />
-              <ResizeHandle
-                aria-label="Resize sessions panel"
-                aria-pressed={resizing === "rail"}
-                placement="end"
-                onPointerDown={beginRailResize}
-              />
-            </GridItem>
+            {navigation.open ? (
+              <GridItem area="sidebar" tag="aside">
+                <SessionRail
+                  mode={navigation.mode}
+                  onCreate={createNewSession}
+                  onSelect={selectSession}
+                  previews={previews}
+                  selectedSessionId={selectedSessionId}
+                  sessions={sessions}
+                  soulIdentity={soulIdentity}
+                />
+                <ResizeHandle
+                  aria-label="Resize sessions panel"
+                  aria-pressed={resizing === "rail"}
+                  placement="end"
+                  onPointerDown={beginRailResize}
+                />
+              </GridItem>
+            ) : null}
             <GridItem area="main" tag="main">
               <ChatShell
                 activity={activity}
@@ -333,4 +382,40 @@ function sessionLabel(session: SessionSummary) {
 function clampWidth(width: number, target: "inspect" | "rail") {
   const range = target === "rail" ? RAIL_WIDTH_RANGE : INSPECT_WIDTH_RANGE;
   return Math.round(Math.min(range.max, Math.max(range.min, width)));
+}
+
+type NavigationState = {
+  mode: NavigationMode;
+  open: boolean;
+};
+
+function nextNavigationState(current: NavigationState, event: NavigationEvent) {
+  switch (event.type) {
+    case "navigation:mode-selected":
+      if (current.mode === event.mode) {
+        return {
+          ...current,
+          open: !current.open,
+        };
+      }
+      return {
+        mode: event.mode,
+        open: true,
+      };
+    case "navigation:panel-toggled":
+      return {
+        ...current,
+        open: !current.open,
+      };
+  }
+}
+
+function gridTemplate(navigationOpen: boolean, inspecting: boolean) {
+  if (navigationOpen && inspecting) {
+    return "sidebar-main-inspect";
+  }
+  if (navigationOpen) {
+    return "sidebar-main";
+  }
+  return inspecting ? "main-inspect" : "main";
 }

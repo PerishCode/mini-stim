@@ -74,7 +74,7 @@ export function ToolCallInspectPanel(props: ToolCallInspectProps) {
   const ModePanel = inspectModeRegistry[mode];
 
   return (
-    <Stack ref={panelRef} gap="md" grow>
+    <Stack ref={panelRef} gap="md">
       <Inline justify="between" align="center" wrap gap="sm">
         <Text size="xs" tone="subtle">
           TOOL CALL

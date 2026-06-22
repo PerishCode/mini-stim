@@ -2,6 +2,11 @@ export interface InspectPanePreference {
   open: boolean;
 }
 
+export interface NavigationPanePreference {
+  mode: "sessions" | "souls";
+  open: boolean;
+}
+
 export interface DesktopLayoutPreference {
   railWidthPx: number | null;
   inspectWidthPx: number | null;
@@ -9,6 +14,7 @@ export interface DesktopLayoutPreference {
 
 export interface UiPreferences {
   inspect: InspectPanePreference;
+  navigation: NavigationPanePreference;
   desktopLayout: DesktopLayoutPreference;
 }
 
@@ -31,6 +37,10 @@ const UI_STORAGE_KEY = "mini-stim:ui-preferences:v1";
 const DEFAULT_UI_PREFERENCES: UiPreferences = {
   inspect: {
     open: false,
+  },
+  navigation: {
+    mode: "sessions",
+    open: true,
   },
   desktopLayout: {
     railWidthPx: null,
@@ -67,6 +77,10 @@ export function defaultPreferences(): UiPreferences {
   return {
     inspect: {
       open: DEFAULT_UI_PREFERENCES.inspect.open,
+    },
+    navigation: {
+      mode: DEFAULT_UI_PREFERENCES.navigation.mode,
+      open: DEFAULT_UI_PREFERENCES.navigation.open,
     },
     desktopLayout: {
       railWidthPx: DEFAULT_UI_PREFERENCES.desktopLayout.railWidthPx,
@@ -115,10 +129,21 @@ function removePreferences(driver: StorageDriver | null) {
 function normalizePreferences(value: unknown): UiPreferences {
   const source = isRecord(value) ? value : {};
   const inspect = isRecord(source.inspect) ? source.inspect : {};
+  const navigation = isRecord(source.navigation) ? source.navigation : {};
   const desktopLayout = isRecord(source.desktopLayout) ? source.desktopLayout : {};
   return {
     inspect: {
       open: inspect.open === true,
+    },
+    navigation: {
+      mode:
+        navigation.mode === "sessions" || navigation.mode === "souls"
+          ? navigation.mode
+          : DEFAULT_UI_PREFERENCES.navigation.mode,
+      open:
+        typeof navigation.open === "boolean"
+          ? navigation.open
+          : DEFAULT_UI_PREFERENCES.navigation.open,
     },
     desktopLayout: {
       railWidthPx: nullablePositiveNumber(desktopLayout.railWidthPx),

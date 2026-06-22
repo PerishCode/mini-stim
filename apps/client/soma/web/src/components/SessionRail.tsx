@@ -95,7 +95,7 @@ export function SessionRail(props: {
       </Panel.Header>
       <Panel.Body scroll>
         {props.mode === "sessions" ? (
-          <Stack gap="sm" grow>
+          <Stack gap="sm">
             <Inline justify="between" align="center">
               <Inline gap="sm" align="center">
                 <Text size="xs" tone="subtle">
@@ -150,7 +150,7 @@ export function SessionRail(props: {
             ) : null}
           </Stack>
         ) : (
-          <Stack gap="sm" grow>
+          <Stack gap="sm">
             <Inline justify="between" align="center">
               <Inline gap="sm" align="center">
                 <Text size="xs" tone="subtle">

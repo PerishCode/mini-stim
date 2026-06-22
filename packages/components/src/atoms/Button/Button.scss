@@ -3,17 +3,17 @@
 
 $button-sizes: (
   "sm": (
-    min-height: 2rem,
+    min-height: 1.75rem,
     font-size: var(--ms-font-size-sm),
     padding-inline: var(--ms-space-3),
   ),
   "md": (
-    min-height: 2.5rem,
+    min-height: 2.125rem,
     font-size: var(--ms-font-size-md),
     padding-inline: var(--ms-space-4),
   ),
   "lg": (
-    min-height: 3.25rem,
+    min-height: 2.75rem,
     font-size: var(--ms-font-size-md),
     padding-inline: var(--ms-space-4),
   ),

@@ -63,6 +63,7 @@
   &__body {
     position: relative;
     display: flex;
+    flex-direction: column;
     grid-row: 2;
     min-height: 0;
     overflow: hidden;
@@ -70,22 +71,13 @@
   }
 
   &__body--tone-inset {
-    background: transparent;
-
-    &::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background:
-        linear-gradient(180deg, var(--ms-color-panel-inset-feather), rgba(240, 237, 230, 0) 1.75rem),
-        linear-gradient(0deg, var(--ms-color-panel-inset-feather), rgba(240, 237, 230, 0) 1.75rem),
-        linear-gradient(180deg, rgba(115, 97, 74, 0.06), rgba(115, 97, 74, 0) 7rem),
-        radial-gradient(circle at top, rgba(255, 255, 255, 0.18), transparent 22rem),
-        color-mix(in srgb, var(--ms-color-surface-inset-bg) 62%, transparent);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
-      pointer-events: none;
-      z-index: 0;
-    }
+    background:
+      linear-gradient(180deg, var(--ms-color-panel-inset-feather), rgba(240, 237, 230, 0) 1.75rem),
+      linear-gradient(0deg, var(--ms-color-panel-inset-feather), rgba(240, 237, 230, 0) 1.75rem),
+      linear-gradient(180deg, rgba(115, 97, 74, 0.06), rgba(115, 97, 74, 0) 7rem),
+      radial-gradient(circle at top, rgba(255, 255, 255, 0.18), transparent 22rem),
+      color-mix(in srgb, var(--ms-color-surface-inset-bg) 62%, transparent);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
   }
 
   &__body--scroll {

@@ -7,12 +7,10 @@ import {
 } from "@mini-stim/components";
 
 import { STIM_APP_NAMESPACE } from "../appNamespace";
+import { selectNavigationMode } from "../events/navigation";
 import type { NavigationMode } from "../navigationMode";
 
-export function NavigationDock(props: {
-  mode: NavigationMode;
-  onModeChange: (mode: NavigationMode) => void;
-}) {
+export function NavigationDock(props: { mode: NavigationMode; open: boolean }) {
   const dockRef = useAppComponentRef({
     domain: "navigation",
     id: "navigation-dock",
@@ -49,9 +47,9 @@ export function NavigationDock(props: {
         ref={sessionsRef}
         label="Sessions"
         size="sm"
-        tone={props.mode === "sessions" ? "accent" : "neutral"}
-        aria-pressed={props.mode === "sessions"}
-        onClick={() => props.onModeChange("sessions")}
+        tone={props.open && props.mode === "sessions" ? "accent" : "neutral"}
+        aria-pressed={pressedState(props, "sessions")}
+        onClick={() => selectNavigationMode("sessions")}
       >
         <SessionsIcon size="sm" />
       </IconButton>
@@ -59,12 +57,20 @@ export function NavigationDock(props: {
         ref={soulsRef}
         label="Souls"
         size="sm"
-        tone={props.mode === "souls" ? "accent" : "neutral"}
-        aria-pressed={props.mode === "souls"}
-        onClick={() => props.onModeChange("souls")}
+        tone={props.open && props.mode === "souls" ? "accent" : "neutral"}
+        aria-pressed={pressedState(props, "souls")}
+        onClick={() => selectNavigationMode("souls")}
       >
         <SoulsIcon size="sm" />
       </IconButton>
     </Stack>
   );
+}
+
+function pressedState(navigation: { mode: NavigationMode; open: boolean }, mode: NavigationMode) {
+  if (navigation.mode !== mode) {
+    return false;
+  }
+
+  return navigation.open ? true : "mixed";
 }

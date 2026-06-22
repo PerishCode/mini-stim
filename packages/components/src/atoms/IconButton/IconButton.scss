@@ -8,8 +8,8 @@
   --ms-icon-button-hover-border: var(--ms-color-border-strong);
 
   display: inline-grid;
-  width: 2.625rem;
-  height: 2.625rem;
+  width: 2.25rem;
+  height: 2.25rem;
   place-items: center;
   border: 1px solid var(--ms-icon-button-border);
   border-radius: var(--ms-radius-md);
@@ -30,13 +30,13 @@
   @include focus-ring;
 
   &--size-sm {
-    width: 2rem;
-    height: 2rem;
+    width: 1.75rem;
+    height: 1.75rem;
   }
 
   &--size-md {
-    width: 2.625rem;
-    height: 2.625rem;
+    width: 2.25rem;
+    height: 2.25rem;
   }
 
   &--tone-accent {
@@ -45,5 +45,16 @@
     --ms-icon-button-text: var(--ms-color-accent-text);
     --ms-icon-button-hover-bg: var(--ms-color-accent-hover);
     --ms-icon-button-hover-border: var(--ms-color-accent-hover);
+  }
+
+  &[aria-pressed="mixed"] {
+    --ms-icon-button-bg: color-mix(in srgb, var(--ms-color-selected-bg) 42%, transparent);
+    --ms-icon-button-border: color-mix(in srgb, var(--ms-color-selected-border) 58%, transparent);
+    --ms-icon-button-text: var(--ms-color-accent);
+    --ms-icon-button-hover-bg: var(--ms-color-selected-bg);
+    --ms-icon-button-hover-border: var(--ms-color-selected-border);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.34),
+      0 1px 0 rgba(35, 67, 88, 0.06);
   }
 }

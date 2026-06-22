@@ -8,7 +8,7 @@ type GridProps = ComponentPropsWithoutRef<"div"> & {
   grow?: boolean;
   inspectWidthPx?: number | null;
   sidebarWidthPx?: number | null;
-  template?: "sidebar-main" | "sidebar-main-inspect";
+  template?: "main" | "main-inspect" | "sidebar-main" | "sidebar-main-inspect";
 };
 
 type GridItemProps = ComponentPropsWithoutRef<"div"> & {
