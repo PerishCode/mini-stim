@@ -7,15 +7,16 @@ use std::{
 
 use futures_util::StreamExt;
 use santi_provider::{
-    DeepSeekProvider, DeepSeekProviderConfig, FunctionCallOutput, ProviderClient, ProviderEvent,
-    ProviderFunctionCall, ProviderFunctionTool, ProviderMessage, ProviderRequest,
+    ChatCompletionsProvider, ChatCompletionsProviderConfig, FunctionCallOutput, ProviderClient,
+    ProviderEvent, ProviderFunctionCall, ProviderFunctionTool, ProviderMessage, ProviderRequest,
     ProviderStreamTrace, ProviderTool,
 };
 use serde_json::Value;
 
 #[tokio::test]
 async fn maps_chat_body() {
-    let body = capture_body(DeepSeekProviderConfig {
+    let body = capture_body(ChatCompletionsProviderConfig {
+        provider: "deepseek".to_string(),
         api_key: "test-key".to_string(),
         model: "deepseek-v4-pro".to_string(),
         base_url: String::new(),
@@ -121,6 +122,26 @@ async fn parses_streamed_tool_call() {
 }
 
 #[tokio::test]
+async fn keeps_tool_name() {
+    let events = capture_events(vec![
+        r#"data: {"id":"chatcmpl_tool","choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_shell","type":"function","function":{"name":"shell","arguments":""}}]},"finish_reason":null}]}"#,
+        r#"data: {"id":"chatcmpl_tool","choices":[{"delta":{"tool_calls":[{"index":0,"function":{"name":"","arguments":"{\"command\""}}]},"finish_reason":null}]}"#,
+        r#"data: {"id":"chatcmpl_tool","choices":[{"delta":{"tool_calls":[{"index":0,"function":{"name":"","arguments":":\"pwd\"}"}}]},"finish_reason":null}]}"#,
+        r#"data: {"id":"chatcmpl_tool","choices":[{"delta":{},"finish_reason":"tool_calls"}]}"#,
+    ])
+    .await;
+
+    assert!(matches!(
+        events.as_slice(),
+        [
+            ProviderEvent::ResponseStarted { .. },
+            ProviderEvent::FunctionCallRequested(call),
+        ] if call.name == "shell"
+                && call.arguments["command"] == "pwd"
+    ));
+}
+
+#[tokio::test]
 async fn emits_stream_trace_events() {
     let events = capture_all_events(vec![
         r#"data: {"id":"chatcmpl_1","choices":[{"delta":{"content":"ok"},"finish_reason":null}]}"#,
@@ -148,7 +169,7 @@ async fn emits_stream_trace_events() {
     }));
 }
 
-async fn capture_body(mut config: DeepSeekProviderConfig) -> Value {
+async fn capture_body(mut config: ChatCompletionsProviderConfig) -> Value {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
     config.base_url = format!("http://{}", listener.local_addr().expect("local address"));
     let (tx, rx) = mpsc::channel();
@@ -158,7 +179,7 @@ async fn capture_body(mut config: DeepSeekProviderConfig) -> Value {
         vec![r#"data: {"id":"chatcmpl_test","choices":[{"delta":{},"finish_reason":"stop"}]}"#],
     );
 
-    let provider = DeepSeekProvider::new(config);
+    let provider = ChatCompletionsProvider::new(config);
     let mut stream = provider
         .stream_response(base_request(provider.metadata().model, None))
         .await
@@ -172,7 +193,8 @@ async fn capture_body(mut config: DeepSeekProviderConfig) -> Value {
 
 async fn capture_with_outputs() -> Value {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
-    let config = DeepSeekProviderConfig {
+    let config = ChatCompletionsProviderConfig {
+        provider: "deepseek".to_string(),
         api_key: "test-key".to_string(),
         model: "deepseek-v4-pro".to_string(),
         base_url: format!("http://{}", listener.local_addr().expect("local address")),
@@ -187,7 +209,7 @@ async fn capture_with_outputs() -> Value {
         vec![r#"data: {"id":"chatcmpl_test","choices":[{"delta":{},"finish_reason":"stop"}]}"#],
     );
 
-    let provider = DeepSeekProvider::new(config);
+    let provider = ChatCompletionsProvider::new(config);
     let mut stream = provider
         .stream_response(base_request(
             provider.metadata().model,
@@ -218,7 +240,8 @@ async fn capture_with_outputs() -> Value {
 
 async fn capture_with_output_rounds() -> Value {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
-    let config = DeepSeekProviderConfig {
+    let config = ChatCompletionsProviderConfig {
+        provider: "deepseek".to_string(),
         api_key: "test-key".to_string(),
         model: "deepseek-v4-pro".to_string(),
         base_url: format!("http://{}", listener.local_addr().expect("local address")),
@@ -233,7 +256,7 @@ async fn capture_with_output_rounds() -> Value {
         vec![r#"data: {"id":"chatcmpl_test","choices":[{"delta":{},"finish_reason":"stop"}]}"#],
     );
 
-    let provider = DeepSeekProvider::new(config);
+    let provider = ChatCompletionsProvider::new(config);
     let mut stream = provider
         .stream_response(base_request(
             provider.metadata().model,
@@ -286,7 +309,8 @@ async fn capture_events(lines: Vec<&'static str>) -> Vec<ProviderEvent> {
 
 async fn capture_all_events(lines: Vec<&'static str>) -> Vec<ProviderEvent> {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
-    let config = DeepSeekProviderConfig {
+    let config = ChatCompletionsProviderConfig {
+        provider: "deepseek".to_string(),
         api_key: "test-key".to_string(),
         model: "deepseek-v4-pro".to_string(),
         base_url: format!("http://{}", listener.local_addr().expect("local address")),
@@ -297,7 +321,7 @@ async fn capture_all_events(lines: Vec<&'static str>) -> Vec<ProviderEvent> {
     let (tx, rx) = mpsc::channel();
     let server = response_server(listener, tx, lines);
 
-    let provider = DeepSeekProvider::new(config);
+    let provider = ChatCompletionsProvider::new(config);
     let mut stream = provider
         .stream_response(base_request(provider.metadata().model, None))
         .await

@@ -1,14 +1,18 @@
 use async_trait::async_trait;
 use futures_util::stream;
 use santi_core::{
-    MessagePart, ObjectBucket, ObjectUri, SantiService, SantiServiceConfig, SendSessionRequest,
+    MessagePart, ObjectBucket, ObjectUri, SESSION_WORKSPACE_URI, SOUL_WORKSPACE_URI, SantiService,
+    SantiServiceConfig, SendSessionRequest, session_memory_uri, soul_memory_uri,
 };
 use santi_provider::{
     ProviderClient, ProviderEvent, ProviderFunctionCall, ProviderMetadata, ProviderRequest,
     ProviderStream,
 };
 use serde_json::json;
-use std::sync::{Arc, Mutex};
+use std::{
+    path::Path,
+    sync::{Arc, Mutex},
+};
 use tokio::time::{Duration, sleep};
 
 #[derive(Clone, Default)]
@@ -42,14 +46,14 @@ impl ProviderClient for FakeProvider {
                         "id": "item_tool",
                         "call_id": "call_shell",
                         "name": "shell",
-                        "arguments": r#"{"command":"pwd && printf \"\\n$SANTI_SESSION_MEMORY_DIR\"","cwd":"@session"}"#,
+                        "arguments": r#"{"command":"pwd && printf \"\\n$SANTI_SESSION_MEMORY_DIR\"","cwd":"session://"}"#,
                     }),
                     call_id: "call_shell".to_string(),
                     name: "shell".to_string(),
-                    arguments_raw: r#"{"command":"pwd && printf \"\\n$SANTI_SESSION_MEMORY_DIR\"","cwd":"@session"}"#.to_string(),
+                    arguments_raw: r#"{"command":"pwd && printf \"\\n$SANTI_SESSION_MEMORY_DIR\"","cwd":"session://"}"#.to_string(),
                     arguments: json!({
                         "command": "pwd && printf \"\\n$SANTI_SESSION_MEMORY_DIR\"",
-                        "cwd": "@session"
+                        "cwd": SESSION_WORKSPACE_URI
                     }),
                 })),
                 Ok(ProviderEvent::Completed {
@@ -120,20 +124,56 @@ async fn sends_with_runtime() {
     assert!(instructions.contains("soul_name: Liberte"));
     assert!(instructions.contains("[santi-soul]"));
     assert!(instructions.contains("[santi-session]"));
-    assert!(instructions.contains("source: @soul/MEMORY.md"));
-    assert!(instructions.contains("source: @session/MEMORY.md"));
+    assert!(instructions.contains(&format!(
+        "{} will always be displayed in [santi-soul].",
+        soul_memory_uri()
+    )));
+    assert!(instructions.contains(&format!(
+        "{} will always be displayed in [santi-session].",
+        session_memory_uri()
+    )));
+    assert!(instructions.contains(&format!(
+        "These files have no internal version history; save backups into {SOUL_WORKSPACE_URI} or {SESSION_WORKSPACE_URI} if needed."
+    )));
+    assert!(
+        instructions
+            .contains("<santi-system> blocks describe Santi runtime facts in this session.")
+    );
+    assert!(instructions.contains(
+        "They are part of your context, not user speech or your natural-language reply."
+    ));
+    assert!(
+        instructions
+            .contains("Read them as session facts about the workspace, runtime, or provider flow.")
+    );
+    assert!(instructions.contains(&format!("source: {}", soul_memory_uri())));
+    assert!(instructions.contains(&format!("source: {}", session_memory_uri())));
+    assert!(!instructions.contains("hint:"));
+    assert!(!instructions.contains("@soul"));
+    assert!(!instructions.contains("@session"));
     assert!(!instructions.contains("<santi-runtime>"));
     assert!(!instructions.contains("<santi-tools>"));
-    let tool_names = requests[0]
-        .tools
-        .as_ref()
-        .expect("tools")
+    let tools = requests[0].tools.as_ref().expect("tools");
+    let tool_names = tools
         .iter()
         .map(|tool| match tool {
             santi_provider::ProviderTool::Function(tool) => tool.name.as_str(),
         })
         .collect::<Vec<_>>();
     assert_eq!(tool_names, vec!["shell"]);
+    let tool_descriptions = tools
+        .iter()
+        .map(|tool| match tool {
+            santi_provider::ProviderTool::Function(tool) => {
+                format!("{} {}", tool.description, tool.parameters)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(tool_descriptions.contains(&soul_memory_uri()));
+    assert!(tool_descriptions.contains(&session_memory_uri()));
+    assert!(!tool_descriptions.contains("@soul"));
+    assert!(!tool_descriptions.contains("@session"));
 
     let detail = service
         .session(&session.session.id)
@@ -194,13 +234,16 @@ async fn dispatches_tools() {
         .get("stdout")
         .and_then(|value| value.as_str())
         .expect("shell stdout");
-    let session_memory_dir = format!("runtime/sessions/{}/memory", session.session.id);
-    assert!(stdout.contains(&session_memory_dir));
+    let session_memory_dir = Path::new("runtime")
+        .join("sessions")
+        .join(&session.session.id)
+        .join("memory");
+    assert!(stdout.contains(&session_memory_dir.display().to_string()));
     let cwd = output
         .get("cwd")
         .and_then(|value| value.as_str())
         .expect("shell cwd");
-    assert!(cwd.ends_with(&session_memory_dir));
+    assert!(Path::new(cwd).ends_with(&session_memory_dir));
 
     let requests = provider.requests.lock().unwrap();
     assert_eq!(requests.len(), 2);

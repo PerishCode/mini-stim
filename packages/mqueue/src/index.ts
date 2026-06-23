@@ -424,6 +424,7 @@ function createMqueueCore(target: Window): SantiMqueue {
         void ensureMaterial(sessionId, payload.material.kind);
       },
       turnFailed: (payload) => {
+        removeTransient(sessionId, payload.turn_id);
         markTurnFailed(sessionId, payload.turn_id, payload.error);
         dispatchMessage(
           target,

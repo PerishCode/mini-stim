@@ -82,25 +82,21 @@ names its unlock condition so deferral stays distinguishable from neglect:
 
 ## Setup
 
-Create `.env` from `.env.example` and fill:
+Create local app config from `santi.example.toml`:
 
-```text
-SANTI_PROVIDER=openai
-
-OPENAI_API_KEY=
-OPENAI_MODEL=
-OPENAI_RESPONSES_BASE_URL=https://api.openai.com/v1
-OPENAI_REASONING_EFFORT=
-OPENAI_REASONING_SUMMARY=
-OPENAI_MAX_OUTPUT_TOKENS=
-
-DEEPSEEK_API_KEY=
-DEEPSEEK_MODEL=deepseek-v4-pro
-DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEEPSEEK_THINKING=
-DEEPSEEK_REASONING_EFFORT=
-DEEPSEEK_MAX_TOKENS=
+```sh
+cp santi.example.toml santi.toml
 ```
+
+Fill the selected profile in `santi.toml`. The file is ignored by git because
+it owns local API keys and model parameters.
+
+The default config path is `<cwd>/santi.toml`. Override it with `--config` or
+`SANTI_CONFIG`. Provider selection resolves as
+`--provider > config.provider > SANTI_PROVIDER > openai`.
+
+Use `provider = "siliconflow"` or `--provider siliconflow` for GLM-5.2 through
+SiliconFlow.
 
 Install dependencies:
 

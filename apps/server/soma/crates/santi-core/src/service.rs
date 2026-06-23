@@ -1,3 +1,4 @@
+mod failure;
 mod materials;
 mod text_delta;
 mod thinking;
@@ -21,6 +22,7 @@ use crate::{
     ThinkingCompletionReason, ThinkingSpan, TurnActivityState, UpdateSessionRequest, prefixed_id,
     timestamp_now,
 };
+use failure::ProviderTurnFailure;
 use text_delta::TextDeltaUpdate;
 use timing::{ProviderTurnTiming, provider_event_name};
 
@@ -194,15 +196,20 @@ impl SantiService {
 
         let (assistant_text, provider_response_id) = match send_result {
             Ok(value) => value,
-            Err(error) => {
-                self.fail_background_turn(&session_id, &turn_id, error);
+            Err(failure) => {
+                self.fail_background_turn(
+                    &session_id,
+                    &turn_id,
+                    failure.error,
+                    failure.partial_assistant_text,
+                );
                 return;
             }
         };
 
         if assistant_text.trim().is_empty() {
             let error = "provider completed without assistant output".to_string();
-            self.fail_background_turn(&session_id, &turn_id, error);
+            self.fail_background_turn(&session_id, &turn_id, error, String::new());
             return;
         }
 
@@ -210,12 +217,12 @@ impl SantiService {
             &session_id,
             ActorType::Soul,
             self.store.default_soul_id(),
-            MessageContent::text(assistant_text),
+            MessageContent::text(assistant_text.clone()),
             MessageState::Fixed,
         ) {
             Ok(message) => message.session_message,
             Err(error) => {
-                self.fail_background_turn(&session_id, &turn_id, error);
+                self.fail_background_turn(&session_id, &turn_id, error, assistant_text);
                 return;
             }
         };
@@ -223,7 +230,7 @@ impl SantiService {
             .store
             .append_message_ref(&soul_session_id, &assistant_message.message.id)
         {
-            self.fail_background_turn(&session_id, &turn_id, error);
+            self.fail_background_turn(&session_id, &turn_id, error, String::new());
             return;
         }
         if let Err(error) = self.store.complete_turn(
@@ -231,7 +238,7 @@ impl SantiService {
             assistant_message.relation.session_seq,
             provider_response_id,
         ) {
-            self.fail_background_turn(&session_id, &turn_id, error);
+            self.fail_background_turn(&session_id, &turn_id, error, String::new());
             return;
         }
         self.publish_stream(
@@ -243,35 +250,34 @@ impl SantiService {
         );
     }
 
-    fn fail_background_turn(&self, session_id: &str, turn_id: &str, error: String) {
-        let _ = self.store.fail_turn(turn_id, &error);
-        self.publish_stream(
-            session_id,
-            SantiStreamPayload::TurnFailed {
-                turn_id: turn_id.to_string(),
-                error,
-            },
-        );
-    }
-
     async fn run_provider_turn(
         &self,
         session_id: &str,
         soul_session_id: &str,
         turn_id: &str,
-    ) -> Result<(String, Option<String>), String> {
+    ) -> Result<(String, Option<String>), ProviderTurnFailure> {
         let mut assistant_text = String::new();
         let mut function_call_outputs = Vec::new();
         let mut timing = ProviderTurnTiming::new(turn_id);
         let mut round = 0;
+        macro_rules! provider_try {
+            ($expr:expr) => {
+                match $expr {
+                    Ok(value) => value,
+                    Err(error) => return Err(ProviderTurnFailure::new(error, &assistant_text)),
+                }
+            };
+        }
 
         let final_response_id = loop {
             round += 1;
-            let input = provider_messages(&self.store, soul_session_id)?;
+            let input = provider_try!(provider_messages(&self.store, soul_session_id));
             let metadata = self.provider.metadata();
             let request = ProviderRequest {
                 model: metadata.model,
-                instructions: Some(self.system_prompt_text(session_id, soul_session_id)?),
+                instructions: Some(provider_try!(
+                    self.system_prompt_text(session_id, soul_session_id)
+                )),
                 input,
                 tools: Some(provider_tools()),
                 previous_response_id: None,
@@ -298,7 +304,7 @@ impl SantiService {
                 }
                 Err(error) => {
                     timing.failed(round, "http_response", &error);
-                    return Err(error);
+                    return Err(ProviderTurnFailure::new(error, &assistant_text));
                 }
             };
             let mut calls = Vec::new();
@@ -315,12 +321,12 @@ impl SantiService {
                     Ok(event) => event,
                     Err(error) => {
                         timing.failed(round, "sse_event", &error);
-                        self.fail_current_thinking_span(
+                        provider_try!(self.fail_current_thinking_span(
                             session_id,
                             &mut current_thinking_span,
                             error.clone(),
-                        )?;
-                        return Err(error);
+                        ));
+                        return Err(ProviderTurnFailure::new(error, &assistant_text));
                     }
                 };
                 if let ProviderEvent::StreamTrace(trace) = event {
@@ -340,13 +346,13 @@ impl SantiService {
                         provider_response_id,
                     } => {
                         active_provider_response_id = provider_response_id.clone();
-                        self.ensure_thinking_span(
+                        provider_try!(self.ensure_thinking_span(
                             session_id,
                             turn_id,
                             &mut current_thinking_span,
                             &mut summary_thinking_span,
                             provider_response_id.clone(),
-                        )?;
+                        ));
                         self.publish_turn_activity(
                             session_id,
                             turn_id,
@@ -356,19 +362,19 @@ impl SantiService {
                     }
                     ProviderEvent::ReasoningSummaryDelta(delta) => {
                         reasoning_summary.push_str(&delta);
-                        self.update_thinking_span_summary(
+                        provider_try!(self.update_thinking_span_summary(
                             session_id,
                             &mut summary_thinking_span,
                             reasoning_summary.clone(),
-                        )?;
+                        ));
                     }
                     ProviderEvent::ReasoningSummaryDone(summary) => {
                         reasoning_summary = summary;
-                        self.update_thinking_span_summary(
+                        provider_try!(self.update_thinking_span_summary(
                             session_id,
                             &mut summary_thinking_span,
                             reasoning_summary.clone(),
-                        )?;
+                        ));
                     }
                     ProviderEvent::TextDelta(delta) => {
                         let update = TextDeltaUpdate {
@@ -381,15 +387,15 @@ impl SantiService {
                             current_thinking_span: &mut current_thinking_span,
                             active_provider_response_id: &active_provider_response_id,
                         };
-                        self.handle_text_delta(delta, update)?;
+                        provider_try!(self.handle_text_delta(delta, update));
                     }
                     ProviderEvent::FunctionCallRequested(call) => {
                         timing.function_call_requested(round, &call.name);
-                        self.complete_current_thinking_span(
+                        provider_try!(self.complete_current_thinking_span(
                             session_id,
                             &mut current_thinking_span,
                             ThinkingCompletionReason::ToolCallRequested,
-                        )?;
+                        ));
                         self.publish_turn_activity(
                             session_id,
                             turn_id,
@@ -403,21 +409,21 @@ impl SantiService {
                     } => {
                         timing.completed(round);
                         active_provider_response_id = provider_response_id.clone();
-                        self.complete_current_thinking_span(
+                        provider_try!(self.complete_current_thinking_span(
                             session_id,
                             &mut current_thinking_span,
                             ThinkingCompletionReason::ProviderCompleted,
-                        )?;
+                        ));
                         completed_response_id = provider_response_id;
                         break;
                     }
                     ProviderEvent::Failed(error) => {
-                        self.fail_current_thinking_span(
+                        provider_try!(self.fail_current_thinking_span(
                             session_id,
                             &mut current_thinking_span,
                             error.clone(),
-                        )?;
-                        return Err(error);
+                        ));
+                        return Err(ProviderTurnFailure::new(error, &assistant_text));
                     }
                 }
             }
@@ -435,8 +441,12 @@ impl SantiService {
                     TurnActivityState::RunningTool,
                     active_provider_response_id.clone(),
                 );
-                let mut output =
-                    self.handle_tool_call(session_id, soul_session_id, turn_id, call)?;
+                let mut output = provider_try!(self.handle_tool_call(
+                    session_id,
+                    soul_session_id,
+                    turn_id,
+                    call
+                ));
                 if !round_assistant_text.is_empty() {
                     output.assistant_content = Some(round_assistant_text.clone());
                 }

@@ -99,6 +99,15 @@ plane and must stay limited to cell lifecycle facts.
   diagnostic, log, database, and temp paths must come from store.
 - Inspect socket paths are transport addresses, not persistent app paths. They
   may use OS IPC locations but must not become storage roots.
+- Workspace context uses core-owned URI schemes as the only semantic truth
+  source:
+  - `soul://` is the current soul workspace.
+  - `session://` is the current session workspace.
+  - `soul://MEMORY.md` and `session://MEMORY.md` are the canonical memory
+    resources rendered into the system prompt.
+  - Tool inputs, system prompt material, and UI/material source labels must use
+    these URI schemes through core constants/helpers, not hand-written strings.
+  - Do not use or accept old `@` workspace aliases.
 
 ## Execution Rules
 
@@ -389,32 +398,25 @@ surface before considering any alternate browser layer.
 
 ## Environment
 
-`.env` is local and ignored by git. Select the model provider with:
+Local app config defaults to `<cwd>/santi.toml`, created from the committed
+`santi.example.toml`. `santi.toml` is ignored by git and owns local API keys,
+model parameters, and the default active provider.
 
 ```text
-SANTI_PROVIDER=openai
+cp santi.example.toml santi.toml
 ```
 
-OpenAI settings:
+Config resolution is modeled by `mini-stim-server-soma`'s `ConfigService`.
+Config path resolves as:
 
 ```text
-OPENAI_API_KEY=
-OPENAI_MODEL=
-OPENAI_RESPONSES_BASE_URL=https://api.openai.com/v1
-OPENAI_REASONING_EFFORT=
-OPENAI_REASONING_SUMMARY=
-OPENAI_MAX_OUTPUT_TOKENS=
+--config > SANTI_CONFIG > ./santi.toml
 ```
 
-DeepSeek settings:
+Provider selection resolves as:
 
 ```text
-DEEPSEEK_API_KEY=
-DEEPSEEK_MODEL=deepseek-v4-pro
-DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEEPSEEK_THINKING=
-DEEPSEEK_REASONING_EFFORT=
-DEEPSEEK_MAX_TOKENS=
+--provider > config.provider > SANTI_PROVIDER > openai
 ```
 
 Server soma settings:

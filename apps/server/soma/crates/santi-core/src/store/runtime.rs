@@ -246,6 +246,41 @@ impl SantiStore {
         turn_by_id(&conn, turn_id)?.ok_or_else(|| "failed turn missing".to_string())
     }
 
+    pub fn finish_failed_turn_context(
+        &self,
+        turn_id: &str,
+        last_seen_session_seq: i64,
+    ) -> Result<Turn, String> {
+        let conn = self.conn.lock().unwrap();
+        let now = timestamp_now();
+        conn.execute(
+            r#"
+            UPDATE turns
+            SET end_soul_session_seq = (
+                  SELECT next_seq - 1 FROM soul_sessions WHERE id = turns.soul_session_id
+                ),
+                updated_at = ?2
+            WHERE id = ?1 AND status = 'failed'
+            "#,
+            params![turn_id, now],
+        )
+        .map_err(|error| error.to_string())?;
+        conn.execute(
+            r#"
+            UPDATE soul_sessions
+            SET last_seen_session_seq = CASE
+                  WHEN last_seen_session_seq > ?2 THEN last_seen_session_seq
+                  ELSE ?2
+                END,
+                updated_at = ?3
+            WHERE id = (SELECT soul_session_id FROM turns WHERE id = ?1)
+            "#,
+            params![turn_id, last_seen_session_seq, now],
+        )
+        .map_err(|error| error.to_string())?;
+        turn_by_id(&conn, turn_id)?.ok_or_else(|| "failed turn missing".to_string())
+    }
+
     pub fn tool_calls_for_turn(&self, turn_id: &str) -> Result<Vec<ToolCall>, String> {
         let conn = self.conn.lock().unwrap();
         tool_calls_for_turn(&conn, turn_id)

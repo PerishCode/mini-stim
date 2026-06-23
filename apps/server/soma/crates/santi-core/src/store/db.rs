@@ -3,9 +3,9 @@ mod timeline;
 use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::{
-    ActorType, Compact, Session, SessionEffect, SessionMessage, SessionProfile, SessionSummary,
-    SoulProfile, SoulSession, SoulSessionEntry, SoulSessionTargetType, ThinkingSpan, ToolCall,
-    ToolResult, Turn, timestamp_now,
+    ActorType, Compact, MessageKind, Session, SessionEffect, SessionMessage, SessionProfile,
+    SessionSummary, SoulProfile, SoulSession, SoulSessionEntry, SoulSessionTargetType,
+    ThinkingSpan, ToolCall, ToolResult, Turn, timestamp_now,
 };
 
 use super::rows::*;
@@ -197,7 +197,7 @@ pub(super) fn message_by_id(
     conn.query_row(
         r#"
         SELECT r.session_id, r.message_id, r.session_seq, r.created_at,
-               m.id, m.actor_type, m.actor_id, m.content, m.state, m.version,
+               m.id, m.actor_type, m.actor_id, m.message_kind, m.content, m.state, m.version,
                m.deleted_at, m.created_at, m.updated_at
         FROM r_session_messages r
         JOIN messages m ON m.id = r.message_id
@@ -219,7 +219,7 @@ pub(super) fn session_messages(
         .prepare(
             r#"
             SELECT r.session_id, r.message_id, r.session_seq, r.created_at,
-                   m.id, m.actor_type, m.actor_id, m.content, m.state, m.version,
+                   m.id, m.actor_type, m.actor_id, m.message_kind, m.content, m.state, m.version,
                    m.deleted_at, m.created_at, m.updated_at
             FROM r_session_messages r
             JOIN messages m ON m.id = r.message_id
@@ -381,10 +381,13 @@ pub(super) fn session_effects(
 pub(super) fn session_message_to_provider(
     message: &SessionMessage,
 ) -> Option<crate::ProviderInputMessage> {
-    let role = match message.message.actor_type {
-        ActorType::Account => "user",
-        ActorType::Soul => "assistant",
-        ActorType::System => "system",
+    let role = match message.message.message_kind {
+        MessageKind::SantiSystem => "user",
+        MessageKind::Text => match message.message.actor_type {
+            ActorType::Account => "user",
+            ActorType::Soul => "assistant",
+            ActorType::System => "system",
+        },
     };
     let content = message.message.content.content_text();
     if content.trim().is_empty() {

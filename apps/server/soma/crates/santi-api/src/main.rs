@@ -11,6 +11,7 @@ use axum::{
     routing::{get, post},
 };
 use futures_core::Stream;
+use mini_stim_server_soma::{config, provider};
 use santi_core::{
     CreateSessionResponse, ErrorResponse, HealthResponse, MaterialRequest, SantiService,
     SantiServiceConfig, SantiStreamEvent, SantiStreamPayload, SendSessionAcceptedResponse,
@@ -25,13 +26,13 @@ use tower_http::{
 use utoipa::OpenApi;
 
 mod bucket;
-mod provider;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
     dotenvy::dotenv_override().ok();
-    match env::args().nth(1).as_deref() {
-        Some("export-openapi") => {
+    let config = config::ConfigService::from_env_args()?;
+    match config.command() {
+        config::AppCommand::ExportOpenApi => {
             println!(
                 "{}",
                 serde_json::to_string_pretty(&ApiDoc::openapi())
@@ -39,13 +40,12 @@ async fn main() -> Result<(), String> {
             );
             Ok(())
         }
-        Some("serve") | None => serve().await,
-        Some(command) => Err(format!("unknown command: {command}")),
+        config::AppCommand::Serve => serve(config).await,
     }
 }
 
-async fn serve() -> Result<(), String> {
-    let provider = provider::from_env()?;
+async fn serve(config: config::ConfigService) -> Result<(), String> {
+    let provider = provider::from_config(config.provider_config()?);
     let database_path = env::var("SANTI_DB").map_err(|_| "SANTI_DB is required".to_string())?;
     let runtime_root = env::var("SANTI_RUNTIME_ROOT").unwrap_or_else(|_| {
         db_parent(&database_path)

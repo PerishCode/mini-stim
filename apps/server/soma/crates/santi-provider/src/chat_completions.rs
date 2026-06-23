@@ -13,7 +13,8 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-pub struct DeepSeekProviderConfig {
+pub struct ChatCompletionsProviderConfig {
+    pub provider: String,
     pub api_key: String,
     pub model: String,
     pub base_url: String,
@@ -23,13 +24,13 @@ pub struct DeepSeekProviderConfig {
 }
 
 #[derive(Debug, Clone)]
-pub struct DeepSeekProvider {
-    config: DeepSeekProviderConfig,
+pub struct ChatCompletionsProvider {
+    config: ChatCompletionsProviderConfig,
     client: Client,
 }
 
-impl DeepSeekProvider {
-    pub fn new(config: DeepSeekProviderConfig) -> Self {
+impl ChatCompletionsProvider {
+    pub fn new(config: ChatCompletionsProviderConfig) -> Self {
         Self {
             config,
             client: Client::new(),
@@ -38,10 +39,10 @@ impl DeepSeekProvider {
 }
 
 #[async_trait]
-impl ProviderClient for DeepSeekProvider {
+impl ProviderClient for ChatCompletionsProvider {
     fn metadata(&self) -> ProviderMetadata {
         ProviderMetadata {
-            provider: Arc::from("deepseek"),
+            provider: Arc::from(self.config.provider.clone()),
             model: self.config.model.clone(),
         }
     }
@@ -62,14 +63,15 @@ impl ProviderClient for DeepSeekProvider {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
             return Err(format!(
-                "deepseek chat completions request failed: {status} {body}"
+                "{} chat completions request failed: {status} {body}",
+                self.config.provider
             ));
         }
         Ok(Box::pin(parse_sse(response.bytes_stream())))
     }
 }
 
-fn chat_body(config: &DeepSeekProviderConfig, request: ProviderRequest) -> Value {
+fn chat_body(config: &ChatCompletionsProviderConfig, request: ProviderRequest) -> Value {
     let mut body = Map::from_iter([
         ("model".to_string(), json!(request.model)),
         ("messages".to_string(), messages(&request)),
@@ -347,7 +349,7 @@ impl ToolCallAccumulator {
                 target.id = id;
             }
             if let Some(function) = tool_call.function {
-                if let Some(name) = function.name {
+                if let Some(name) = function.name.filter(|name| !name.is_empty()) {
                     target.name = name;
                 }
                 if let Some(arguments) = function.arguments {
@@ -358,7 +360,8 @@ impl ToolCallAccumulator {
     }
 
     fn finish(&mut self, response_id: Option<String>) -> Result<Vec<ProviderEvent>, String> {
-        let response_id = response_id.ok_or_else(|| "missing deepseek response id".to_string())?;
+        let response_id =
+            response_id.ok_or_else(|| "missing chat completions response id".to_string())?;
         let calls = std::mem::take(&mut self.calls);
         calls
             .into_iter()
@@ -382,7 +385,7 @@ impl AccumulatedToolCall {
             self.arguments
         };
         let arguments = serde_json::from_str::<Value>(&arguments_raw)
-            .map_err(|error| format!("invalid deepseek tool arguments: {error}"))?;
+            .map_err(|error| format!("invalid chat completions tool arguments: {error}"))?;
         Ok(ProviderEvent::FunctionCallRequested(ProviderFunctionCall {
             response_id: response_id.to_string(),
             item_id: Some(self.id.clone()),

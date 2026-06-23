@@ -603,6 +603,7 @@
           "id",
           "actor_type",
           "actor_id",
+          "message_kind",
           "content",
           "state",
           "version",
@@ -635,6 +636,9 @@
           "id": {
             "type": "string"
           },
+          "message_kind": {
+            "$ref": "#/components/schemas/MessageKind"
+          },
           "state": {
             "$ref": "#/components/schemas/MessageState"
           },
@@ -660,6 +664,13 @@
             }
           }
         }
+      },
+      "MessageKind": {
+        "type": "string",
+        "enum": [
+          "text",
+          "santi_system"
+        ]
       },
       "MessagePart": {
         "oneOf": [
@@ -709,7 +720,8 @@
         "type": "string",
         "enum": [
           "pending",
-          "fixed"
+          "fixed",
+          "aborted"
         ]
       },
       "SendSessionAcceptedResponse": {

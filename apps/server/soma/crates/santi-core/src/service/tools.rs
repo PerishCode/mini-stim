@@ -1,13 +1,10 @@
-use std::{
-    path::{Component, Path, PathBuf},
-    process::Command,
-};
+use std::{path::PathBuf, process::Command};
 
 use santi_provider::{FunctionCallOutput, ProviderFunctionCall};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use crate::SantiStreamPayload;
+use crate::{SantiStreamPayload, WorkspaceRoot, parse_workspace_uri};
 
 use super::SantiService;
 
@@ -100,13 +97,12 @@ impl SantiService {
         let Some(cwd) = cwd else {
             return Ok(self.execution_root());
         };
-        if let Some(path) = cwd.strip_prefix("@soul") {
-            return aliased_path(self.soul_memory_dir(), path, "@soul");
-        }
-        if let Some(path) = cwd.strip_prefix("@session") {
-            return aliased_path(self.session_memory_dir(session_id), path, "@session");
-        }
-        Ok(PathBuf::from(cwd))
+        let uri = parse_workspace_uri(cwd)?;
+        let root = match uri.root {
+            WorkspaceRoot::Soul => self.soul_memory_dir(),
+            WorkspaceRoot::Session => self.session_memory_dir(session_id),
+        };
+        Ok(root.join(uri.path))
     }
 
     pub(super) fn runtime_root(&self) -> PathBuf {
@@ -165,25 +161,6 @@ fn shell_command(command: &str) -> Command {
 
 fn default_shell_name() -> &'static str {
     if cfg!(windows) { "pwsh" } else { "bash" }
-}
-
-fn aliased_path(root: PathBuf, suffix: &str, alias: &str) -> Result<PathBuf, String> {
-    if suffix.is_empty() {
-        return Ok(root);
-    }
-    let Some(path) = suffix.strip_prefix('/') else {
-        return Err(format!("invalid cwd alias: {alias}{suffix}"));
-    };
-    let path = Path::new(path);
-    if path.components().any(|component| {
-        matches!(
-            component,
-            Component::ParentDir | Component::RootDir | Component::Prefix(_)
-        )
-    }) {
-        return Err(format!("cwd alias cannot escape {alias}"));
-    }
-    Ok(root.join(path))
 }
 
 fn parse_tool_args<T: for<'de> Deserialize<'de>>(value: &Value) -> Result<T, String> {

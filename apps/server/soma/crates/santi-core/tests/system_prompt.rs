@@ -3,7 +3,8 @@ use std::{fs, sync::Arc};
 use async_trait::async_trait;
 use futures_util::stream;
 use santi_core::{
-    MaterialKind, MaterialRequest, SantiService, SantiServiceConfig, SessionMaterial,
+    MaterialKind, MaterialRequest, SESSION_WORKSPACE_URI, SOUL_WORKSPACE_URI, SantiService,
+    SantiServiceConfig, SessionMaterial, session_memory_uri, soul_memory_uri,
 };
 use santi_provider::{ProviderClient, ProviderMetadata, ProviderStream};
 
@@ -30,7 +31,7 @@ impl ProviderClient for FakeProvider {
 #[test]
 fn renders_material_shape() {
     let harness = PromptHarness::open();
-    harness.write_soul("---\nsanti_hint: true\n---\n# Soul");
+    harness.write_soul("---\nplain: value\n---\n# Soul");
     harness.write_session("# Session");
 
     let text = harness.system_prompt().text;
@@ -39,43 +40,44 @@ fn renders_material_shape() {
     assert!(text.contains("[santi-meta]"));
     assert!(text.contains("channel: mini-stim"));
     assert!(text.contains("soul_name: Liberte"));
+    assert!(text.contains(&format!(
+        "{} will always be displayed in [santi-soul].",
+        soul_memory_uri()
+    )));
+    assert!(text.contains(&format!(
+        "{} will always be displayed in [santi-session].",
+        session_memory_uri()
+    )));
+    assert!(text.contains(&format!(
+        "These files have no internal version history; save backups into {SOUL_WORKSPACE_URI} or {SESSION_WORKSPACE_URI} if needed."
+    )));
+    assert!(text.contains("<santi-system> blocks describe Santi runtime facts in this session."));
+    assert!(text.contains(
+        "They are part of your context, not user speech or your natural-language reply."
+    ));
+    assert!(
+        text.contains("Read them as session facts about the workspace, runtime, or provider flow.")
+    );
     assert!(text.contains("[santi-soul]"));
     assert!(text.contains("[santi-session]"));
-    assert!(text.contains("hint: Use soul memory"));
-    assert!(text.contains("source: @soul/MEMORY.md"));
-    assert!(text.contains("source: @session/MEMORY.md"));
-    assert!(text.contains("content:\n---\nsanti_hint: true\n---\n# Soul"));
+    assert!(text.contains(&format!("source: {}", soul_memory_uri())));
+    assert!(text.contains(&format!("source: {}", session_memory_uri())));
+    assert!(text.contains("content:\n---\nplain: value\n---\n# Soul"));
     assert!(text.contains("content:\n# Session"));
+    assert!(!text.contains("hint:"));
+    assert!(!text.contains("@soul"));
+    assert!(!text.contains("@session"));
 }
 
 #[test]
-fn reports_hidden_hint() {
+fn leaves_frontmatter_plain() {
     let harness = PromptHarness::open();
-    harness.write_soul("---\nsanti_hint: false\n---\n# Soul");
+    harness.write_soul("---\nplain: value\n---\n# Soul");
 
     let text = harness.system_prompt().text;
 
-    assert!(text.contains("hint: Hidden, enable by set santi_hint: true in @soul/MEMORY.md"));
-}
-
-#[test]
-fn reports_invalid_hint() {
-    let harness = PromptHarness::open();
-    harness.write_soul("---\nsanti_hint: yes\n---\n# Soul");
-
-    let text = harness.system_prompt().text;
-
-    assert!(text.contains("hint: Invalid santi_hint in @soul/MEMORY.md. Use true|false."));
-}
-
-#[test]
-fn reports_invalid_frontmatter() {
-    let harness = PromptHarness::open();
-    harness.write_soul("---\nsanti_hint true\n---\n# Soul");
-
-    let text = harness.system_prompt().text;
-
-    assert!(text.contains("hint: Invalid frontmatter in @soul/MEMORY.md. Use --- with santi_hint"));
+    assert!(text.contains("content:\n---\nplain: value\n---\n# Soul"));
+    assert!(!text.contains("hint:"));
 }
 
 struct PromptHarness {

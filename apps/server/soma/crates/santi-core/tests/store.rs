@@ -1,5 +1,7 @@
 use rusqlite::Connection;
-use santi_core::{ActorType, MessageContent, MessageState, SantiStore, ThinkingCompletionReason};
+use santi_core::{
+    ActorType, MessageContent, MessageKind, MessageState, SantiStore, ThinkingCompletionReason,
+};
 
 #[test]
 fn schema_matches_runtime() {
@@ -69,6 +71,39 @@ fn appends_relations_in_order() {
     assert_eq!(input.len(), 1);
     assert_eq!(input[0].role, "user");
     assert_eq!(input[0].content, "hello ordering");
+}
+
+#[test]
+fn maps_santi_system_input() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let store = SantiStore::open(temp.path().join("santi.sqlite")).expect("open store");
+    let session = store.create_session().expect("create session");
+    let soul_session = store
+        .acquire_soul_session(&session.session.id)
+        .expect("acquire soul session")
+        .soul_session;
+    let message = store
+        .append_santi_system_message(
+            &session.session.id,
+            MessageContent::text("<santi-system>\nkind: note\n</santi-system>"),
+        )
+        .expect("append santi system")
+        .session_message;
+    store
+        .append_message_ref(&soul_session.id, &message.message.id)
+        .expect("append message ref");
+
+    assert_eq!(message.message.actor_type, ActorType::System);
+    assert_eq!(message.message.message_kind, MessageKind::SantiSystem);
+    let input = store
+        .assembly_input(&soul_session.id)
+        .expect("assembly input");
+    assert_eq!(input.len(), 1);
+    assert_eq!(input[0].role, "user");
+    assert_eq!(
+        input[0].content,
+        "<santi-system>\nkind: note\n</santi-system>"
+    );
 }
 
 #[test]

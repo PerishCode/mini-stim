@@ -2,7 +2,7 @@ use rusqlite::Row;
 use serde_json::Value;
 
 use crate::{
-    ActorType, Compact, Message, MessageContent, MessageState, Session, SessionEffect,
+    ActorType, Compact, Message, MessageContent, MessageKind, MessageState, Session, SessionEffect,
     SessionMessage, SessionMessageRef, SessionProfile, SessionSummary, SoulProfile, SoulSession,
     SoulSessionTargetType, ThinkingCompletionReason, ThinkingSpan, ThinkingSpanState, ToolCall,
     ToolResult, Turn, TurnStatus, TurnTriggerType,
@@ -78,22 +78,24 @@ pub(super) fn map_soul_session_row(row: &Row<'_>) -> rusqlite::Result<SoulSessio
 }
 
 pub(super) fn map_session_message_row(row: &Row<'_>) -> rusqlite::Result<SessionMessage> {
-    let content_json: String = row.get(7)?;
+    let content_json: String = row.get(8)?;
     let content = serde_json::from_str::<MessageContent>(&content_json).map_err(|error| {
-        rusqlite::Error::FromSqlConversionFailure(7, rusqlite::types::Type::Text, Box::new(error))
+        rusqlite::Error::FromSqlConversionFailure(8, rusqlite::types::Type::Text, Box::new(error))
     })?;
     let actor_type = actor_type_from_db(row.get::<_, String>(5)?.as_str());
-    let state = message_state_from_db(row.get::<_, String>(8)?.as_str());
+    let message_kind = message_kind_from_db(row.get::<_, String>(7)?.as_str());
+    let state = message_state_from_db(row.get::<_, String>(9)?.as_str());
     let message = Message {
         id: row.get(4)?,
         actor_type,
         actor_id: row.get(6)?,
+        message_kind,
         content,
         state,
-        version: row.get(9)?,
-        deleted_at: row.get(10)?,
-        created_at: row.get(11)?,
-        updated_at: row.get(12)?,
+        version: row.get(10)?,
+        deleted_at: row.get(11)?,
+        created_at: row.get(12)?,
+        updated_at: row.get(13)?,
     };
     let content_text = message.content.content_text();
     Ok(SessionMessage {
@@ -226,6 +228,22 @@ pub(super) fn message_state_db(value: &MessageState) -> &'static str {
     match value {
         MessageState::Pending => "pending",
         MessageState::Fixed => "fixed",
+        MessageState::Aborted => "aborted",
+    }
+}
+
+pub(super) fn message_kind_db(value: &MessageKind) -> &'static str {
+    match value {
+        MessageKind::Text => "text",
+        MessageKind::SantiSystem => "santi_system",
+    }
+}
+
+fn message_kind_from_db(value: &str) -> MessageKind {
+    match value {
+        "text" => MessageKind::Text,
+        "santi_system" => MessageKind::SantiSystem,
+        _ => MessageKind::Text,
     }
 }
 
@@ -233,6 +251,7 @@ fn message_state_from_db(value: &str) -> MessageState {
     match value {
         "pending" => MessageState::Pending,
         "fixed" => MessageState::Fixed,
+        "aborted" => MessageState::Aborted,
         _ => MessageState::Fixed,
     }
 }

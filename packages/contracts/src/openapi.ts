@@ -93,11 +93,19 @@ export interface MessageContent {
   parts: MessagePart[];
 }
 
+export type MessageKind = (typeof MessageKind)[keyof typeof MessageKind];
+
+export const MessageKind = {
+  text: "text",
+  santi_system: "santi_system",
+} as const;
+
 export type MessageState = (typeof MessageState)[keyof typeof MessageState];
 
 export const MessageState = {
   pending: "pending",
   fixed: "fixed",
+  aborted: "aborted",
 } as const;
 
 export interface Message {
@@ -107,6 +115,7 @@ export interface Message {
   created_at: String;
   deleted_at?: null | String;
   id: string;
+  message_kind: MessageKind;
   state: MessageState;
   updated_at: String;
   version: number;

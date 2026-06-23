@@ -1,15 +1,13 @@
 import type {
   ErrorResponse,
-  MessageState,
   SessionMessage,
   ThinkingSpan,
   ToolCall,
   ToolResult,
   Turn,
 } from "@mini-stim/contracts";
-
+import { DEFAULT_ACTOR_ID } from "./lib/helpers/message";
 import type {
-  MessageDeltaPayload,
   MessageEvent,
   MessagePhase,
   MessageProjection,
@@ -25,7 +23,7 @@ import type {
   TurnGroup,
 } from "./types";
 
-const DEFAULT_ACTOR_ID = "account_local";
+export { appendText, dedupeMessages, transientMessage } from "./lib/helpers/message";
 
 export function sessionEvent<Action extends SessionAction | "projection", Payload>(
   action: Action,
@@ -121,53 +119,6 @@ export function parseStreamEvent(raw: Event): StreamEvent | null {
   } catch {
     return null;
   }
-}
-
-export function transientMessage(sessionId: string, payload: MessageDeltaPayload): SessionMessage {
-  const createdAt = new Date().toISOString();
-  return {
-    relation: {
-      session_id: sessionId,
-      message_id: payload.message_id,
-      session_seq: Number.MAX_SAFE_INTEGER,
-      created_at: createdAt,
-    },
-    message: {
-      id: payload.message_id,
-      actor_type: payload.role,
-      actor_id: payload.role === "soul" ? "soul_default" : "account_local",
-      content: { parts: [{ type: "text", text: payload.text }] },
-      state: "pending" as MessageState,
-      version: 1,
-      deleted_at: null,
-      created_at: createdAt,
-      updated_at: createdAt,
-    },
-    content_text: payload.text,
-  };
-}
-
-export function appendText(message: SessionMessage, text: string): SessionMessage {
-  const contentText = `${message.content_text}${text}`;
-  return {
-    ...message,
-    content_text: contentText,
-    message: {
-      ...message.message,
-      content: { parts: [{ type: "text", text: contentText }] },
-      updated_at: new Date().toISOString(),
-    },
-  };
-}
-
-export function dedupeMessages(messages: SessionMessage[]): SessionMessage[] {
-  const byId = new Map<string, SessionMessage>();
-  for (const message of messages) {
-    byId.set(message.message.id, message);
-  }
-  return [...byId.values()].sort(
-    (left, right) => left.relation.session_seq - right.relation.session_seq,
-  );
 }
 
 export function cloneProjection(value: SessionProjection): SessionProjection {

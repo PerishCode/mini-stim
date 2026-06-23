@@ -105,6 +105,8 @@ function MessageTimelineItem(props: {
 }) {
   const role = props.item.message.message.actor_type;
   const pending = props.item.message.message.state === "pending";
+  const aborted = props.item.message.message.state === "aborted";
+  const isSantiSystem = props.item.message.message.message_kind === "santi_system";
 
   return (
     <AnchoredContentGroupItem
@@ -113,16 +115,65 @@ function MessageTimelineItem(props: {
       innerRef={props.itemRef}
       onClick={() => selectInspectTarget(props.target)}
     >
-      <MarkdownText tone={role === "account" ? "strong" : "default"}>
-        {props.item.message.content_text}
-      </MarkdownText>
+      {isSantiSystem ? (
+        <SantiSystemWhisper item={props.item} />
+      ) : (
+        <MarkdownText tone={role === "account" ? "strong" : "default"}>
+          {props.item.message.content_text}
+        </MarkdownText>
+      )}
       {pending ? (
         <Text size="xs" tone="subtle">
           generating…
         </Text>
       ) : null}
+      {aborted ? (
+        <Text size="xs" tone="subtle">
+          aborted
+        </Text>
+      ) : null}
     </AnchoredContentGroupItem>
   );
+}
+
+function SantiSystemWhisper(props: { item: Extract<TimelineItem, { kind: "message" }> }) {
+  const fields = santiSystemFields(props.item.message.content_text);
+  const kind = fields.get("kind") ?? "santi_system";
+  const summary = fields.get("summary");
+  const trace = fields.get("trace");
+
+  return (
+    <Surface tone="inset" padding="sm" width="content">
+      <Stack gap="xs">
+        <Text size="xs" tone="subtle">
+          {compactJoin("\u00a0·\u00a0", ["santi-system", kind])}
+        </Text>
+        {summary ? (
+          <Text size="xs" tone="muted">
+            {summary}
+          </Text>
+        ) : null}
+        {trace ? (
+          <Text size="xs" tone="subtle">
+            {trace}
+          </Text>
+        ) : null}
+        <Timestamp value={props.item.createdAt} size="xs" tone="subtle" />
+      </Stack>
+    </Surface>
+  );
+}
+
+function santiSystemFields(content: string) {
+  const fields = new Map<string, string>();
+  for (const line of content.split(/\r?\n/)) {
+    const [key, ...rest] = line.split(":");
+    if (!key || rest.length === 0) {
+      continue;
+    }
+    fields.set(key.trim(), rest.join(":").trim());
+  }
+  return fields;
 }
 
 function registrationForItem(item: TimelineItem) {
