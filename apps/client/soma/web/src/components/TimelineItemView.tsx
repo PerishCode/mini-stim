@@ -1,7 +1,10 @@
 import {
   AnchoredContentGroupItem,
   MarkdownText,
+  Stack,
+  Surface,
   Text,
+  Timestamp,
   useAppComponentRef,
 } from "@mini-stim/components";
 import type { TimelineItem } from "@mini-stim/hooks";
@@ -16,6 +19,8 @@ import {
 } from "./domains/tool-call/model/toolCallModel";
 import { ToolCallWhisper, ToolResultWhisper } from "./domains/tool-call/transcript/ToolCallWhisper";
 
+type ThinkingTimelineItem = Extract<TimelineItem, { kind: "thinking" }>;
+
 export function TimelineItemView(props: {
   align?: "start" | "center" | "end";
   item: TimelineItem;
@@ -27,6 +32,16 @@ export function TimelineItemView(props: {
   switch (item.kind) {
     case "message":
       return <MessageTimelineItem align={align} item={item} itemRef={itemRef} target={target} />;
+    case "thinking":
+      return (
+        <AnchoredContentGroupItem
+          align={align}
+          innerRef={itemRef}
+          onClick={() => selectInspectTarget(target)}
+        >
+          <ThinkingWhisper item={item} />
+        </AnchoredContentGroupItem>
+      );
     case "tool_call":
       return (
         <AnchoredContentGroupItem
@@ -48,6 +63,38 @@ export function TimelineItemView(props: {
         </AnchoredContentGroupItem>
       );
   }
+}
+
+function ThinkingWhisper(props: { item: ThinkingTimelineItem }) {
+  const thinking = props.item.thinking;
+  const running = thinking.state === "running";
+  const failed = thinking.state === "failed";
+  const duration = thinking.finished_at
+    ? durationLabel(thinking.created_at, thinking.finished_at)
+    : "";
+  const headline = thinkingHeadlineText(props.item, duration);
+  const summary = thinking.summary?.trim();
+
+  return (
+    <Surface tone={failed ? "danger" : "inset"} padding="sm" width="content">
+      <Stack gap="xs">
+        <Text size="xs" tone={running || failed ? "strong" : "subtle"}>
+          {headline}
+        </Text>
+        {summary ? (
+          <Text size="xs" tone="muted">
+            {summary}
+          </Text>
+        ) : null}
+        {failed && thinking.error_text ? (
+          <Text size="xs" tone={failed ? "strong" : "muted"}>
+            {thinking.error_text}
+          </Text>
+        ) : null}
+        <Timestamp value={thinking.created_at} size="xs" tone="subtle" />
+      </Stack>
+    </Surface>
+  );
 }
 
 function MessageTimelineItem(props: {
@@ -97,6 +144,24 @@ function registrationForItem(item: TimelineItem) {
         surface: "transcript",
       } as const;
     }
+    case "thinking":
+      return {
+        copyText: thinkingCopyText(item),
+        domain: "thinking",
+        id: `thinking-${item.thinking.id}`,
+        kind: "message",
+        label: "Thinking",
+        metadata: {
+          session_id: item.sessionId,
+          thinking_id: item.thinking.id,
+          turn_id: item.thinking.turn_id,
+        },
+        namespace: STIM_APP_NAMESPACE,
+        projection: "thinking whisper",
+        role: "soul",
+        surface: "transcript",
+        variant: item.thinking.state,
+      } as const;
     case "tool_call":
       return {
         copyText: toolRunCopyText(item),
@@ -145,6 +210,12 @@ function targetForItem(item: TimelineItem) {
         sessionId: item.sessionId,
         messageId: item.message.message.id,
       } as const;
+    case "thinking":
+      return {
+        kind: "thinking",
+        sessionId: item.sessionId,
+        thinkingId: item.thinking.id,
+      } as const;
     case "tool_call":
       return {
         kind: "tool_call",
@@ -157,6 +228,63 @@ function targetForItem(item: TimelineItem) {
         sessionId: item.sessionId,
         toolResultId: item.toolResult.id,
       } as const;
+  }
+}
+
+function thinkingCopyText(item: ThinkingTimelineItem) {
+  const duration = item.thinking.finished_at
+    ? durationLabel(item.thinking.created_at, item.thinking.finished_at)
+    : "";
+
+  return compactLines([
+    thinkingHeadlineText(item, duration),
+    `status: ${thinkingStateLabel(item)}`,
+    duration ? `duration: ${duration}` : null,
+    item.thinking.summary ? `summary: ${item.thinking.summary}` : null,
+    item.thinking.error_text ? `error: ${item.thinking.error_text}` : null,
+    refsLine([
+      ["session", item.sessionId],
+      ["turn", item.thinking.turn_id],
+      ["thinking", item.thinking.id],
+    ]),
+  ]);
+}
+
+function thinkingStateLabel(item: ThinkingTimelineItem) {
+  switch (item.thinking.state) {
+    case "running":
+      return "waiting";
+    case "completed":
+      return "ready";
+    case "failed":
+      return "failed";
+  }
+}
+
+function thinkingHeadlineText(item: ThinkingTimelineItem, duration: string) {
+  const thinking = item.thinking;
+  if (thinking.state === "running") {
+    return "thinking · waiting";
+  }
+
+  if (thinking.state === "failed") {
+    return "thinking · failed";
+  }
+
+  const milestone = thinkingCompletionReasonLabel(thinking.completion_reason);
+  return compactJoin("\u00a0·\u00a0", ["thinking", milestone, duration]);
+}
+
+function thinkingCompletionReasonLabel(reason: string | null | undefined) {
+  switch (reason) {
+    case "first_text_delta":
+      return "first\u00a0token";
+    case "tool_call_requested":
+      return "tool\u00a0call";
+    case "provider_completed":
+      return "provider\u00a0completed";
+    default:
+      return null;
   }
 }
 
@@ -228,6 +356,19 @@ function toolResultCopyText(item: Extract<TimelineItem, { kind: "tool_result" }>
       ["result", item.toolResult.id],
     ]),
   ]);
+}
+
+function durationLabel(start: string, end: string) {
+  const startMs = Date.parse(start);
+  const endMs = Date.parse(end);
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) {
+    return "";
+  }
+  const ms = endMs - startMs;
+  if (ms < 1000) {
+    return `${ms}ms`;
+  }
+  return `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)}s`;
 }
 
 function shellRunStatusLine(shell: ReturnType<typeof createShellToolModel>) {

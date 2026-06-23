@@ -641,6 +641,7 @@
           "turn",
           "user_message",
           "assistant_message",
+          "thinking_spans",
           "tool_calls",
           "tool_results"
         ],
@@ -656,6 +657,12 @@
           },
           "soul_session": {
             "$ref": "#/components/schemas/SoulSession"
+          },
+          "thinking_spans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ThinkingSpan"
+            }
           },
           "tool_calls": {
             "type": "array",
@@ -867,6 +874,7 @@
           "profile",
           "messages",
           "turns",
+          "thinking_spans",
           "tool_calls",
           "tool_results",
           "compacts",
@@ -916,6 +924,12 @@
                 "$ref": "#/components/schemas/SoulSession"
               }
             ]
+          },
+          "thinking_spans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ThinkingSpan"
+            }
           },
           "tool_calls": {
             "type": "array",
@@ -1049,6 +1063,87 @@
       "String": {
         "type": "string"
       },
+      "ThinkingCompletionReason": {
+        "type": "string",
+        "enum": [
+          "first_text_delta",
+          "tool_call_requested",
+          "provider_completed"
+        ]
+      },
+      "ThinkingSpan": {
+        "type": "object",
+        "required": [
+          "id",
+          "turn_id",
+          "state",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "completion_reason": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ThinkingCompletionReason"
+              }
+            ]
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/String"
+          },
+          "error_text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finished_at": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/String"
+              }
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "provider_response_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "$ref": "#/components/schemas/ThinkingSpanState"
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "turn_id": {
+            "type": "string"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/String"
+          }
+        }
+      },
+      "ThinkingSpanState": {
+        "type": "string",
+        "enum": [
+          "running",
+          "completed",
+          "failed"
+        ]
+      },
       "ToolCall": {
         "type": "object",
         "required": [
@@ -1169,6 +1264,37 @@
             "$ref": "#/components/schemas/String"
           }
         }
+      },
+      "TurnActivity": {
+        "type": "object",
+        "required": [
+          "turn_id",
+          "state"
+        ],
+        "properties": {
+          "provider_response_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "$ref": "#/components/schemas/TurnActivityState"
+          },
+          "turn_id": {
+            "type": "string"
+          }
+        }
+      },
+      "TurnActivityState": {
+        "type": "string",
+        "enum": [
+          "requesting",
+          "thinking",
+          "generating",
+          "calling_tool",
+          "running_tool"
+        ]
       },
       "TurnStatus": {
         "type": "string",

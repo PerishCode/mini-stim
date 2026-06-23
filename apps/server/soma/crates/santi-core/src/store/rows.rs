@@ -4,7 +4,8 @@ use serde_json::Value;
 use crate::{
     ActorType, Compact, Message, MessageContent, MessageState, Session, SessionEffect,
     SessionMessage, SessionMessageRef, SessionProfile, SessionSummary, SoulProfile, SoulSession,
-    SoulSessionTargetType, ToolCall, ToolResult, Turn, TurnStatus, TurnTriggerType,
+    SoulSessionTargetType, ThinkingCompletionReason, ThinkingSpan, ThinkingSpanState, ToolCall,
+    ToolResult, Turn, TurnStatus, TurnTriggerType,
 };
 
 pub(super) fn map_session_row(row: &Row<'_>) -> rusqlite::Result<Session> {
@@ -148,6 +149,24 @@ pub(super) fn map_tool_result_row(row: &Row<'_>) -> rusqlite::Result<ToolResult>
     })
 }
 
+pub(super) fn map_thinking_span_row(row: &Row<'_>) -> rusqlite::Result<ThinkingSpan> {
+    Ok(ThinkingSpan {
+        id: row.get(0)?,
+        turn_id: row.get(1)?,
+        provider_response_id: row.get(2)?,
+        state: thinking_state_from_db(row.get::<_, String>(3)?.as_str()),
+        summary: row.get(4)?,
+        completion_reason: row
+            .get::<_, Option<String>>(5)?
+            .as_deref()
+            .map(completion_reason_from_db),
+        error_text: row.get(6)?,
+        created_at: row.get(7)?,
+        updated_at: row.get(8)?,
+        finished_at: row.get(9)?,
+    })
+}
+
 pub(super) fn map_compact_row(row: &Row<'_>) -> rusqlite::Result<Compact> {
     Ok(Compact {
         id: row.get(0)?,
@@ -234,10 +253,45 @@ fn turn_status_from_db(value: &str) -> TurnStatus {
     }
 }
 
+pub(super) fn thinking_span_state_db(value: &ThinkingSpanState) -> &'static str {
+    match value {
+        ThinkingSpanState::Running => "running",
+        ThinkingSpanState::Completed => "completed",
+        ThinkingSpanState::Failed => "failed",
+    }
+}
+
+pub(super) fn thinking_completion_reason_db(value: &ThinkingCompletionReason) -> &'static str {
+    match value {
+        ThinkingCompletionReason::FirstTextDelta => "first_text_delta",
+        ThinkingCompletionReason::ToolCallRequested => "tool_call_requested",
+        ThinkingCompletionReason::ProviderCompleted => "provider_completed",
+    }
+}
+
+fn completion_reason_from_db(value: &str) -> ThinkingCompletionReason {
+    match value {
+        "first_text_delta" => ThinkingCompletionReason::FirstTextDelta,
+        "tool_call_requested" => ThinkingCompletionReason::ToolCallRequested,
+        "provider_completed" => ThinkingCompletionReason::ProviderCompleted,
+        _ => ThinkingCompletionReason::ProviderCompleted,
+    }
+}
+
+fn thinking_state_from_db(value: &str) -> ThinkingSpanState {
+    match value {
+        "running" => ThinkingSpanState::Running,
+        "completed" => ThinkingSpanState::Completed,
+        "failed" => ThinkingSpanState::Failed,
+        _ => ThinkingSpanState::Failed,
+    }
+}
+
 pub(super) fn entry_type_db(value: &SoulSessionTargetType) -> &'static str {
     match value {
         SoulSessionTargetType::Message => "message",
         SoulSessionTargetType::Compact => "compact",
+        SoulSessionTargetType::Thinking => "thinking",
         SoulSessionTargetType::ToolCall => "tool_call",
         SoulSessionTargetType::ToolResult => "tool_result",
     }

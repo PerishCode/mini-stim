@@ -1,11 +1,9 @@
+mod thinking;
+mod tools;
+
 use futures_util::StreamExt;
-use santi_provider::{
-    FunctionCallOutput, ProviderClient, ProviderEvent, ProviderFunctionCall, ProviderMessage,
-    ProviderRequest,
-};
-use serde::Deserialize;
-use serde_json::{Value, json};
-use std::{path::PathBuf, process::Command, sync::Arc};
+use santi_provider::{ProviderClient, ProviderEvent, ProviderMessage, ProviderRequest};
+use std::sync::Arc;
 use tokio::sync::broadcast;
 
 use crate::service_prompt::{
@@ -14,7 +12,8 @@ use crate::service_prompt::{
 use crate::{
     ActorType, CreateSessionResponse, MessageContent, MessageState, SantiStore, SantiStreamEvent,
     SantiStreamPayload, SendSessionRequest, SendSessionResponse, SessionDetail,
-    SessionRuntimeSnapshot, SessionSummary, UpdateSessionRequest, prefixed_id, timestamp_now,
+    SessionRuntimeSnapshot, SessionSummary, ThinkingCompletionReason, ThinkingSpan,
+    TurnActivityState, UpdateSessionRequest, prefixed_id, timestamp_now,
 };
 
 #[derive(Clone)]
@@ -212,6 +211,7 @@ impl SantiService {
             turn: completed_turn,
             user_message,
             assistant_message,
+            thinking_spans: self.store.thinking_spans_for_turn(&turn.id)?,
             tool_calls: self.store.tool_calls_for_turn(&turn.id)?,
             tool_results: self.store.tool_results_for_turn(&turn.id)?,
         })
@@ -249,13 +249,79 @@ impl SantiService {
                     Some(function_call_outputs.clone())
                 },
             };
+            self.publish_turn_activity(session_id, turn_id, TurnActivityState::Requesting, None);
             let mut stream = self.provider.stream_response(request).await?;
             let mut calls = Vec::new();
             let mut completed_response_id = None;
+            let mut active_provider_response_id = None;
+            let mut current_thinking_span: Option<ThinkingSpan> = None;
+            let mut summary_thinking_span: Option<ThinkingSpan> = None;
+            let mut reasoning_summary = String::new();
 
             while let Some(event) = stream.next().await {
-                match event? {
+                let event = match event {
+                    Ok(event) => event,
+                    Err(error) => {
+                        self.fail_current_thinking_span(
+                            session_id,
+                            &mut current_thinking_span,
+                            error.clone(),
+                        )?;
+                        return Err(error);
+                    }
+                };
+                match event {
+                    ProviderEvent::ResponseStarted {
+                        provider_response_id,
+                    }
+                    | ProviderEvent::ResponseInProgress {
+                        provider_response_id,
+                    } => {
+                        active_provider_response_id = provider_response_id.clone();
+                        self.ensure_thinking_span(
+                            session_id,
+                            turn_id,
+                            &mut current_thinking_span,
+                            &mut summary_thinking_span,
+                            provider_response_id.clone(),
+                        )?;
+                        self.publish_turn_activity(
+                            session_id,
+                            turn_id,
+                            TurnActivityState::Thinking,
+                            provider_response_id,
+                        );
+                    }
+                    ProviderEvent::ReasoningSummaryDelta(delta) => {
+                        reasoning_summary.push_str(&delta);
+                        self.update_thinking_span_summary(
+                            session_id,
+                            &mut summary_thinking_span,
+                            reasoning_summary.clone(),
+                        )?;
+                    }
+                    ProviderEvent::ReasoningSummaryDone(summary) => {
+                        reasoning_summary = summary;
+                        self.update_thinking_span_summary(
+                            session_id,
+                            &mut summary_thinking_span,
+                            reasoning_summary.clone(),
+                        )?;
+                    }
                     ProviderEvent::TextDelta(delta) => {
+                        if assistant_text.is_empty() {
+                            self.complete_current_thinking_span(
+                                session_id,
+                                &mut current_thinking_span,
+                                ThinkingCompletionReason::FirstTextDelta,
+                            )?;
+                            self.publish_turn_activity(
+                                session_id,
+                                turn_id,
+                                TurnActivityState::Generating,
+                                active_provider_response_id.clone(),
+                            );
+                        }
                         assistant_text.push_str(&delta);
                         self.publish_stream(
                             session_id,
@@ -268,15 +334,39 @@ impl SantiService {
                         );
                     }
                     ProviderEvent::FunctionCallRequested(call) => {
+                        self.complete_current_thinking_span(
+                            session_id,
+                            &mut current_thinking_span,
+                            ThinkingCompletionReason::ToolCallRequested,
+                        )?;
+                        self.publish_turn_activity(
+                            session_id,
+                            turn_id,
+                            TurnActivityState::CallingTool,
+                            active_provider_response_id.clone(),
+                        );
                         calls.push(call);
                     }
                     ProviderEvent::Completed {
                         provider_response_id,
                     } => {
+                        active_provider_response_id = provider_response_id.clone();
+                        self.complete_current_thinking_span(
+                            session_id,
+                            &mut current_thinking_span,
+                            ThinkingCompletionReason::ProviderCompleted,
+                        )?;
                         completed_response_id = provider_response_id;
                         break;
                     }
-                    ProviderEvent::Failed(error) => return Err(error),
+                    ProviderEvent::Failed(error) => {
+                        self.fail_current_thinking_span(
+                            session_id,
+                            &mut current_thinking_span,
+                            error.clone(),
+                        )?;
+                        return Err(error);
+                    }
                 }
             }
 
@@ -286,6 +376,12 @@ impl SantiService {
 
             let mut outputs = Vec::new();
             for call in calls {
+                self.publish_turn_activity(
+                    session_id,
+                    turn_id,
+                    TurnActivityState::RunningTool,
+                    active_provider_response_id.clone(),
+                );
                 outputs.push(self.handle_tool_call(session_id, soul_session_id, turn_id, call)?);
             }
             function_call_outputs.extend(outputs);
@@ -339,156 +435,4 @@ impl SantiService {
             payload,
         });
     }
-
-    fn handle_tool_call(
-        &self,
-        session_id: &str,
-        soul_session_id: &str,
-        turn_id: &str,
-        call: ProviderFunctionCall,
-    ) -> Result<FunctionCallOutput, String> {
-        let tool_call =
-            self.store
-                .append_tool_call(turn_id, &call.call_id, &call.name, &call.arguments)?;
-        self.publish_stream(
-            session_id,
-            SantiStreamPayload::ToolCallCreated {
-                tool_call: tool_call.clone(),
-            },
-        );
-        let dispatch = self.dispatch_tool(session_id, soul_session_id, &call);
-        let (output, error_text) = match dispatch {
-            Ok(output) => (Some(output), None),
-            Err(error) => (None, Some(error)),
-        };
-        let result =
-            self.store
-                .append_tool_result(&call.call_id, output.clone(), error_text.clone())?;
-        self.publish_stream(
-            session_id,
-            SantiStreamPayload::ToolResultCreated {
-                tool_result: result.clone(),
-            },
-        );
-        Ok(FunctionCallOutput {
-            call_id: call.call_id.clone(),
-            call,
-            output: serde_json::to_string(&json!({
-                "ok": error_text.is_none(),
-                "output": result.output,
-                "error": result.error_text,
-            }))
-            .map_err(|error| error.to_string())?,
-        })
-    }
-
-    fn dispatch_tool(
-        &self,
-        session_id: &str,
-        soul_session_id: &str,
-        call: &ProviderFunctionCall,
-    ) -> Result<Value, String> {
-        match call.name.as_str() {
-            "write_soul_memory" => {
-                let args = parse_tool_args::<WriteMemoryArgs>(&call.arguments)?;
-                let soul = self.store.write_soul_memory(&args.text)?;
-                Ok(json!({ "ok": true, "soul_id": soul.id }))
-            }
-            "write_session_memory" => {
-                let args = parse_tool_args::<WriteMemoryArgs>(&call.arguments)?;
-                let soul_session = self
-                    .store
-                    .write_session_memory(soul_session_id, &args.text)?;
-                Ok(json!({ "ok": true, "soul_session_id": soul_session.id }))
-            }
-            "shell" => {
-                let args = parse_tool_args::<ShellArgs>(&call.arguments)?;
-                self.run_shell(session_id, args)
-            }
-            name => Err(format!("unsupported tool: {name}")),
-        }
-    }
-
-    fn run_shell(&self, session_id: &str, args: ShellArgs) -> Result<Value, String> {
-        std::fs::create_dir_all(self.soul_memory_dir()).map_err(|error| error.to_string())?;
-        let cwd = args
-            .cwd
-            .map(PathBuf::from)
-            .unwrap_or_else(|| self.execution_root());
-        std::fs::create_dir_all(&cwd).map_err(|error| error.to_string())?;
-        let mut command = shell_command(&args.command);
-        let output = command
-            .current_dir(&cwd)
-            .env("SANTI_SOUL_MEMORY_DIR", self.soul_memory_dir())
-            .env(
-                "SANTI_SESSION_MEMORY_DIR",
-                self.session_memory_dir(session_id),
-            )
-            .output()
-            .map_err(|error| format!("failed to run shell: {error}"))?;
-        Ok(json!({
-            "exit_code": output.status.code().unwrap_or(-1),
-            "stdout": String::from_utf8_lossy(&output.stdout),
-            "stderr": String::from_utf8_lossy(&output.stderr),
-            "shell": default_shell_name(),
-        }))
-    }
-
-    fn runtime_root(&self) -> PathBuf {
-        PathBuf::from(&self.config.runtime_root)
-    }
-
-    fn execution_root(&self) -> PathBuf {
-        PathBuf::from(&self.config.execution_root)
-    }
-
-    fn soul_memory_dir(&self) -> PathBuf {
-        self.runtime_root().join("souls").join("memory")
-    }
-
-    fn session_memory_dir(&self, session_id: &str) -> PathBuf {
-        self.runtime_root()
-            .join("sessions")
-            .join(session_id)
-            .join("memory")
-    }
-}
-
-#[derive(Debug, Deserialize)]
-struct WriteMemoryArgs {
-    text: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct ShellArgs {
-    command: String,
-    cwd: Option<String>,
-}
-
-fn shell_command(command: &str) -> Command {
-    #[cfg(windows)]
-    {
-        let mut shell = Command::new("pwsh");
-        shell
-            .arg("-NoLogo")
-            .arg("-NoProfile")
-            .arg("-Command")
-            .arg(command);
-        shell
-    }
-
-    #[cfg(not(windows))]
-    {
-        let mut shell = Command::new("/bin/bash");
-        shell.arg("-lc").arg(command);
-        shell
-    }
-}
-
-fn default_shell_name() -> &'static str {
-    if cfg!(windows) { "pwsh" } else { "bash" }
-}
-
-fn parse_tool_args<T: for<'de> Deserialize<'de>>(value: &Value) -> Result<T, String> {
-    serde_json::from_value(value.clone()).map_err(|error| error.to_string())
 }

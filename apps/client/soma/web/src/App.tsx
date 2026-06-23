@@ -157,6 +157,19 @@ export function App() {
     if (!running) {
       return "sending";
     }
+    switch (running.activity?.state) {
+      case "requesting":
+        return "sending";
+      case "thinking":
+        return "thinking";
+      case "generating":
+        return "generating";
+      case "calling_tool":
+      case "running_tool":
+        return "running tool";
+      default:
+        break;
+    }
     if (running.items.some((item) => item.kind === "tool_call" && !item.toolResult)) {
       return "running tool";
     }

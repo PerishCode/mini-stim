@@ -3,9 +3,11 @@ import type {
   SessionMessage,
   SessionRuntimeSnapshot,
   SessionSummary,
+  ThinkingSpan,
   ToolCall,
   ToolResult,
   Turn,
+  TurnActivity,
   UpdateSessionRequest,
 } from "@mini-stim/contracts";
 
@@ -20,9 +22,14 @@ export type {
   SessionSummary,
   SoulProfile,
   SoulSession,
+  ThinkingCompletionReason,
+  ThinkingSpan,
+  ThinkingSpanState,
   ToolCall,
   ToolResult,
   Turn,
+  TurnActivity,
+  TurnActivityState,
   TurnStatus,
 } from "@mini-stim/contracts";
 
@@ -73,19 +80,29 @@ export type MessagePhase =
   | "created"
   | "delta"
   | "completed"
+  | "thinking_created"
+  | "thinking_updated"
+  | "thinking_completed"
   | "tool_call"
   | "tool_result"
   | "turn_started"
+  | "turn_activity"
   | "failed"
   | "projection";
 
 export type MessageConnectionState = "closed" | "connecting" | "open" | "error";
+
+export interface TurnActivityProjection extends TurnActivity {
+  created_at: string;
+}
 
 export interface MessageProjection {
   messagesBySessionId: Record<string, SessionMessage[]>;
   timelineBySessionId: Record<string, TimelineItem[]>;
   turnTimelineBySessionId: Record<string, TurnGroup[]>;
   turnsBySessionId: Record<string, Turn[]>;
+  turnActivityBySessionId: Record<string, Record<string, TurnActivityProjection>>;
+  thinkingSpansBySessionId: Record<string, ThinkingSpan[]>;
   toolCallsBySessionId: Record<string, ToolCall[]>;
   toolResultsBySessionId: Record<string, ToolResult[]>;
   connectionBySessionId: Record<string, MessageConnectionState>;
@@ -99,6 +116,7 @@ export interface TurnGroup {
   createdAt: string;
   /** Absent for the fallback group holding items with no resolvable turn. */
   turn?: Turn;
+  activity?: TurnActivityProjection;
   items: TimelineItem[];
 }
 
@@ -109,6 +127,13 @@ export type TimelineItem =
       sessionId: string;
       createdAt: string;
       message: SessionMessage;
+    }
+  | {
+      kind: "thinking";
+      id: string;
+      sessionId: string;
+      createdAt: string;
+      thinking: ThinkingSpan;
     }
   | {
       kind: "tool_call";
@@ -210,9 +235,13 @@ export type StreamPayload =
   | { type: "message_created"; message: SessionMessage }
   | MessageDeltaPayload
   | { type: "message_completed"; turn_id: string; message: SessionMessage }
+  | { type: "thinking_created"; thinking: ThinkingSpan }
+  | { type: "thinking_updated"; thinking: ThinkingSpan }
+  | { type: "thinking_completed"; thinking: ThinkingSpan }
   | { type: "tool_call_created"; tool_call: ToolCall }
   | { type: "tool_result_created"; tool_result: ToolResult }
   | { type: "turn_started"; turn: Turn }
+  | { type: "turn_activity"; activity: TurnActivity }
   | { type: "turn_failed"; turn_id: string; error: string };
 
 export interface MessageDeltaPayload {

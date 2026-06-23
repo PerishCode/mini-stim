@@ -51,6 +51,7 @@ async fn serve() -> Result<(), String> {
         base_url: env::var("OPENAI_RESPONSES_BASE_URL")
             .unwrap_or_else(|_| "https://api.openai.com/v1".to_string()),
         reasoning_effort: optional_env("OPENAI_REASONING_EFFORT"),
+        reasoning_summary: optional_env("OPENAI_REASONING_SUMMARY"),
         max_output_tokens: optional_env("OPENAI_MAX_OUTPUT_TOKENS")
             .map(|value| {
                 value
@@ -346,7 +347,11 @@ fn sse_event_name(payload: &SantiStreamPayload) -> &'static str {
         SantiStreamPayload::MessageCompleted { .. } => "message_completed",
         SantiStreamPayload::ToolCallCreated { .. } => "tool_call_created",
         SantiStreamPayload::ToolResultCreated { .. } => "tool_result_created",
+        SantiStreamPayload::ThinkingCreated { .. } => "thinking_created",
+        SantiStreamPayload::ThinkingUpdated { .. } => "thinking_updated",
+        SantiStreamPayload::ThinkingCompleted { .. } => "thinking_completed",
         SantiStreamPayload::TurnStarted { .. } => "turn_started",
+        SantiStreamPayload::TurnActivity { .. } => "turn_activity",
         SantiStreamPayload::TurnFailed { .. } => "turn_failed",
     }
 }
@@ -446,9 +451,13 @@ impl IntoResponse for ApiError {
         santi_core::SessionMessage,
         santi_core::SessionMessageRef,
         santi_core::SoulSession,
+        santi_core::ThinkingSpan,
+        santi_core::ThinkingSpanState,
         santi_core::ToolCall,
         santi_core::ToolResult,
         santi_core::Turn,
+        santi_core::TurnActivity,
+        santi_core::TurnActivityState,
         santi_core::TurnStatus,
         santi_core::TurnTriggerType
     ))

@@ -58,6 +58,14 @@ pub struct ProviderMetadata {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ProviderEvent {
+    ResponseStarted {
+        provider_response_id: Option<String>,
+    },
+    ResponseInProgress {
+        provider_response_id: Option<String>,
+    },
+    ReasoningSummaryDelta(String),
+    ReasoningSummaryDone(String),
     TextDelta(String),
     FunctionCallRequested(ProviderFunctionCall),
     Completed {

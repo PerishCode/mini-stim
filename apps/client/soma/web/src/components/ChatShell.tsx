@@ -1,4 +1,5 @@
 import { Panel, useAppComponentRef } from "@mini-stim/components";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 
 import { STIM_APP_NAMESPACE } from "../appNamespace";
 import { ChatHeader } from "./ChatHeader";
@@ -21,6 +22,9 @@ export function ChatShell(props: {
   timeline: Parameters<typeof Transcript>[0]["timeline"];
   draft: string;
 }) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const transcriptRef = useRef<HTMLDivElement | null>(null);
+  const followTailRef = useRef(true);
   const shellRef = useAppComponentRef({
     domain: "chat",
     id: "chat-shell",
@@ -30,6 +34,48 @@ export function ChatShell(props: {
     projection: "primary panel",
     surface: "workspace",
   });
+  const handleScroll = useCallback(() => {
+    const scrollElement = scrollRef.current;
+    if (!scrollElement) {
+      return;
+    }
+    followTailRef.current = distanceFromBottom(scrollElement) <= 48;
+  }, []);
+  const scrollToBottom = useCallback(() => {
+    const scrollElement = scrollRef.current;
+    if (!scrollElement) {
+      return;
+    }
+    requestAnimationFrame(() => {
+      scrollElement.scrollTop = scrollElement.scrollHeight;
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (followTailRef.current) {
+      scrollToBottom();
+    }
+  });
+
+  useEffect(() => {
+    const transcriptElement = transcriptRef.current;
+    if (!transcriptElement) {
+      return undefined;
+    }
+    const observer = new ResizeObserver(() => {
+      if (followTailRef.current) {
+        scrollToBottom();
+      }
+    });
+    observer.observe(transcriptElement);
+    return () => observer.disconnect();
+  }, [scrollToBottom]);
+
+  function handleSend() {
+    followTailRef.current = true;
+    props.onSend();
+    scrollToBottom();
+  }
 
   return (
     <Panel.Root ref={shellRef}>
@@ -45,18 +91,27 @@ export function ChatShell(props: {
           titleValue={props.titleValue}
         />
       </Panel.Header>
-      <Panel.Body tone="inset" scroll>
-        <Transcript soulIdentity={props.soulIdentity} timeline={props.timeline} />
+      <Panel.Body innerRef={scrollRef} tone="inset" scroll onScroll={handleScroll}>
+        <Transcript
+          contentRef={transcriptRef}
+          soulIdentity={props.soulIdentity}
+          timeline={props.timeline}
+        />
       </Panel.Body>
       <Panel.Footer>
         <Composer
           value={props.draft}
-          disabled={props.busy || !props.selectedSessionId}
+          disabled={!props.selectedSessionId}
           error={props.error}
           onChange={props.onDraftChange}
-          onSubmit={props.onSend}
+          onSubmit={handleSend}
+          submitting={props.busy}
         />
       </Panel.Footer>
     </Panel.Root>
   );
+}
+
+function distanceFromBottom(element: HTMLElement) {
+  return element.scrollHeight - element.scrollTop - element.clientHeight;
 }

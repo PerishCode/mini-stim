@@ -1,6 +1,7 @@
 import {
   installSantiMqueue,
   type MessageConnectionState,
+  type MessageEvent,
   type MessagePart,
   type MessageProjection,
   type MqueueError,
@@ -38,8 +39,14 @@ export type {
   SessionRuntimeSnapshot,
   SessionSummary,
   SoulSession,
+  ThinkingCompletionReason,
+  ThinkingSpan,
+  ThinkingSpanState,
   TimelineItem,
   Turn,
+  TurnActivity,
+  TurnActivityProjection,
+  TurnActivityState,
   TurnGroup,
   TurnStatus,
 } from "@mini-stim/mqueue";
@@ -119,7 +126,7 @@ export function useSessionMessages(sessionId?: string | null): SessionMessage[] 
 export function useSessionTurnTimeline(sessionId?: string | null): TurnGroup[] {
   const mqueue = useSantiMqueue();
   const selectedSessionId = useSelectedSessionId();
-  const store = useMemo(() => createMessageStore(mqueue), [mqueue]);
+  const store = useMemo(() => createMessageStore(mqueue, isProjectionEvent), [mqueue]);
   const resolvedSessionId = sessionId ?? selectedSessionId;
   const projection = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   if (!resolvedSessionId) {
@@ -194,7 +201,7 @@ export function useDebouncedValue<T>(
 export function useMessageConnection(sessionId?: string | null): MessageConnectionState {
   const mqueue = useSantiMqueue();
   const selectedSessionId = useSelectedSessionId();
-  const store = useMemo(() => createMessageStore(mqueue), [mqueue]);
+  const store = useMemo(() => createMessageStore(mqueue, isConnectionEvent), [mqueue]);
   const resolvedSessionId = sessionId ?? selectedSessionId;
   const projection = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   if (!resolvedSessionId) {
@@ -215,16 +222,32 @@ function createSessionStore(mqueue: SantiMqueue) {
   };
 }
 
-function createMessageStore(mqueue: SantiMqueue) {
+function createMessageStore(mqueue: SantiMqueue, shouldUpdate: (event: MessageEvent) => boolean) {
   let snapshot: MessageProjection = mqueue.message.snapshot();
   return {
     getSnapshot: () => snapshot,
     subscribe: (onStoreChange: () => void) =>
-      mqueue.message.sub(() => {
+      mqueue.message.sub((event) => {
+        if (!shouldUpdate(event)) {
+          return;
+        }
         snapshot = mqueue.message.snapshot();
         onStoreChange();
       }),
   };
+}
+
+function isProjectionEvent(event: MessageEvent) {
+  return event.phase === "projection";
+}
+
+function isConnectionEvent(event: MessageEvent) {
+  return (
+    event.phase === "connecting" ||
+    event.phase === "open" ||
+    event.phase === "closed" ||
+    event.phase === "error"
+  );
 }
 
 export function useSessionActions(): SessionActions {

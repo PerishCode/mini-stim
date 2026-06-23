@@ -1,12 +1,15 @@
+mod timeline;
+
 use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::{
     ActorType, Compact, Session, SessionEffect, SessionMessage, SessionProfile, SessionSummary,
-    Soul, SoulProfile, SoulSession, SoulSessionEntry, SoulSessionTargetType, ToolCall, ToolResult,
-    Turn, timestamp_now,
+    Soul, SoulProfile, SoulSession, SoulSessionEntry, SoulSessionTargetType, ThinkingSpan,
+    ToolCall, ToolResult, Turn, timestamp_now,
 };
 
 use super::rows::*;
+pub(super) use timeline::*;
 
 pub(super) fn ensure_session(conn: &Connection, session_id: &str) -> Result<(), String> {
     let exists = conn
@@ -331,105 +334,23 @@ pub(super) fn tool_result_by_id(
     .map_err(|error| error.to_string())
 }
 
-pub(super) fn turns_for_soul_session(
+pub(super) fn thinking_span_by_id(
     conn: &Connection,
-    soul_session_id: &str,
-) -> Result<Vec<Turn>, String> {
-    let mut stmt = conn
-        .prepare(
-            r#"
-            SELECT id, soul_session_id, trigger_type, trigger_ref, input_through_session_seq,
-                   base_soul_session_seq, end_soul_session_seq, status, error_text,
-                   created_at, updated_at, finished_at
-            FROM turns
-            WHERE soul_session_id = ?1
-            ORDER BY created_at ASC
-            "#,
-        )
-        .map_err(|error| error.to_string())?;
-    let rows = stmt
-        .query_map(params![soul_session_id], map_turn_row)
-        .map_err(|error| error.to_string())?;
-    collect_rows(rows)
-}
-
-pub(super) fn soul_tool_calls(
-    conn: &Connection,
-    soul_session_id: &str,
-) -> Result<Vec<ToolCall>, String> {
-    let mut stmt = conn
-        .prepare(
-            r#"
-            SELECT c.id, c.turn_id, c.tool_name, c.arguments, c.created_at
-            FROM tool_calls c
-            JOIN turns t ON t.id = c.turn_id
-            WHERE t.soul_session_id = ?1
-            ORDER BY c.created_at ASC
-            "#,
-        )
-        .map_err(|error| error.to_string())?;
-    let rows = stmt
-        .query_map(params![soul_session_id], map_tool_call_row)
-        .map_err(|error| error.to_string())?;
-    collect_rows(rows)
-}
-
-pub(super) fn tool_calls_for_turn(
-    conn: &Connection,
-    turn_id: &str,
-) -> Result<Vec<ToolCall>, String> {
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, turn_id, tool_name, arguments, created_at FROM tool_calls WHERE turn_id = ?1 ORDER BY created_at ASC",
-        )
-        .map_err(|error| error.to_string())?;
-    let rows = stmt
-        .query_map(params![turn_id], map_tool_call_row)
-        .map_err(|error| error.to_string())?;
-    collect_rows(rows)
-}
-
-pub(super) fn soul_tool_results(
-    conn: &Connection,
-    soul_session_id: &str,
-) -> Result<Vec<ToolResult>, String> {
-    let mut stmt = conn
-        .prepare(
-            r#"
-            SELECT r.id, r.tool_call_id, r.output, r.error_text, r.created_at
-            FROM tool_results r
-            JOIN tool_calls c ON c.id = r.tool_call_id
-            JOIN turns t ON t.id = c.turn_id
-            WHERE t.soul_session_id = ?1
-            ORDER BY r.created_at ASC
-            "#,
-        )
-        .map_err(|error| error.to_string())?;
-    let rows = stmt
-        .query_map(params![soul_session_id], map_tool_result_row)
-        .map_err(|error| error.to_string())?;
-    collect_rows(rows)
-}
-
-pub(super) fn tool_results_for_turn(
-    conn: &Connection,
-    turn_id: &str,
-) -> Result<Vec<ToolResult>, String> {
-    let mut stmt = conn
-        .prepare(
-            r#"
-            SELECT r.id, r.tool_call_id, r.output, r.error_text, r.created_at
-            FROM tool_results r
-            JOIN tool_calls c ON c.id = r.tool_call_id
-            WHERE c.turn_id = ?1
-            ORDER BY r.created_at ASC
-            "#,
-        )
-        .map_err(|error| error.to_string())?;
-    let rows = stmt
-        .query_map(params![turn_id], map_tool_result_row)
-        .map_err(|error| error.to_string())?;
-    collect_rows(rows)
+    thinking_span_id: &str,
+) -> Result<Option<ThinkingSpan>, String> {
+    conn.query_row(
+        r#"
+        SELECT id, turn_id, provider_response_id, state, summary, completion_reason,
+               error_text, created_at, updated_at, finished_at
+        FROM thinking_spans
+        WHERE id = ?1
+        LIMIT 1
+        "#,
+        params![thinking_span_id],
+        map_thinking_span_row,
+    )
+    .optional()
+    .map_err(|error| error.to_string())
 }
 
 pub(super) fn compacts_for_soul_session(

@@ -19,7 +19,7 @@ use db::*;
 use rows::{actor_type_db, collect_rows, map_session_summary_row, message_state_db};
 use schema::SCHEMA;
 
-const SANTI_SCHEMA_VERSION: u32 = 4;
+const SANTI_SCHEMA_VERSION: u32 = 6;
 const DEFAULT_ACCOUNT_ID: &str = "account_local";
 const DEFAULT_SOUL_ID: &str = "soul_default";
 
@@ -71,6 +71,7 @@ impl SantiStore {
                 DROP TABLE IF EXISTS conversations;
                 DROP TABLE IF EXISTS r_soul_session_messages;
                 DROP TABLE IF EXISTS compacts;
+                DROP TABLE IF EXISTS thinking_spans;
                 DROP TABLE IF EXISTS tool_results;
                 DROP TABLE IF EXISTS tool_calls;
                 DROP TABLE IF EXISTS turns;
@@ -234,6 +235,11 @@ impl SantiStore {
             messages: session_messages(&conn, session_id)?,
             turns: if let Some(soul_session) = &soul_session {
                 turns_for_soul_session(&conn, &soul_session.id)?
+            } else {
+                Vec::new()
+            },
+            thinking_spans: if let Some(soul_session) = &soul_session {
+                soul_thinking_spans(&conn, &soul_session.id)?
             } else {
                 Vec::new()
             },

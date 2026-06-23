@@ -222,6 +222,36 @@ pub struct ToolResult {
     pub created_at: Timestamp,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ThinkingSpanState {
+    Running,
+    Completed,
+    Failed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ThinkingCompletionReason {
+    FirstTextDelta,
+    ToolCallRequested,
+    ProviderCompleted,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ThinkingSpan {
+    pub id: String,
+    pub turn_id: String,
+    pub provider_response_id: Option<String>,
+    pub state: ThinkingSpanState,
+    pub summary: Option<String>,
+    pub completion_reason: Option<ThinkingCompletionReason>,
+    pub error_text: Option<String>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+    pub finished_at: Option<Timestamp>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Compact {
     pub id: String,
@@ -252,6 +282,7 @@ pub struct SessionEffect {
 pub enum SoulSessionTargetType {
     Message,
     Compact,
+    Thinking,
     ToolCall,
     ToolResult,
 }
@@ -310,6 +341,7 @@ pub struct SendSessionResponse {
     pub turn: Turn,
     pub user_message: SessionMessage,
     pub assistant_message: SessionMessage,
+    pub thinking_spans: Vec<ThinkingSpan>,
     pub tool_calls: Vec<ToolCall>,
     pub tool_results: Vec<ToolResult>,
 }
@@ -320,6 +352,23 @@ pub struct SantiStreamEvent {
     pub session_id: String,
     pub created_at: Timestamp,
     pub payload: SantiStreamPayload,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum TurnActivityState {
+    Requesting,
+    Thinking,
+    Generating,
+    CallingTool,
+    RunningTool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct TurnActivity {
+    pub turn_id: String,
+    pub state: TurnActivityState,
+    pub provider_response_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -345,8 +394,20 @@ pub enum SantiStreamPayload {
     ToolResultCreated {
         tool_result: ToolResult,
     },
+    ThinkingCreated {
+        thinking: ThinkingSpan,
+    },
+    ThinkingUpdated {
+        thinking: ThinkingSpan,
+    },
+    ThinkingCompleted {
+        thinking: ThinkingSpan,
+    },
     TurnStarted {
         turn: Turn,
+    },
+    TurnActivity {
+        activity: TurnActivity,
     },
     TurnFailed {
         turn_id: String,
@@ -362,6 +423,7 @@ pub struct SessionRuntimeSnapshot {
     pub soul_profile: Option<SoulProfile>,
     pub messages: Vec<SessionMessage>,
     pub turns: Vec<Turn>,
+    pub thinking_spans: Vec<ThinkingSpan>,
     pub tool_calls: Vec<ToolCall>,
     pub tool_results: Vec<ToolResult>,
     pub compacts: Vec<Compact>,

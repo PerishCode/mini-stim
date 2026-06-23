@@ -73,10 +73,16 @@ export type {
   SessionSummary,
   SoulProfile,
   SoulSession,
+  ThinkingCompletionReason,
+  ThinkingSpan,
+  ThinkingSpanState,
   TimelineItem,
   ToolCall,
   ToolResult,
   Turn,
+  TurnActivity,
+  TurnActivityProjection,
+  TurnActivityState,
   TurnGroup,
   TurnStatus,
 } from "./types";
@@ -117,6 +123,8 @@ function createMqueueCore(target: Window): SantiMqueue {
     timelineBySessionId: {},
     turnTimelineBySessionId: {},
     turnsBySessionId: {},
+    turnActivityBySessionId: {},
+    thinkingSpansBySessionId: {},
     toolCallsBySessionId: {},
     toolResultsBySessionId: {},
     connectionBySessionId: {},
@@ -128,7 +136,9 @@ function createMqueueCore(target: Window): SantiMqueue {
     markTurnFailed,
     removeTransient,
     setMessageProjection,
+    setTurnActivity,
     upsertMessages,
+    upsertThinkingSpans,
     upsertTools,
     upsertTurns,
   } = createProjectionWriter(state, messageState);
@@ -307,6 +317,7 @@ function createMqueueCore(target: Window): SantiMqueue {
         ) as SessionRuntimeSnapshot;
         state.runtimeBySessionId[runtimePayload.sessionId] = runtime;
         upsertTurns(runtimePayload.sessionId, runtime.turns);
+        upsertThinkingSpans(runtimePayload.sessionId, runtime.thinking_spans);
         upsertTools(runtimePayload.sessionId, runtime.tool_calls, runtime.tool_results);
         emitMessageProjection(runtimePayload.sessionId);
         dispatchSession(target, sessionEvent(action, "committed", runtime, "http"));
@@ -352,6 +363,7 @@ function createMqueueCore(target: Window): SantiMqueue {
       response.assistant_message,
     ]);
     upsertTurns(summarySessionId(response.session), [response.turn]);
+    upsertThinkingSpans(summarySessionId(response.session), response.thinking_spans);
     upsertTools(summarySessionId(response.session), response.tool_calls, response.tool_results);
     state.messages = state.messagesBySessionId[summarySessionId(response.session)];
     emitMessageProjection(summarySessionId(response.session));
@@ -402,6 +414,21 @@ function createMqueueCore(target: Window): SantiMqueue {
         emitProjection();
         emitMessageProjection(sessionId);
       },
+      thinkingCreated: (payload) => {
+        upsertThinkingSpans(sessionId, [payload.thinking]);
+        dispatchMessage(target, messageEvent("thinking_created", sessionId, payload, "sse"));
+        emitMessageProjection(sessionId);
+      },
+      thinkingUpdated: (payload) => {
+        upsertThinkingSpans(sessionId, [payload.thinking]);
+        dispatchMessage(target, messageEvent("thinking_updated", sessionId, payload, "sse"));
+        emitMessageProjection(sessionId);
+      },
+      thinkingCompleted: (payload) => {
+        upsertThinkingSpans(sessionId, [payload.thinking]);
+        dispatchMessage(target, messageEvent("thinking_completed", sessionId, payload, "sse"));
+        emitMessageProjection(sessionId);
+      },
       toolCall: (payload) => {
         upsertTools(sessionId, [payload.tool_call], []);
         dispatchMessage(target, messageEvent("tool_call", sessionId, payload, "sse"));
@@ -416,6 +443,14 @@ function createMqueueCore(target: Window): SantiMqueue {
         upsertTurns(sessionId, [payload.turn]);
         dispatchMessage(target, messageEvent("turn_started", sessionId, payload, "sse"));
         emitMessageProjection(sessionId);
+      },
+      turnActivity: (payload, createdAt) => {
+        const activity = { ...payload.activity, created_at: createdAt };
+        const changed = setTurnActivity(sessionId, activity);
+        dispatchMessage(target, messageEvent("turn_activity", sessionId, activity, "sse"));
+        if (changed) {
+          emitMessageProjection(sessionId);
+        }
       },
       turnFailed: (payload) => {
         markTurnFailed(sessionId, payload.turn_id, payload.error);

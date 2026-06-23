@@ -141,6 +141,40 @@ export interface SoulSession {
   updated_at: String;
 }
 
+export type ThinkingCompletionReason =
+  (typeof ThinkingCompletionReason)[keyof typeof ThinkingCompletionReason];
+
+export const ThinkingCompletionReason = {
+  first_text_delta: "first_text_delta",
+  tool_call_requested: "tool_call_requested",
+  provider_completed: "provider_completed",
+} as const;
+
+export type ThinkingSpanState =
+  (typeof ThinkingSpanState)[keyof typeof ThinkingSpanState];
+
+export const ThinkingSpanState = {
+  running: "running",
+  completed: "completed",
+  failed: "failed",
+} as const;
+
+export interface ThinkingSpan {
+  completion_reason?: null | ThinkingCompletionReason;
+  created_at: String;
+  /** @nullable */
+  error_text?: string | null;
+  finished_at?: null | String;
+  id: string;
+  /** @nullable */
+  provider_response_id?: string | null;
+  state: ThinkingSpanState;
+  /** @nullable */
+  summary?: string | null;
+  turn_id: string;
+  updated_at: String;
+}
+
 export interface ToolCall {
   arguments: unknown;
   created_at: String;
@@ -197,6 +231,7 @@ export interface SendSessionResponse {
   session: SessionSummary;
   soul_profile: SoulProfile;
   soul_session: SoulSession;
+  thinking_spans: ThinkingSpan[];
   tool_calls: ToolCall[];
   tool_results: ToolResult[];
   turn: Turn;
@@ -233,9 +268,28 @@ export interface SessionRuntimeSnapshot {
   session: Session;
   soul_profile?: null | SoulProfile;
   soul_session?: null | SoulSession;
+  thinking_spans: ThinkingSpan[];
   tool_calls: ToolCall[];
   tool_results: ToolResult[];
   turns: Turn[];
+}
+
+export type TurnActivityState =
+  (typeof TurnActivityState)[keyof typeof TurnActivityState];
+
+export const TurnActivityState = {
+  requesting: "requesting",
+  thinking: "thinking",
+  generating: "generating",
+  calling_tool: "calling_tool",
+  running_tool: "running_tool",
+} as const;
+
+export interface TurnActivity {
+  /** @nullable */
+  provider_response_id?: string | null;
+  state: TurnActivityState;
+  turn_id: string;
 }
 
 export interface UpdateSessionRequest {

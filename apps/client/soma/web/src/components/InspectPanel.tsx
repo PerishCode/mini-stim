@@ -89,6 +89,7 @@ function MessageInspectDomain(props: InspectDomainPanelProps) {
       return <MessageInspectPanel runtime={props.runtime} messageId={props.target.messageId} />;
     case "session":
     case "turn":
+    case "thinking":
     case "tool_call":
     case "tool_result":
     case undefined:
@@ -103,6 +104,7 @@ function ToolCallInspectDomain(props: InspectDomainPanelProps) {
       return <ToolCallInspectPanel runtime={props.runtime} target={props.target} />;
     case "message":
     case "session":
+    case "thinking":
     case "turn":
     case undefined:
       return <SessionInspectPanel runtime={props.runtime} />;
@@ -117,6 +119,7 @@ function resolveInspectDomain(target: InspectTarget | null): InspectDomain {
     case "tool_result":
       return "tool-call";
     case "session":
+    case "thinking":
     case "turn":
     case undefined:
       return "session";

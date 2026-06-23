@@ -8,6 +8,7 @@ import {
   useAppComponentRef,
 } from "@mini-stim/components";
 import type { TurnGroup } from "@mini-stim/hooks";
+import type { Ref } from "react";
 import { Fragment } from "react";
 
 import { STIM_APP_NAMESPACE } from "../appNamespace";
@@ -20,7 +21,11 @@ export interface SoulIdentity {
   name: string;
 }
 
-export function Transcript(props: { soulIdentity: SoulIdentity; timeline: TurnGroup[] }) {
+export function Transcript(props: {
+  contentRef?: Ref<HTMLDivElement>;
+  soulIdentity: SoulIdentity;
+  timeline: TurnGroup[];
+}) {
   const items = flattenTimelineItems(props.timeline);
   const groups = buildTranscriptGroups(items);
   const empty = !props.timeline.some((group) => group.items.length || group.turn);
@@ -35,7 +40,7 @@ export function Transcript(props: { soulIdentity: SoulIdentity; timeline: TurnGr
   });
 
   return (
-    <Stack ref={transcriptRef} gap="sm" grow={empty}>
+    <Stack ref={mergeRefs(transcriptRef, props.contentRef)} gap="sm" grow={empty}>
       {groups.map((group) => (
         <TranscriptGroupView
           key={group.id}
@@ -48,6 +53,21 @@ export function Transcript(props: { soulIdentity: SoulIdentity; timeline: TurnGr
       {empty ? <TranscriptEmpty /> : null}
     </Stack>
   );
+}
+
+function mergeRefs<T>(...refs: Array<Ref<T> | undefined>) {
+  return (element: T | null) => {
+    for (const ref of refs) {
+      if (!ref) {
+        continue;
+      }
+      if (typeof ref === "function") {
+        ref(element);
+      } else {
+        ref.current = element;
+      }
+    }
+  };
 }
 
 function TranscriptEmpty() {

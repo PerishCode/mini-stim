@@ -1,5 +1,5 @@
 use rusqlite::Connection;
-use santi_core::{ActorType, MessageContent, MessageState, SantiStore};
+use santi_core::{ActorType, MessageContent, MessageState, SantiStore, ThinkingCompletionReason};
 
 #[test]
 fn schema_matches_runtime() {
@@ -23,6 +23,7 @@ fn schema_matches_runtime() {
         "turns",
         "tool_calls",
         "tool_results",
+        "thinking_spans",
         "compacts",
         "r_soul_session_messages",
     ] {
@@ -68,6 +69,74 @@ fn appends_relations_in_order() {
     assert_eq!(input.len(), 1);
     assert_eq!(input[0].role, "user");
     assert_eq!(input[0].content, "hello ordering");
+}
+
+#[test]
+fn thinking_spans_skip_input() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let store = SantiStore::open(temp.path().join("santi.sqlite")).expect("open store");
+    let session = store.create_session().expect("create session");
+    let user = store
+        .append_message(
+            &session.session.id,
+            ActorType::Account,
+            store.default_account_id(),
+            MessageContent::text("hello thinking"),
+            MessageState::Fixed,
+        )
+        .expect("append user")
+        .session_message;
+    let soul_session = store
+        .acquire_soul_session(&session.session.id)
+        .expect("acquire soul session")
+        .soul_session;
+    store
+        .append_message_ref(&soul_session.id, &user.message.id)
+        .expect("append message ref");
+    let turn = store
+        .start_turn(
+            &soul_session.id,
+            &user.message.id,
+            user.relation.session_seq,
+        )
+        .expect("start turn")
+        .turn;
+    let thinking = store
+        .append_thinking_span(&turn.id, Some("resp_test".to_string()))
+        .expect("append thinking");
+    let thinking = store
+        .update_thinking_span_summary(&thinking.id, "Looked at the prompt.".to_string())
+        .expect("update thinking summary")
+        .expect("thinking exists");
+    let thinking = store
+        .complete_thinking_span(&thinking.id, ThinkingCompletionReason::FirstTextDelta)
+        .expect("complete thinking")
+        .expect("thinking exists");
+
+    let snapshot = store
+        .runtime_snapshot(&session.session.id)
+        .expect("runtime snapshot")
+        .expect("session exists");
+    assert_eq!(snapshot.thinking_spans.len(), 1);
+    assert_eq!(snapshot.thinking_spans[0].id, thinking.id);
+    assert_eq!(
+        snapshot.thinking_spans[0].provider_response_id.as_deref(),
+        Some("resp_test")
+    );
+    assert_eq!(
+        snapshot.thinking_spans[0].summary.as_deref(),
+        Some("Looked at the prompt.")
+    );
+    assert_eq!(
+        snapshot.thinking_spans[0].completion_reason,
+        Some(ThinkingCompletionReason::FirstTextDelta)
+    );
+
+    let input = store
+        .assembly_input(&soul_session.id)
+        .expect("assembly input");
+    assert_eq!(input.len(), 1);
+    assert_eq!(input[0].content, "hello thinking");
 }
 
 #[test]
