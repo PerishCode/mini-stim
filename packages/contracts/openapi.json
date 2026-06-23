@@ -261,6 +261,64 @@
         }
       }
     },
+    "/api/v1/sessions/{session_id}/materials": {
+      "post": {
+        "tags": [],
+        "operationId": "session_material",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MaterialRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionMaterial"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/sessions/{session_id}/messages": {
       "get": {
         "tags": [],
@@ -390,7 +448,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SendSessionResponse"
+                  "$ref": "#/components/schemas/SendSessionAcceptedResponse"
                 }
               }
             }
@@ -500,6 +558,42 @@
           },
           "service": {
             "type": "string"
+          }
+        }
+      },
+      "MaterialKind": {
+        "type": "string",
+        "enum": [
+          "system_prompt"
+        ]
+      },
+      "MaterialRequest": {
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/MaterialKind"
+          }
+        }
+      },
+      "MaterialUpdated": {
+        "type": "object",
+        "required": [
+          "session_id",
+          "kind",
+          "updated_at"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/MaterialKind"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/String"
           }
         }
       },
@@ -618,6 +712,33 @@
           "fixed"
         ]
       },
+      "SendSessionAcceptedResponse": {
+        "type": "object",
+        "required": [
+          "session",
+          "soul_session",
+          "soul_profile",
+          "turn",
+          "user_message"
+        ],
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/SessionSummary"
+          },
+          "soul_profile": {
+            "$ref": "#/components/schemas/SoulProfile"
+          },
+          "soul_session": {
+            "$ref": "#/components/schemas/SoulSession"
+          },
+          "turn": {
+            "$ref": "#/components/schemas/Turn"
+          },
+          "user_message": {
+            "$ref": "#/components/schemas/SessionMessage"
+          }
+        }
+      },
       "SendSessionRequest": {
         "type": "object",
         "required": [
@@ -629,58 +750,6 @@
             "items": {
               "$ref": "#/components/schemas/MessagePart"
             }
-          }
-        }
-      },
-      "SendSessionResponse": {
-        "type": "object",
-        "required": [
-          "session",
-          "soul_session",
-          "soul_profile",
-          "turn",
-          "user_message",
-          "assistant_message",
-          "thinking_spans",
-          "tool_calls",
-          "tool_results"
-        ],
-        "properties": {
-          "assistant_message": {
-            "$ref": "#/components/schemas/SessionMessage"
-          },
-          "session": {
-            "$ref": "#/components/schemas/SessionSummary"
-          },
-          "soul_profile": {
-            "$ref": "#/components/schemas/SoulProfile"
-          },
-          "soul_session": {
-            "$ref": "#/components/schemas/SoulSession"
-          },
-          "thinking_spans": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ThinkingSpan"
-            }
-          },
-          "tool_calls": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ToolCall"
-            }
-          },
-          "tool_results": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ToolResult"
-            }
-          },
-          "turn": {
-            "$ref": "#/components/schemas/Turn"
-          },
-          "user_message": {
-            "$ref": "#/components/schemas/SessionMessage"
           }
         }
       },
@@ -786,6 +855,33 @@
             "type": "string"
           },
           "status": {
+            "type": "string"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/String"
+          }
+        }
+      },
+      "SessionMaterial": {
+        "type": "object",
+        "required": [
+          "session_id",
+          "kind",
+          "content_type",
+          "text",
+          "updated_at"
+        ],
+        "properties": {
+          "content_type": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MaterialKind"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "text": {
             "type": "string"
           },
           "updated_at": {
@@ -970,6 +1066,7 @@
         "type": "object",
         "required": [
           "soul_id",
+          "soul_name",
           "nickname",
           "avatar_seed",
           "created_at",
@@ -998,6 +1095,9 @@
             "type": "string"
           },
           "soul_id": {
+            "type": "string"
+          },
+          "soul_name": {
             "type": "string"
           },
           "updated_at": {

@@ -9,14 +9,18 @@ import {
   Timestamp,
   useAppComponentRef,
 } from "@mini-stim/components";
-import type { SessionRuntimeSnapshot } from "@mini-stim/hooks";
+import type { SessionMaterial, SessionRuntimeSnapshot } from "@mini-stim/hooks";
 import type { ReactNode } from "react";
 
 import { STIM_APP_NAMESPACE } from "../../../../appNamespace";
 
-export function SessionInspectPanel(props: { runtime: SessionRuntimeSnapshot }) {
-  const { runtime } = props;
+export function SessionInspectPanel(props: {
+  runtime: SessionRuntimeSnapshot;
+  systemPrompt: SessionMaterial | null;
+}) {
+  const { runtime, systemPrompt } = props;
   const memory = runtime.soul_session?.session_memory.trim() ?? "";
+  const promptText = systemPrompt?.text.trim() ?? "";
 
   return (
     <Stack gap="lg">
@@ -30,6 +34,23 @@ export function SessionInspectPanel(props: { runtime: SessionRuntimeSnapshot }) 
           </Text>
           {runtime.profile.desc ? <Text size="sm">{runtime.profile.desc}</Text> : null}
         </Stack>
+      </InspectSection>
+
+      <InspectSection
+        title="SYSTEM PROMPT"
+        aside={
+          systemPrompt ? (
+            <Timestamp value={systemPrompt.updated_at} size="xs" tone="subtle" />
+          ) : null
+        }
+      >
+        {promptText ? (
+          <CodeBlock>{promptText}</CodeBlock>
+        ) : (
+          <Text size="sm" tone="muted">
+            System prompt material has not been loaded yet.
+          </Text>
+        )}
       </InspectSection>
 
       <InspectSection

@@ -62,6 +62,22 @@ export interface HealthResponse {
   service: string;
 }
 
+export type MaterialKind = (typeof MaterialKind)[keyof typeof MaterialKind];
+
+export const MaterialKind = {
+  system_prompt: "system_prompt",
+} as const;
+
+export interface MaterialRequest {
+  kind: MaterialKind;
+}
+
+export interface MaterialUpdated {
+  kind: MaterialKind;
+  session_id: string;
+  updated_at: String;
+}
+
 export type MessagePart =
   | {
       text: string;
@@ -96,23 +112,6 @@ export interface Message {
   version: number;
 }
 
-export interface SendSessionRequest {
-  content: MessagePart[];
-}
-
-export interface SessionMessageRef {
-  created_at: String;
-  message_id: string;
-  session_id: string;
-  session_seq: number;
-}
-
-export interface SessionMessage {
-  content_text: string;
-  message: Message;
-  relation: SessionMessageRef;
-}
-
 export interface SoulProfile {
   /** @nullable */
   avatar_ref?: string | null;
@@ -122,6 +121,7 @@ export interface SoulProfile {
   desc?: string | null;
   nickname: string;
   soul_id: string;
+  soul_name: string;
   updated_at: String;
 }
 
@@ -138,6 +138,95 @@ export interface SoulSession {
   session_id: string;
   session_memory: string;
   soul_id: string;
+  updated_at: String;
+}
+
+export type TurnStatus = (typeof TurnStatus)[keyof typeof TurnStatus];
+
+export const TurnStatus = {
+  running: "running",
+  completed: "completed",
+  failed: "failed",
+} as const;
+
+export type TurnTriggerType =
+  (typeof TurnTriggerType)[keyof typeof TurnTriggerType];
+
+export const TurnTriggerType = {
+  session_send: "session_send",
+  system: "system",
+} as const;
+
+export interface Turn {
+  base_soul_session_seq: number;
+  created_at: String;
+  /** @nullable */
+  end_soul_session_seq?: number | null;
+  /** @nullable */
+  error_text?: string | null;
+  finished_at?: null | String;
+  id: string;
+  input_through_session_seq: number;
+  soul_session_id: string;
+  status: TurnStatus;
+  /** @nullable */
+  trigger_ref?: string | null;
+  trigger_type: TurnTriggerType;
+  updated_at: String;
+}
+
+export interface SessionMessageRef {
+  created_at: String;
+  message_id: string;
+  session_id: string;
+  session_seq: number;
+}
+
+export interface SessionMessage {
+  content_text: string;
+  message: Message;
+  relation: SessionMessageRef;
+}
+
+export interface SendSessionAcceptedResponse {
+  session: SessionSummary;
+  soul_profile: SoulProfile;
+  soul_session: SoulSession;
+  turn: Turn;
+  user_message: SessionMessage;
+}
+
+export interface SendSessionRequest {
+  content: MessagePart[];
+}
+
+export interface SessionDetail {
+  messages: SessionMessage[];
+  profile: SessionProfile;
+  session: Session;
+}
+
+export interface SessionEffect {
+  created_at: String;
+  effect_type: string;
+  /** @nullable */
+  error_text?: string | null;
+  id: string;
+  idempotency_key: string;
+  /** @nullable */
+  result_ref?: string | null;
+  session_id: string;
+  source_hook_id: string;
+  source_turn_id: string;
+  status: string;
+  updated_at: String;
+}
+
+export interface SessionMaterial {
+  content_type: string;
+  kind: MaterialKind;
+  session_id: string;
+  text: string;
   updated_at: String;
 }
 
@@ -190,74 +279,6 @@ export interface ToolResult {
   id: string;
   output?: unknown;
   tool_call_id: string;
-}
-
-export type TurnStatus = (typeof TurnStatus)[keyof typeof TurnStatus];
-
-export const TurnStatus = {
-  running: "running",
-  completed: "completed",
-  failed: "failed",
-} as const;
-
-export type TurnTriggerType =
-  (typeof TurnTriggerType)[keyof typeof TurnTriggerType];
-
-export const TurnTriggerType = {
-  session_send: "session_send",
-  system: "system",
-} as const;
-
-export interface Turn {
-  base_soul_session_seq: number;
-  created_at: String;
-  /** @nullable */
-  end_soul_session_seq?: number | null;
-  /** @nullable */
-  error_text?: string | null;
-  finished_at?: null | String;
-  id: string;
-  input_through_session_seq: number;
-  soul_session_id: string;
-  status: TurnStatus;
-  /** @nullable */
-  trigger_ref?: string | null;
-  trigger_type: TurnTriggerType;
-  updated_at: String;
-}
-
-export interface SendSessionResponse {
-  assistant_message: SessionMessage;
-  session: SessionSummary;
-  soul_profile: SoulProfile;
-  soul_session: SoulSession;
-  thinking_spans: ThinkingSpan[];
-  tool_calls: ToolCall[];
-  tool_results: ToolResult[];
-  turn: Turn;
-  user_message: SessionMessage;
-}
-
-export interface SessionDetail {
-  messages: SessionMessage[];
-  profile: SessionProfile;
-  session: Session;
-}
-
-export interface SessionEffect {
-  created_at: String;
-  effect_type: string;
-  /** @nullable */
-  error_text?: string | null;
-  id: string;
-  idempotency_key: string;
-  /** @nullable */
-  result_ref?: string | null;
-  session_id: string;
-  source_hook_id: string;
-  source_turn_id: string;
-  status: string;
-  updated_at: String;
 }
 
 export interface SessionRuntimeSnapshot {
@@ -582,6 +603,61 @@ export const updateSession = async (
   } as updateSessionResponse;
 };
 
+export type sessionMaterialResponse200 = {
+  data: SessionMaterial;
+  status: 200;
+};
+
+export type sessionMaterialResponse404 = {
+  data: ErrorResponse;
+  status: 404;
+};
+
+export type sessionMaterialResponse500 = {
+  data: ErrorResponse;
+  status: 500;
+};
+
+export type sessionMaterialResponseSuccess = sessionMaterialResponse200 & {
+  headers: Headers;
+};
+export type sessionMaterialResponseError = (
+  | sessionMaterialResponse404
+  | sessionMaterialResponse500
+) & {
+  headers: Headers;
+};
+
+export type sessionMaterialResponse =
+  | sessionMaterialResponseSuccess
+  | sessionMaterialResponseError;
+
+export const getSessionMaterialUrl = (sessionId: string) => {
+  return `/api/v1/sessions/${sessionId}/materials`;
+};
+
+export const sessionMaterial = async (
+  sessionId: string,
+  materialRequest: MaterialRequest,
+  options?: RequestInit,
+): Promise<sessionMaterialResponse> => {
+  const res = await fetch(getSessionMaterialUrl(sessionId), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(materialRequest),
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: sessionMaterialResponse["data"] = body ? JSON.parse(body) : {};
+  return {
+    data,
+    status: res.status,
+    headers: res.headers,
+  } as sessionMaterialResponse;
+};
+
 export type listMessagesResponse200 = {
   data: SessionMessage[];
   status: 200;
@@ -687,7 +763,7 @@ export const runtimeSnapshot = async (
 };
 
 export type sendSessionResponse200 = {
-  data: SendSessionResponse;
+  data: SendSessionAcceptedResponse;
   status: 200;
 };
 

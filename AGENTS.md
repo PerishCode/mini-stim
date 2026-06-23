@@ -23,7 +23,8 @@ Keep directory ownership strict while keeping the product semantics small.
 
 - single-person conversations with one configured AI assistant
 - normalized message and response-run persistence
-- provider-abstracted model streaming with an OpenAI Responses implementation
+- provider-abstracted model streaming with OpenAI Responses and DeepSeek Chat
+  Completions implementations
 - a Rust server with OpenAPI-exported contracts
 - a web client generated against those contracts
 
@@ -35,7 +36,7 @@ Keep directory ownership strict while keeping the product semantics small.
 - delivery targets, delivery workers, or retry leases
 - product-specific sidecar semantics beyond the local cell/soma dev runtime
 - Tauri, native macOS projections, or packaged platform launchers
-- legacy OpenAI completions or chat completions compatibility
+- legacy OpenAI completions compatibility
 
 ## Repository Structure
 
@@ -113,8 +114,8 @@ plane and must stay limited to cell lifecycle facts.
   `mini-stim-server-soma` bin.
 - `packages/contracts` must be generated from the Rust OpenAPI source of truth.
 - Do not hand-maintain divergent client/server DTOs.
-- Use the provider boundary even when only OpenAI is configured. Do not add
-  legacy completions paths.
+- Use the provider boundary even when only one concrete provider is configured.
+  Do not add legacy OpenAI completions paths.
 - If the expected local environment or command is unavailable, report the
   missing prerequisite directly and stop that path. Do not spend time inventing
   fallbacks or exploring unrelated environment workarounds unless the user asks.
@@ -388,7 +389,13 @@ surface before considering any alternate browser layer.
 
 ## Environment
 
-`.env` is local and ignored by git. Required OpenAI settings:
+`.env` is local and ignored by git. Select the model provider with:
+
+```text
+SANTI_PROVIDER=openai
+```
+
+OpenAI settings:
 
 ```text
 OPENAI_API_KEY=
@@ -397,6 +404,17 @@ OPENAI_RESPONSES_BASE_URL=https://api.openai.com/v1
 OPENAI_REASONING_EFFORT=
 OPENAI_REASONING_SUMMARY=
 OPENAI_MAX_OUTPUT_TOKENS=
+```
+
+DeepSeek settings:
+
+```text
+DEEPSEEK_API_KEY=
+DEEPSEEK_MODEL=deepseek-v4-pro
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_THINKING=
+DEEPSEEK_REASONING_EFFORT=
+DEEPSEEK_MAX_TOKENS=
 ```
 
 Server soma settings:

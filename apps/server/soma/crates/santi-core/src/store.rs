@@ -10,6 +10,7 @@ use crate::{
     SoulSessionEntry, SoulSessionTargetType, Turn, prefixed_id, timestamp_now,
 };
 
+mod assembly;
 mod db;
 mod rows;
 mod runtime;
@@ -19,7 +20,7 @@ use db::*;
 use rows::{actor_type_db, collect_rows, map_session_summary_row, message_state_db};
 use schema::SCHEMA;
 
-const SANTI_SCHEMA_VERSION: u32 = 6;
+const SANTI_SCHEMA_VERSION: u32 = 7;
 const DEFAULT_ACCOUNT_ID: &str = "account_local";
 const DEFAULT_SOUL_ID: &str = "soul_default";
 
@@ -118,9 +119,9 @@ impl SantiStore {
         conn.execute(
             r#"
             INSERT OR IGNORE INTO soul_profiles (
-              soul_id, nickname, avatar_ref, avatar_seed, desc, created_at, updated_at
+              soul_id, soul_name, nickname, avatar_ref, avatar_seed, desc, created_at, updated_at
             )
-            VALUES (?1, 'Santi', NULL, ?1, NULL, ?2, ?2)
+            VALUES (?1, 'Liberte', 'Santi', NULL, ?1, NULL, ?2, ?2)
             "#,
             params![DEFAULT_SOUL_ID, now],
         )

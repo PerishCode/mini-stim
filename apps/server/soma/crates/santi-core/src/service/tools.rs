@@ -1,4 +1,7 @@
-use std::{path::PathBuf, process::Command};
+use std::{
+    path::{Component, Path, PathBuf},
+    process::Command,
+};
 
 use santi_provider::{FunctionCallOutput, ProviderFunctionCall};
 use serde::Deserialize;
@@ -48,28 +51,18 @@ impl SantiService {
                 "error": result.error_text,
             }))
             .map_err(|error| error.to_string())?,
+            assistant_content: None,
+            reasoning_content: None,
         })
     }
 
     fn dispatch_tool(
         &self,
         session_id: &str,
-        soul_session_id: &str,
+        _soul_session_id: &str,
         call: &ProviderFunctionCall,
     ) -> Result<Value, String> {
         match call.name.as_str() {
-            "write_soul_memory" => {
-                let args = parse_tool_args::<WriteMemoryArgs>(&call.arguments)?;
-                let soul = self.store.write_soul_memory(&args.text)?;
-                Ok(json!({ "ok": true, "soul_id": soul.id }))
-            }
-            "write_session_memory" => {
-                let args = parse_tool_args::<WriteMemoryArgs>(&call.arguments)?;
-                let soul_session = self
-                    .store
-                    .write_session_memory(soul_session_id, &args.text)?;
-                Ok(json!({ "ok": true, "soul_session_id": soul_session.id }))
-            }
             "shell" => {
                 let args = parse_tool_args::<ShellArgs>(&call.arguments)?;
                 self.run_shell(session_id, args)
@@ -80,10 +73,9 @@ impl SantiService {
 
     fn run_shell(&self, session_id: &str, args: ShellArgs) -> Result<Value, String> {
         std::fs::create_dir_all(self.soul_memory_dir()).map_err(|error| error.to_string())?;
-        let cwd = args
-            .cwd
-            .map(PathBuf::from)
-            .unwrap_or_else(|| self.execution_root());
+        std::fs::create_dir_all(self.session_memory_dir(session_id))
+            .map_err(|error| error.to_string())?;
+        let cwd = self.resolve_shell_cwd(session_id, args.cwd.as_deref())?;
         std::fs::create_dir_all(&cwd).map_err(|error| error.to_string())?;
         let mut command = shell_command(&args.command);
         let output = command
@@ -100,7 +92,21 @@ impl SantiService {
             "stdout": String::from_utf8_lossy(&output.stdout),
             "stderr": String::from_utf8_lossy(&output.stderr),
             "shell": default_shell_name(),
+            "cwd": cwd.display().to_string(),
         }))
+    }
+
+    fn resolve_shell_cwd(&self, session_id: &str, cwd: Option<&str>) -> Result<PathBuf, String> {
+        let Some(cwd) = cwd else {
+            return Ok(self.execution_root());
+        };
+        if let Some(path) = cwd.strip_prefix("@soul") {
+            return aliased_path(self.soul_memory_dir(), path, "@soul");
+        }
+        if let Some(path) = cwd.strip_prefix("@session") {
+            return aliased_path(self.session_memory_dir(session_id), path, "@session");
+        }
+        Ok(PathBuf::from(cwd))
     }
 
     pub(super) fn runtime_root(&self) -> PathBuf {
@@ -115,17 +121,20 @@ impl SantiService {
         self.runtime_root().join("souls").join("memory")
     }
 
+    pub(super) fn soul_memory_file(&self) -> PathBuf {
+        self.soul_memory_dir().join("MEMORY.md")
+    }
+
     pub(super) fn session_memory_dir(&self, session_id: &str) -> PathBuf {
         self.runtime_root()
             .join("sessions")
             .join(session_id)
             .join("memory")
     }
-}
 
-#[derive(Debug, Deserialize)]
-struct WriteMemoryArgs {
-    text: String,
+    pub(super) fn session_memory_file(&self, session_id: &str) -> PathBuf {
+        self.session_memory_dir(session_id).join("MEMORY.md")
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -156,6 +165,25 @@ fn shell_command(command: &str) -> Command {
 
 fn default_shell_name() -> &'static str {
     if cfg!(windows) { "pwsh" } else { "bash" }
+}
+
+fn aliased_path(root: PathBuf, suffix: &str, alias: &str) -> Result<PathBuf, String> {
+    if suffix.is_empty() {
+        return Ok(root);
+    }
+    let Some(path) = suffix.strip_prefix('/') else {
+        return Err(format!("invalid cwd alias: {alias}{suffix}"));
+    };
+    let path = Path::new(path);
+    if path.components().any(|component| {
+        matches!(
+            component,
+            Component::ParentDir | Component::RootDir | Component::Prefix(_)
+        )
+    }) {
+        return Err(format!("cwd alias cannot escape {alias}"));
+    }
+    Ok(root.join(path))
 }
 
 fn parse_tool_args<T: for<'de> Deserialize<'de>>(value: &Value) -> Result<T, String> {

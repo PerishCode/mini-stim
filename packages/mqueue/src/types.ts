@@ -1,5 +1,8 @@
 import type {
+  MaterialKind,
+  MaterialUpdated,
   MessagePart,
+  SessionMaterial,
   SessionMessage,
   SessionRuntimeSnapshot,
   SessionSummary,
@@ -13,9 +16,12 @@ import type {
 
 export type {
   Compact,
+  MaterialKind,
+  MaterialUpdated,
   MessagePart,
   Session,
   SessionEffect,
+  SessionMaterial,
   SessionMessage,
   SessionProfile,
   SessionRuntimeSnapshot,
@@ -37,6 +43,7 @@ export type SessionAction =
   | "create"
   | "get"
   | "list"
+  | "material"
   | "messages"
   | "runtime"
   | "select"
@@ -49,6 +56,7 @@ export interface SessionPayloads {
   create: undefined;
   get: { sessionId: string };
   list: undefined;
+  material: { kind: MaterialKind; sessionId: string };
   messages: { sessionId: string };
   runtime: { sessionId: string };
   select: { sessionId: string | null };
@@ -66,6 +74,7 @@ export interface SessionProjection {
   sessions: SessionSummary[];
   selectedSessionId: string | null;
   messages: SessionMessage[];
+  materialsBySessionId: Record<string, Partial<Record<MaterialKind, SessionMaterial>>>;
   messagesBySessionId: Record<string, SessionMessage[]>;
   runtimeBySessionId: Record<string, SessionRuntimeSnapshot>;
   pending: number;
@@ -238,6 +247,7 @@ export type StreamPayload =
   | { type: "thinking_created"; thinking: ThinkingSpan }
   | { type: "thinking_updated"; thinking: ThinkingSpan }
   | { type: "thinking_completed"; thinking: ThinkingSpan }
+  | { type: "material_updated"; material: MaterialUpdated }
   | { type: "tool_call_created"; tool_call: ToolCall }
   | { type: "tool_result_created"; tool_result: ToolResult }
   | { type: "turn_started"; turn: Turn }

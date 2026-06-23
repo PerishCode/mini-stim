@@ -1,3 +1,4 @@
+mod assembly;
 mod model;
 mod object_store;
 mod service;

@@ -27,13 +27,13 @@ packages/
   components/
 ```
 
-The only product loop is web client -> Rust server -> OpenAI Responses API
+The only product loop is web client -> Rust server -> provider-abstracted model
 streaming -> SQLite transcript.
 
 `santi-core` owns the chat domain and persistence boundary. `santi-provider`
-owns model-provider traits plus the concrete OpenAI provider implementation used
-by the server soma. The root `sidecar.toml` starts project-local cells, and each
-cell manages its sidecar-unaware soma.
+owns model-provider traits plus concrete provider implementations used by the
+server soma. The root `sidecar.toml` starts project-local cells, and each cell
+manages its sidecar-unaware soma.
 
 Terminology:
 
@@ -45,7 +45,7 @@ Terminology:
 ## Scope
 
 - Single-person conversations.
-- OpenAI Responses API native streaming.
+- Provider-abstracted model streaming.
 - Normalized local SQLite persistence.
 - Rust server soma with OpenAPI export.
 - Generated TypeScript contracts.
@@ -57,7 +57,7 @@ Out of scope:
 - Multiplayer chat.
 - Agent registries, agent runtimes, delivery workers, product-specific sidecar
   semantics, Tauri, and native projections.
-- Legacy completions or chat completions compatibility.
+- Legacy OpenAI completions compatibility.
 
 Modeled in core but deliberately not yet surfaced in the web UI. Each entry
 names its unlock condition so deferral stays distinguishable from neglect:
@@ -85,12 +85,21 @@ names its unlock condition so deferral stays distinguishable from neglect:
 Create `.env` from `.env.example` and fill:
 
 ```text
+SANTI_PROVIDER=openai
+
 OPENAI_API_KEY=
 OPENAI_MODEL=
 OPENAI_RESPONSES_BASE_URL=https://api.openai.com/v1
 OPENAI_REASONING_EFFORT=
 OPENAI_REASONING_SUMMARY=
 OPENAI_MAX_OUTPUT_TOKENS=
+
+DEEPSEEK_API_KEY=
+DEEPSEEK_MODEL=deepseek-v4-pro
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_THINKING=
+DEEPSEEK_REASONING_EFFORT=
+DEEPSEEK_MAX_TOKENS=
 ```
 
 Install dependencies:

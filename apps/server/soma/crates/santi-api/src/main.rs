@@ -1,4 +1,4 @@
-use std::{convert::Infallible, env, net::SocketAddr, path::PathBuf, sync::Arc};
+use std::{convert::Infallible, env, net::SocketAddr, path::PathBuf};
 
 use axum::{
     Json, Router,
@@ -12,12 +12,12 @@ use axum::{
 };
 use futures_core::Stream;
 use santi_core::{
-    CreateSessionResponse, ErrorResponse, HealthResponse, SantiService, SantiServiceConfig,
-    SantiStreamEvent, SantiStreamPayload, SendSessionRequest, SendSessionResponse, Session,
-    SessionDetail, SessionProfile, SessionRuntimeSnapshot, SessionSummary, SoulProfile,
-    UpdateSessionRequest, prefixed_id, timestamp_now,
+    CreateSessionResponse, ErrorResponse, HealthResponse, MaterialRequest, SantiService,
+    SantiServiceConfig, SantiStreamEvent, SantiStreamPayload, SendSessionAcceptedResponse,
+    SendSessionRequest, Session, SessionDetail, SessionMaterial, SessionProfile,
+    SessionRuntimeSnapshot, SessionSummary, SoulProfile, UpdateSessionRequest, prefixed_id,
+    timestamp_now,
 };
-use santi_provider::{OpenAIProvider, OpenAIProviderConfig};
 use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,
@@ -25,10 +25,11 @@ use tower_http::{
 use utoipa::OpenApi;
 
 mod bucket;
+mod provider;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
-    dotenvy::dotenv().ok();
+    dotenvy::dotenv_override().ok();
     match env::args().nth(1).as_deref() {
         Some("export-openapi") => {
             println!(
@@ -44,22 +45,7 @@ async fn main() -> Result<(), String> {
 }
 
 async fn serve() -> Result<(), String> {
-    let provider = Arc::new(OpenAIProvider::new(OpenAIProviderConfig {
-        api_key: env::var("OPENAI_API_KEY")
-            .map_err(|_| "OPENAI_API_KEY is required".to_string())?,
-        model: env::var("OPENAI_MODEL").map_err(|_| "OPENAI_MODEL is required".to_string())?,
-        base_url: env::var("OPENAI_RESPONSES_BASE_URL")
-            .unwrap_or_else(|_| "https://api.openai.com/v1".to_string()),
-        reasoning_effort: optional_env("OPENAI_REASONING_EFFORT"),
-        reasoning_summary: optional_env("OPENAI_REASONING_SUMMARY"),
-        max_output_tokens: optional_env("OPENAI_MAX_OUTPUT_TOKENS")
-            .map(|value| {
-                value
-                    .parse::<u32>()
-                    .map_err(|_| "OPENAI_MAX_OUTPUT_TOKENS must be an unsigned integer".to_string())
-            })
-            .transpose()?,
-    }));
+    let provider = provider::from_env()?;
     let database_path = env::var("SANTI_DB").map_err(|_| "SANTI_DB is required".to_string())?;
     let runtime_root = env::var("SANTI_RUNTIME_ROOT").unwrap_or_else(|_| {
         db_parent(&database_path)
@@ -110,13 +96,6 @@ fn bind_addr_string() -> String {
     format!("{host}:{port}")
 }
 
-fn optional_env(name: &str) -> Option<String> {
-    env::var(name)
-        .ok()
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
-}
-
 fn router(service: SantiService) -> Router {
     Router::new()
         .route("/api/v1/health", get(health))
@@ -127,6 +106,10 @@ fn router(service: SantiService) -> Router {
             get(get_session).patch(update_session),
         )
         .route("/api/v1/sessions/{session_id}/messages", get(list_messages))
+        .route(
+            "/api/v1/sessions/{session_id}/materials",
+            post(session_material),
+        )
         .route("/api/v1/sessions/{session_id}/events", get(session_events))
         .route("/api/v1/sessions/{session_id}/send", post(send_session))
         .route(
@@ -252,6 +235,28 @@ async fn list_messages(
         .ok_or_else(|| ApiError::not_found("session not found"))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/sessions/{session_id}/materials",
+    params(("session_id" = String, Path)),
+    request_body = MaterialRequest,
+    responses(
+        (status = 200, body = SessionMaterial),
+        (status = 404, body = ErrorResponse),
+        (status = 500, body = ErrorResponse)
+    )
+)]
+async fn session_material(
+    State(service): State<SantiService>,
+    Path(session_id): Path<String>,
+    Json(request): Json<MaterialRequest>,
+) -> Result<Json<SessionMaterial>, ApiError> {
+    service
+        .session_material(&session_id, request)
+        .map(Json)
+        .map_err(ApiError::from_service)
+}
+
 async fn session_events(
     State(service): State<SantiService>,
     Path(session_id): Path<String>,
@@ -290,7 +295,7 @@ async fn session_events(
     params(("session_id" = String, Path)),
     request_body = SendSessionRequest,
     responses(
-        (status = 200, body = SendSessionResponse),
+        (status = 200, body = SendSessionAcceptedResponse),
         (status = 404, body = ErrorResponse),
         (status = 500, body = ErrorResponse)
     )
@@ -299,7 +304,7 @@ async fn send_session(
     State(service): State<SantiService>,
     Path(session_id): Path<String>,
     Json(request): Json<SendSessionRequest>,
-) -> Result<Json<SendSessionResponse>, ApiError> {
+) -> Result<Json<SendSessionAcceptedResponse>, ApiError> {
     service
         .send_session(&session_id, request)
         .await
@@ -350,6 +355,7 @@ fn sse_event_name(payload: &SantiStreamPayload) -> &'static str {
         SantiStreamPayload::ThinkingCreated { .. } => "thinking_created",
         SantiStreamPayload::ThinkingUpdated { .. } => "thinking_updated",
         SantiStreamPayload::ThinkingCompleted { .. } => "thinking_completed",
+        SantiStreamPayload::MaterialUpdated { .. } => "material_updated",
         SantiStreamPayload::TurnStarted { .. } => "turn_started",
         SantiStreamPayload::TurnActivity { .. } => "turn_activity",
         SantiStreamPayload::TurnFailed { .. } => "turn_failed",
@@ -424,6 +430,7 @@ impl IntoResponse for ApiError {
         get_session,
         update_session,
         list_messages,
+        session_material,
         send_session,
         runtime_snapshot,
         bucket::get_bucket_object
@@ -432,10 +439,12 @@ impl IntoResponse for ApiError {
         CreateSessionResponse,
         ErrorResponse,
         HealthResponse,
+        MaterialRequest,
         SendSessionRequest,
-        SendSessionResponse,
+        SendSessionAcceptedResponse,
         Session,
         SessionDetail,
+        SessionMaterial,
         SessionProfile,
         SessionRuntimeSnapshot,
         SessionSummary,
@@ -447,6 +456,8 @@ impl IntoResponse for ApiError {
         santi_core::MessageContent,
         santi_core::MessagePart,
         santi_core::MessageState,
+        santi_core::MaterialKind,
+        santi_core::MaterialUpdated,
         santi_core::SessionEffect,
         santi_core::SessionMessage,
         santi_core::SessionMessageRef,

@@ -4,8 +4,8 @@ use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::{
     ActorType, Compact, Session, SessionEffect, SessionMessage, SessionProfile, SessionSummary,
-    Soul, SoulProfile, SoulSession, SoulSessionEntry, SoulSessionTargetType, ThinkingSpan,
-    ToolCall, ToolResult, Turn, timestamp_now,
+    SoulProfile, SoulSession, SoulSessionEntry, SoulSessionTargetType, ThinkingSpan, ToolCall,
+    ToolResult, Turn, timestamp_now,
 };
 
 use super::rows::*;
@@ -133,30 +133,13 @@ pub(super) fn session_summary_by_id(
     .map_err(|error| error.to_string())
 }
 
-pub(super) fn soul_by_id(conn: &Connection, soul_id: &str) -> Result<Option<Soul>, String> {
-    conn.query_row(
-        "SELECT id, memory, created_at, updated_at FROM souls WHERE id = ?1 LIMIT 1",
-        params![soul_id],
-        |row| {
-            Ok(Soul {
-                id: row.get(0)?,
-                memory: row.get(1)?,
-                created_at: row.get(2)?,
-                updated_at: row.get(3)?,
-            })
-        },
-    )
-    .optional()
-    .map_err(|error| error.to_string())
-}
-
 pub(super) fn soul_profile_by_id(
     conn: &Connection,
     soul_id: &str,
 ) -> Result<Option<SoulProfile>, String> {
     conn.query_row(
         r#"
-        SELECT soul_id, nickname, avatar_ref, avatar_seed, desc, created_at, updated_at
+        SELECT soul_id, soul_name, nickname, avatar_ref, avatar_seed, desc, created_at, updated_at
         FROM soul_profiles
         WHERE soul_id = ?1
         LIMIT 1

@@ -87,10 +87,14 @@ export function validateSessionPayload<Action extends SessionAction>(
 ) {
   switch (action) {
     case "get":
+    case "material":
     case "messages":
     case "runtime":
       if (!(payload as { sessionId?: unknown })?.sessionId) {
         throw new Error(`session.${action} requires sessionId`);
+      }
+      if (action === "material" && !(payload as { kind?: unknown })?.kind) {
+        throw new Error("session.material requires kind");
       }
       return;
     case "select":
@@ -171,6 +175,12 @@ export function cloneProjection(value: SessionProjection): SessionProjection {
     sessions: [...value.sessions],
     selectedSessionId: value.selectedSessionId,
     messages: [...value.messages],
+    materialsBySessionId: Object.fromEntries(
+      Object.entries(value.materialsBySessionId ?? {}).map(([sessionId, materials]) => [
+        sessionId,
+        { ...materials },
+      ]),
+    ),
     messagesBySessionId: Object.fromEntries(
       Object.entries(value.messagesBySessionId).map(([sessionId, messages]) => [
         sessionId,

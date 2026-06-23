@@ -1,5 +1,6 @@
 import { parseStreamEvent } from "./events";
 import type {
+  MaterialUpdated,
   MessageDeltaPayload,
   SessionMessage,
   StreamPayload,
@@ -23,6 +24,7 @@ export interface SessionStreamHandlers {
   thinkingCreated(payload: { type: "thinking_created"; thinking: ThinkingSpan }): void;
   thinkingUpdated(payload: { type: "thinking_updated"; thinking: ThinkingSpan }): void;
   thinkingCompleted(payload: { type: "thinking_completed"; thinking: ThinkingSpan }): void;
+  materialUpdated(payload: { type: "material_updated"; material: MaterialUpdated }): void;
   toolCall(payload: { type: "tool_call_created"; tool_call: ToolCall }): void;
   toolResult(payload: { type: "tool_result_created"; tool_result: ToolResult }): void;
   turnStarted(payload: { type: "turn_started"; turn: Turn }): void;
@@ -40,6 +42,7 @@ export function openSessionStream(sessionId: string, handlers: SessionStreamHand
   listen(source, "thinking_created", "thinking_created", handlers.thinkingCreated);
   listen(source, "thinking_updated", "thinking_updated", handlers.thinkingUpdated);
   listen(source, "thinking_completed", "thinking_completed", handlers.thinkingCompleted);
+  listen(source, "material_updated", "material_updated", handlers.materialUpdated);
   listen(source, "tool_call_created", "tool_call_created", handlers.toolCall);
   listen(source, "tool_result_created", "tool_result_created", handlers.toolResult);
   listen(source, "turn_started", "turn_started", handlers.turnStarted);

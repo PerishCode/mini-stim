@@ -7,8 +7,8 @@ Use `.task/MAIN.md` for active planning and keep docs focused on settled boundar
 ## Index
 
 - Current durable boundary is documented in `AGENTS.md`: single-person web chat,
-  Rust server, provider-abstracted model streaming with a concrete OpenAI
-  implementation, generated OpenAPI contracts, and normalized local
+  Rust server, provider-abstracted model streaming with concrete OpenAI and
+  DeepSeek implementations, generated OpenAPI contracts, and normalized local
   persistence.
 - The local dev runtime uses sidecar CLI with project-local cells and somas:
   `cell` is the managed control boundary, `soma` is the sidecar-unaware

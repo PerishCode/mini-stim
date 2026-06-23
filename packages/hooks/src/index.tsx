@@ -1,5 +1,6 @@
 import {
   installSantiMqueue,
+  type MaterialKind,
   type MessageConnectionState,
   type MessageEvent,
   type MessagePart,
@@ -8,6 +9,7 @@ import {
   type PubAck,
   type SantiMqueue,
   type SantiWindow,
+  type SessionMaterial,
   type SessionMessage,
   type SessionProjection,
   type SessionRuntimeSnapshot,
@@ -27,6 +29,8 @@ import {
 
 export type {
   Compact,
+  MaterialKind,
+  MaterialUpdated,
   MessageConnectionState,
   MessagePart,
   MqueueError,
@@ -34,6 +38,7 @@ export type {
   SantiMqueue,
   Session,
   SessionEffect,
+  SessionMaterial,
   SessionMessage,
   SessionProjection,
   SessionRuntimeSnapshot,
@@ -62,6 +67,7 @@ interface SessionActions {
   create(): PubAck;
   get(sessionId: string): PubAck;
   list(): PubAck;
+  refreshMaterial(sessionId: string, kind: MaterialKind): PubAck;
   refreshRuntime(sessionId: string): PubAck;
   select(sessionId: string | null): PubAck;
   selectAndGet(sessionId: string): PubAck[];
@@ -165,6 +171,17 @@ export function useSessionRuntime(sessionId?: string | null): SessionRuntimeSnap
   return projection.runtimeBySessionId[resolvedSessionId] ?? null;
 }
 
+export function useSessionMaterial(
+  sessionId: string | null | undefined,
+  kind: MaterialKind,
+): SessionMaterial | null {
+  const projection = useSessionProjection();
+  if (!sessionId) {
+    return null;
+  }
+  return projection.materialsBySessionId[sessionId]?.[kind] ?? null;
+}
+
 export function useSessionPending(): number {
   return useSessionProjection().pending;
 }
@@ -257,6 +274,8 @@ export function useSessionActions(): SessionActions {
       create: () => mqueue.session.pub("create"),
       get: (sessionId: string) => mqueue.session.pub("get", { sessionId }),
       list: () => mqueue.session.pub("list"),
+      refreshMaterial: (sessionId: string, kind: MaterialKind) =>
+        mqueue.session.pub("material", { sessionId, kind }),
       refreshRuntime: (sessionId: string) => mqueue.session.pub("runtime", { sessionId }),
       select: (sessionId: string | null) => mqueue.session.pub("select", { sessionId }),
       selectAndGet: (sessionId: string) => [

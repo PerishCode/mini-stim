@@ -37,6 +37,8 @@ pub struct FunctionCallOutput {
     pub call: ProviderFunctionCall,
     pub call_id: String,
     pub output: String,
+    pub assistant_content: Option<String>,
+    pub reasoning_content: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -50,6 +52,17 @@ pub struct ProviderFunctionCall {
     pub arguments: Value,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProviderStreamTrace {
+    Chunk {
+        bytes: usize,
+    },
+    RawEvent {
+        raw_type: String,
+        mapped_events: Vec<String>,
+    },
+}
+
 #[derive(Debug, Clone)]
 pub struct ProviderMetadata {
     pub provider: Arc<str>,
@@ -58,6 +71,7 @@ pub struct ProviderMetadata {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ProviderEvent {
+    StreamTrace(ProviderStreamTrace),
     ResponseStarted {
         provider_response_id: Option<String>,
     },

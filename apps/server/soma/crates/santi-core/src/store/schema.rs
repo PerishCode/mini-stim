@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS souls (
 
 CREATE TABLE IF NOT EXISTS soul_profiles (
     soul_id TEXT PRIMARY KEY,
+    soul_name TEXT NOT NULL,
     nickname TEXT NOT NULL,
     avatar_ref TEXT,
     avatar_seed TEXT NOT NULL,

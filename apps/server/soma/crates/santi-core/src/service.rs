@@ -1,28 +1,39 @@
+mod materials;
+mod text_delta;
 mod thinking;
+mod timing;
 mod tools;
 
 use futures_util::StreamExt;
-use santi_provider::{ProviderClient, ProviderEvent, ProviderMessage, ProviderRequest};
-use std::sync::Arc;
+use santi_provider::{ProviderClient, ProviderEvent, ProviderRequest};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 use tokio::sync::broadcast;
 
-use crate::service_prompt::{
-    provider_tools, render_self_assessment_instructions, tooling_instructions,
-};
+use crate::assembly::input::provider_messages;
+use crate::service_prompt::provider_tools;
 use crate::{
-    ActorType, CreateSessionResponse, MessageContent, MessageState, SantiStore, SantiStreamEvent,
-    SantiStreamPayload, SendSessionRequest, SendSessionResponse, SessionDetail,
-    SessionRuntimeSnapshot, SessionSummary, ThinkingCompletionReason, ThinkingSpan,
-    TurnActivityState, UpdateSessionRequest, prefixed_id, timestamp_now,
+    ActorType, CreateSessionResponse, MaterialKind, MessageContent, MessageState, SantiStore,
+    SantiStreamEvent, SantiStreamPayload, SendSessionAcceptedResponse, SendSessionRequest,
+    SessionDetail, SessionMaterial, SessionRuntimeSnapshot, SessionSummary,
+    ThinkingCompletionReason, ThinkingSpan, TurnActivityState, UpdateSessionRequest, prefixed_id,
+    timestamp_now,
 };
+use text_delta::TextDeltaUpdate;
+use timing::{ProviderTurnTiming, provider_event_name};
 
 #[derive(Clone)]
 pub struct SantiService {
     pub(crate) store: SantiStore,
     provider: Arc<dyn ProviderClient>,
     pub(crate) config: SantiServiceConfig,
+    material_cache: Arc<Mutex<HashMap<MaterialCacheKey, SessionMaterial>>>,
     stream_events: broadcast::Sender<SantiStreamEvent>,
 }
+
+type MaterialCacheKey = (String, MaterialKind);
 
 #[derive(Debug, Clone)]
 pub struct SantiServiceConfig {
@@ -42,6 +53,7 @@ impl SantiService {
             store,
             provider,
             config,
+            material_cache: Arc::new(Mutex::new(HashMap::new())),
             stream_events: broadcast::channel(1024).0,
         })
     }
@@ -94,7 +106,7 @@ impl SantiService {
         &self,
         session_id: &str,
         request: SendSessionRequest,
-    ) -> Result<SendSessionResponse, String> {
+    ) -> Result<SendSessionAcceptedResponse, String> {
         let text = request.text();
         if text.trim().is_empty() {
             return Err("send content must contain text".to_string());
@@ -134,87 +146,112 @@ impl SantiService {
             SantiStreamPayload::TurnStarted { turn: turn.clone() },
         );
 
-        let send_result = self
-            .run_provider_turn(session_id, &soul_session.id, &turn.id)
-            .await;
-
-        let (assistant_text, provider_response_id) = match send_result {
-            Ok(value) => value,
-            Err(error) => {
-                let _ = self.store.fail_turn(&turn.id, &error);
-                self.publish_stream(
-                    session_id,
-                    SantiStreamPayload::TurnFailed {
-                        turn_id: turn.id.clone(),
-                        error: error.clone(),
-                    },
-                );
-                return Err(error);
-            }
-        };
-
-        if assistant_text.trim().is_empty() {
-            let error = "provider completed without assistant output".to_string();
-            let _ = self.store.fail_turn(&turn.id, &error);
-            self.publish_stream(
-                session_id,
-                SantiStreamPayload::TurnFailed {
-                    turn_id: turn.id.clone(),
-                    error: error.clone(),
-                },
-            );
-            return Err(error);
-        }
-
-        let assistant_message = self
-            .store
-            .append_message(
-                session_id,
-                ActorType::Soul,
-                self.store.default_soul_id(),
-                MessageContent::text(assistant_text),
-                MessageState::Fixed,
-            )?
-            .session_message;
-        self.store
-            .append_message_ref(&soul_session.id, &assistant_message.message.id)?;
-        let completed_turn = self.store.complete_turn(
-            &turn.id,
-            assistant_message.relation.session_seq,
-            provider_response_id,
-        )?;
-        self.publish_stream(
-            session_id,
-            SantiStreamPayload::MessageCompleted {
-                turn_id: turn.id.clone(),
-                message: assistant_message.clone(),
-            },
-        );
-
         let snapshot = self
             .store
             .runtime_snapshot(session_id)?
             .ok_or_else(|| "soul_session disappeared".to_string())?;
-        let soul_session = snapshot
+        let accepted_soul_session = snapshot
             .soul_session
             .ok_or_else(|| "soul_session disappeared".to_string())?;
         let soul_profile = snapshot
             .soul_profile
             .ok_or_else(|| "soul_profile disappeared".to_string())?;
-        Ok(SendSessionResponse {
+        let background = self.clone();
+        let background_session_id = session_id.to_string();
+        let background_soul_session_id = soul_session.id.clone();
+        let background_turn_id = turn.id.clone();
+        tokio::spawn(async move {
+            background
+                .complete_provider_turn(
+                    background_session_id,
+                    background_soul_session_id,
+                    background_turn_id,
+                )
+                .await;
+        });
+
+        Ok(SendSessionAcceptedResponse {
             session: SessionSummary {
                 session: snapshot.session,
                 profile: snapshot.profile,
             },
-            soul_session,
+            soul_session: accepted_soul_session,
             soul_profile,
-            turn: completed_turn,
+            turn,
             user_message,
-            assistant_message,
-            thinking_spans: self.store.thinking_spans_for_turn(&turn.id)?,
-            tool_calls: self.store.tool_calls_for_turn(&turn.id)?,
-            tool_results: self.store.tool_results_for_turn(&turn.id)?,
         })
+    }
+
+    async fn complete_provider_turn(
+        &self,
+        session_id: String,
+        soul_session_id: String,
+        turn_id: String,
+    ) {
+        let send_result = self
+            .run_provider_turn(&session_id, &soul_session_id, &turn_id)
+            .await;
+
+        let (assistant_text, provider_response_id) = match send_result {
+            Ok(value) => value,
+            Err(error) => {
+                self.fail_background_turn(&session_id, &turn_id, error);
+                return;
+            }
+        };
+
+        if assistant_text.trim().is_empty() {
+            let error = "provider completed without assistant output".to_string();
+            self.fail_background_turn(&session_id, &turn_id, error);
+            return;
+        }
+
+        let assistant_message = match self.store.append_message(
+            &session_id,
+            ActorType::Soul,
+            self.store.default_soul_id(),
+            MessageContent::text(assistant_text),
+            MessageState::Fixed,
+        ) {
+            Ok(message) => message.session_message,
+            Err(error) => {
+                self.fail_background_turn(&session_id, &turn_id, error);
+                return;
+            }
+        };
+        if let Err(error) = self
+            .store
+            .append_message_ref(&soul_session_id, &assistant_message.message.id)
+        {
+            self.fail_background_turn(&session_id, &turn_id, error);
+            return;
+        }
+        if let Err(error) = self.store.complete_turn(
+            &turn_id,
+            assistant_message.relation.session_seq,
+            provider_response_id,
+        ) {
+            self.fail_background_turn(&session_id, &turn_id, error);
+            return;
+        }
+        self.publish_stream(
+            &session_id,
+            SantiStreamPayload::MessageCompleted {
+                turn_id,
+                message: assistant_message,
+            },
+        );
+    }
+
+    fn fail_background_turn(&self, session_id: &str, turn_id: &str, error: String) {
+        let _ = self.store.fail_turn(turn_id, &error);
+        self.publish_stream(
+            session_id,
+            SantiStreamPayload::TurnFailed {
+                turn_id: turn_id.to_string(),
+                error,
+            },
+        );
     }
 
     async fn run_provider_turn(
@@ -225,21 +262,16 @@ impl SantiService {
     ) -> Result<(String, Option<String>), String> {
         let mut assistant_text = String::new();
         let mut function_call_outputs = Vec::new();
+        let mut timing = ProviderTurnTiming::new(turn_id);
+        let mut round = 0;
 
         let final_response_id = loop {
-            let input = self
-                .store
-                .assembly_input(soul_session_id)?
-                .into_iter()
-                .map(|message| ProviderMessage {
-                    role: message.role,
-                    content: message.content,
-                })
-                .collect();
+            round += 1;
+            let input = provider_messages(&self.store, soul_session_id)?;
             let metadata = self.provider.metadata();
             let request = ProviderRequest {
                 model: metadata.model,
-                instructions: Some(self.runtime_instructions(session_id, soul_session_id)?),
+                instructions: Some(self.system_prompt_text(session_id, soul_session_id)?),
                 input,
                 tools: Some(provider_tools()),
                 previous_response_id: None,
@@ -249,19 +281,40 @@ impl SantiService {
                     Some(function_call_outputs.clone())
                 },
             };
+            timing.request_built(
+                round,
+                request.input.len(),
+                request.instructions.as_ref().map_or(0, |text| text.len()),
+                request
+                    .function_call_outputs
+                    .as_ref()
+                    .map_or(0, |outputs| outputs.len()),
+            );
             self.publish_turn_activity(session_id, turn_id, TurnActivityState::Requesting, None);
-            let mut stream = self.provider.stream_response(request).await?;
+            let mut stream = match self.provider.stream_response(request).await {
+                Ok(stream) => {
+                    timing.http_response_started(round);
+                    stream
+                }
+                Err(error) => {
+                    timing.failed(round, "http_response", &error);
+                    return Err(error);
+                }
+            };
             let mut calls = Vec::new();
             let mut completed_response_id = None;
             let mut active_provider_response_id = None;
             let mut current_thinking_span: Option<ThinkingSpan> = None;
             let mut summary_thinking_span: Option<ThinkingSpan> = None;
             let mut reasoning_summary = String::new();
+            let mut round_assistant_text = String::new();
+            let mut saw_sse_event = false;
 
             while let Some(event) = stream.next().await {
                 let event = match event {
                     Ok(event) => event,
                     Err(error) => {
+                        timing.failed(round, "sse_event", &error);
                         self.fail_current_thinking_span(
                             session_id,
                             &mut current_thinking_span,
@@ -270,7 +323,16 @@ impl SantiService {
                         return Err(error);
                     }
                 };
+                if let ProviderEvent::StreamTrace(trace) = event {
+                    timing.provider_trace(round, trace);
+                    continue;
+                }
+                if !saw_sse_event {
+                    saw_sse_event = true;
+                    timing.first_sse_event(round, provider_event_name(&event));
+                }
                 match event {
+                    ProviderEvent::StreamTrace(_) => {}
                     ProviderEvent::ResponseStarted {
                         provider_response_id,
                     }
@@ -309,31 +371,20 @@ impl SantiService {
                         )?;
                     }
                     ProviderEvent::TextDelta(delta) => {
-                        if assistant_text.is_empty() {
-                            self.complete_current_thinking_span(
-                                session_id,
-                                &mut current_thinking_span,
-                                ThinkingCompletionReason::FirstTextDelta,
-                            )?;
-                            self.publish_turn_activity(
-                                session_id,
-                                turn_id,
-                                TurnActivityState::Generating,
-                                active_provider_response_id.clone(),
-                            );
-                        }
-                        assistant_text.push_str(&delta);
-                        self.publish_stream(
+                        let update = TextDeltaUpdate {
                             session_id,
-                            SantiStreamPayload::MessageDelta {
-                                message_id: format!("stream_{turn_id}"),
-                                turn_id: turn_id.to_string(),
-                                role: ActorType::Soul,
-                                text: delta,
-                            },
-                        );
+                            turn_id,
+                            assistant_text: &mut assistant_text,
+                            round_assistant_text: &mut round_assistant_text,
+                            timing: &timing,
+                            round,
+                            current_thinking_span: &mut current_thinking_span,
+                            active_provider_response_id: &active_provider_response_id,
+                        };
+                        self.handle_text_delta(delta, update)?;
                     }
                     ProviderEvent::FunctionCallRequested(call) => {
+                        timing.function_call_requested(round, &call.name);
                         self.complete_current_thinking_span(
                             session_id,
                             &mut current_thinking_span,
@@ -350,6 +401,7 @@ impl SantiService {
                     ProviderEvent::Completed {
                         provider_response_id,
                     } => {
+                        timing.completed(round);
                         active_provider_response_id = provider_response_id.clone();
                         self.complete_current_thinking_span(
                             session_id,
@@ -375,6 +427,7 @@ impl SantiService {
             }
 
             let mut outputs = Vec::new();
+            timing.tool_outputs_started(round, calls.len());
             for call in calls {
                 self.publish_turn_activity(
                     session_id,
@@ -382,52 +435,24 @@ impl SantiService {
                     TurnActivityState::RunningTool,
                     active_provider_response_id.clone(),
                 );
-                outputs.push(self.handle_tool_call(session_id, soul_session_id, turn_id, call)?);
+                let mut output =
+                    self.handle_tool_call(session_id, soul_session_id, turn_id, call)?;
+                if !round_assistant_text.is_empty() {
+                    output.assistant_content = Some(round_assistant_text.clone());
+                }
+                if !reasoning_summary.is_empty() {
+                    output.reasoning_content = Some(reasoning_summary.clone());
+                }
+                outputs.push(output);
             }
+            timing.tool_outputs_completed(round, outputs.len());
             function_call_outputs.extend(outputs);
         };
 
         Ok((assistant_text, final_response_id))
     }
 
-    fn runtime_instructions(
-        &self,
-        session_id: &str,
-        soul_session_id: &str,
-    ) -> Result<String, String> {
-        let snapshot = self
-            .store
-            .runtime_snapshot(session_id)?
-            .ok_or_else(|| "session not found".to_string())?;
-        let soul_session = snapshot
-            .soul_session
-            .ok_or_else(|| "soul_session not found".to_string())?;
-        let metadata = self.provider.metadata();
-        Ok(
-            [
-                "You are santi, a customized personal agent service.".to_string(),
-                format!(
-                    "<santi-meta>\nsession_id: {session_id}\nsoul_id: {}\nhas_soul_memory: unknown\nhas_session_memory: {}\nhas_request_instructions: false\n</santi-meta>",
-                    soul_session.soul_id,
-                    !soul_session.session_memory.trim().is_empty()
-                ),
-                render_self_assessment_instructions(),
-                format!(
-                    "<santi-runtime>\nservice_name: santi\nassembly_mode: mini-stim-sidecar\nlaunch_profile: dev\nbind_addr: {}\nprovider_model: {}\nprovider_api: responses\nprovider_gateway_base_url: unknown\nSANTI_SOUL_MEMORY_DIR: {}\nSANTI_SESSION_MEMORY_DIR: {}\nfallback_cwd: {}\nsoul_session_id: {}\n</santi-runtime>",
-                    self.config.bind_addr.as_deref().unwrap_or("unknown"),
-                    metadata.model,
-                    self.soul_memory_dir().display(),
-                    self.session_memory_dir(session_id).display(),
-                    self.execution_root().display(),
-                    soul_session_id
-                ),
-                tooling_instructions(),
-            ]
-            .join("\n\n"),
-        )
-    }
-
-    fn publish_stream(&self, session_id: &str, payload: SantiStreamPayload) {
+    pub(crate) fn publish_stream(&self, session_id: &str, payload: SantiStreamPayload) {
         let _ = self.stream_events.send(SantiStreamEvent {
             event_id: prefixed_id("stream"),
             session_id: session_id.to_string(),

@@ -8,7 +8,7 @@ use std::{
 use futures_util::StreamExt;
 use santi_provider::{
     OpenAIProvider, OpenAIProviderConfig, ProviderClient, ProviderEvent, ProviderFunctionTool,
-    ProviderMessage, ProviderRequest, ProviderTool,
+    ProviderMessage, ProviderRequest, ProviderStreamTrace, ProviderTool,
 };
 use serde_json::Value;
 
@@ -124,6 +124,32 @@ async fn parses_summary_item_done() {
     ));
 }
 
+#[tokio::test]
+async fn emits_stream_trace_events() {
+    let events = capture_all_events(vec![
+        r#"data: {"type":"response.created","response":{"id":"resp_trace"}}"#,
+        r#"data: {"type":"response.output_text.delta","delta":"ok"}"#,
+    ])
+    .await;
+
+    assert!(events.iter().any(|event| {
+        matches!(
+            event,
+            ProviderEvent::StreamTrace(ProviderStreamTrace::Chunk { .. })
+        )
+    }));
+    assert!(events.iter().any(|event| {
+        matches!(
+            event,
+            ProviderEvent::StreamTrace(ProviderStreamTrace::RawEvent {
+                raw_type,
+                mapped_events,
+            }) if raw_type == "response.created"
+                && mapped_events == &vec!["response_started".to_string()]
+        )
+    }));
+}
+
 async fn capture_body(mut config: OpenAIProviderConfig) -> Value {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
     config.base_url = format!("http://{}", listener.local_addr().expect("local address"));
@@ -164,8 +190,8 @@ async fn capture_body(mut config: OpenAIProviderConfig) -> Value {
         .await
         .expect("stream response");
     assert!(matches!(
-        stream.next().await,
-        Some(Ok(ProviderEvent::Completed { .. }))
+        next_business_event(&mut stream).await,
+        Some(ProviderEvent::Completed { .. })
     ));
 
     let body = rx.recv().expect("receive request body");
@@ -209,8 +235,8 @@ async fn capture_body_without_tools(mut config: OpenAIProviderConfig) -> Value {
         .await
         .expect("stream response");
     assert!(matches!(
-        stream.next().await,
-        Some(Ok(ProviderEvent::Completed { .. }))
+        next_business_event(&mut stream).await,
+        Some(ProviderEvent::Completed { .. })
     ));
 
     let body = rx.recv().expect("receive request body");
@@ -219,6 +245,14 @@ async fn capture_body_without_tools(mut config: OpenAIProviderConfig) -> Value {
 }
 
 async fn capture_events(lines: Vec<&'static str>) -> Vec<ProviderEvent> {
+    capture_all_events(lines)
+        .await
+        .into_iter()
+        .filter(|event| !matches!(event, ProviderEvent::StreamTrace(_)))
+        .collect()
+}
+
+async fn capture_all_events(lines: Vec<&'static str>) -> Vec<ProviderEvent> {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
     let config = OpenAIProviderConfig {
         api_key: "test-key".to_string(),
@@ -263,6 +297,16 @@ async fn capture_events(lines: Vec<&'static str>) -> Vec<ProviderEvent> {
     }
     server.join().expect("server thread");
     events
+}
+
+async fn next_business_event(stream: &mut santi_provider::ProviderStream) -> Option<ProviderEvent> {
+    while let Some(event) = stream.next().await {
+        let event = event.expect("provider event");
+        if !matches!(event, ProviderEvent::StreamTrace(_)) {
+            return Some(event);
+        }
+    }
+    None
 }
 
 fn read_body(stream: &mut impl Read) -> Vec<u8> {

@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use crate::{
     FunctionCallOutput, ProviderClient, ProviderEvent, ProviderFunctionCall, ProviderMetadata,
-    ProviderRequest, ProviderStream, ProviderTool,
+    ProviderRequest, ProviderStream, ProviderStreamTrace, ProviderTool,
 };
 
 #[derive(Debug, Clone)]
@@ -192,6 +192,7 @@ fn parse_sse(
         let mut current_response_id: Option<String> = None;
         while let Some(chunk) = bytes.next().await {
             let chunk = chunk.map_err(|error| error.to_string())?;
+            yield ProviderEvent::StreamTrace(ProviderStreamTrace::Chunk { bytes: chunk.len() });
             buffer.push_str(&String::from_utf8_lossy(&chunk));
             while let Some(index) = buffer.find('\n') {
                 let line = buffer[..index].trim_end_matches('\r').to_string();
@@ -200,12 +201,45 @@ fn parse_sse(
                     if payload == "[DONE]" {
                         continue;
                     }
-                    for event in parse_event(payload, &mut current_response_id)? {
+                    let events = parse_event(payload, &mut current_response_id)?;
+                    yield ProviderEvent::StreamTrace(ProviderStreamTrace::RawEvent {
+                        raw_type: raw_event_type(payload),
+                        mapped_events: provider_event_names(&events),
+                    });
+                    for event in events {
                         yield event;
                     }
                 }
             }
         }
+    }
+}
+
+fn raw_event_type(payload: &str) -> String {
+    serde_json::from_str::<OpenAIEventKind>(payload)
+        .map(|event| event.event_type)
+        .unwrap_or_else(|_| "invalid_json".to_string())
+}
+
+fn provider_event_names(events: &[ProviderEvent]) -> Vec<String> {
+    events
+        .iter()
+        .map(provider_event_name)
+        .map(str::to_string)
+        .collect()
+}
+
+fn provider_event_name(event: &ProviderEvent) -> &'static str {
+    match event {
+        ProviderEvent::ResponseStarted { .. } => "response_started",
+        ProviderEvent::ResponseInProgress { .. } => "response_in_progress",
+        ProviderEvent::ReasoningSummaryDelta(_) => "reasoning_summary_delta",
+        ProviderEvent::ReasoningSummaryDone(_) => "reasoning_summary_done",
+        ProviderEvent::TextDelta(_) => "text_delta",
+        ProviderEvent::FunctionCallRequested(_) => "function_call_requested",
+        ProviderEvent::Completed { .. } => "completed",
+        ProviderEvent::Failed(_) => "failed",
+        ProviderEvent::StreamTrace(_) => "stream_trace",
     }
 }
 
@@ -364,6 +398,12 @@ struct OpenAIEvent {
     error: Option<OpenAIError>,
     #[serde(flatten)]
     raw: Value,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenAIEventKind {
+    #[serde(rename = "type")]
+    event_type: String,
 }
 
 impl OpenAIEvent {

@@ -16,6 +16,33 @@ pub struct ErrorResponse {
     pub message: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum MaterialKind {
+    SystemPrompt,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct MaterialRequest {
+    pub kind: MaterialKind,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct SessionMaterial {
+    pub session_id: String,
+    pub kind: MaterialKind,
+    pub content_type: String,
+    pub text: String,
+    pub updated_at: Timestamp,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct MaterialUpdated {
+    pub session_id: String,
+    pub kind: MaterialKind,
+    pub updated_at: Timestamp,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Session {
     pub id: String,
@@ -59,6 +86,7 @@ pub struct Soul {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SoulProfile {
     pub soul_id: String,
+    pub soul_name: String,
     pub nickname: String,
     pub avatar_ref: Option<String>,
     pub avatar_seed: String,
@@ -334,16 +362,12 @@ impl SendSessionRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct SendSessionResponse {
+pub struct SendSessionAcceptedResponse {
     pub session: SessionSummary,
     pub soul_session: SoulSession,
     pub soul_profile: SoulProfile,
     pub turn: Turn,
     pub user_message: SessionMessage,
-    pub assistant_message: SessionMessage,
-    pub thinking_spans: Vec<ThinkingSpan>,
-    pub tool_calls: Vec<ToolCall>,
-    pub tool_results: Vec<ToolResult>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -403,6 +427,9 @@ pub enum SantiStreamPayload {
     ThinkingCompleted {
         thinking: ThinkingSpan,
     },
+    MaterialUpdated {
+        material: MaterialUpdated,
+    },
     TurnStarted {
         turn: Turn,
     },
@@ -445,6 +472,20 @@ pub fn timestamp_now() -> Timestamp {
         .print_timestamp(&now, &mut buf)
         .expect("formatting a timestamp into a String cannot fail");
     buf
+}
+
+pub(crate) fn timestamp_from_system_time(
+    system_time: std::time::SystemTime,
+) -> Result<Timestamp, String> {
+    use jiff::fmt::temporal::DateTimePrinter;
+
+    let timestamp = jiff::Timestamp::try_from(system_time).map_err(|error| error.to_string())?;
+    let mut buf = String::new();
+    DateTimePrinter::new()
+        .precision(Some(3))
+        .print_timestamp(&timestamp, &mut buf)
+        .expect("formatting a timestamp into a String cannot fail");
+    Ok(buf)
 }
 
 pub fn prefixed_id(prefix: &str) -> String {
