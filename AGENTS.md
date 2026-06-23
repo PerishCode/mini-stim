@@ -23,7 +23,8 @@ Keep directory ownership strict while keeping the product semantics small.
 
 - single-person conversations with one configured AI assistant
 - normalized message and response-run persistence
-- provider-abstracted model streaming with an OpenAI Responses implementation
+- provider-abstracted model streaming with OpenAI Responses and DeepSeek Chat
+  Completions implementations
 - a Rust server with OpenAPI-exported contracts
 - a web client generated against those contracts
 
@@ -35,7 +36,7 @@ Keep directory ownership strict while keeping the product semantics small.
 - delivery targets, delivery workers, or retry leases
 - product-specific sidecar semantics beyond the local cell/soma dev runtime
 - Tauri, native macOS projections, or packaged platform launchers
-- legacy OpenAI completions or chat completions compatibility
+- legacy OpenAI completions compatibility
 
 ## Repository Structure
 
@@ -98,6 +99,15 @@ plane and must stay limited to cell lifecycle facts.
   diagnostic, log, database, and temp paths must come from store.
 - Inspect socket paths are transport addresses, not persistent app paths. They
   may use OS IPC locations but must not become storage roots.
+- Workspace context uses core-owned URI schemes as the only semantic truth
+  source:
+  - `soul://` is the current soul workspace.
+  - `session://` is the current session workspace.
+  - `soul://MEMORY.md` and `session://MEMORY.md` are the canonical memory
+    resources rendered into the system prompt.
+  - Tool inputs, system prompt material, and UI/material source labels must use
+    these URI schemes through core constants/helpers, not hand-written strings.
+  - Do not use or accept old `@` workspace aliases.
 
 ## Execution Rules
 
@@ -113,8 +123,8 @@ plane and must stay limited to cell lifecycle facts.
   `mini-stim-server-soma` bin.
 - `packages/contracts` must be generated from the Rust OpenAPI source of truth.
 - Do not hand-maintain divergent client/server DTOs.
-- Use the provider boundary even when only OpenAI is configured. Do not add
-  legacy completions paths.
+- Use the provider boundary even when only one concrete provider is configured.
+  Do not add legacy OpenAI completions paths.
 - If the expected local environment or command is unavailable, report the
   missing prerequisite directly and stop that path. Do not spend time inventing
   fallbacks or exploring unrelated environment workarounds unless the user asks.
@@ -388,14 +398,25 @@ surface before considering any alternate browser layer.
 
 ## Environment
 
-`.env` is local and ignored by git. Required OpenAI settings:
+Local app config defaults to `<cwd>/santi.toml`, created from the committed
+`santi.example.toml`. `santi.toml` is ignored by git and owns local API keys,
+model parameters, and the default active provider.
 
 ```text
-OPENAI_API_KEY=
-OPENAI_MODEL=
-OPENAI_RESPONSES_BASE_URL=https://api.openai.com/v1
-OPENAI_REASONING_EFFORT=
-OPENAI_MAX_OUTPUT_TOKENS=
+cp santi.example.toml santi.toml
+```
+
+Config resolution is modeled by `mini-stim-server-soma`'s `ConfigService`.
+Config path resolves as:
+
+```text
+--config > SANTI_CONFIG > ./santi.toml
+```
+
+Provider selection resolves as:
+
+```text
+--provider > config.provider > SANTI_PROVIDER > openai
 ```
 
 Server soma settings:

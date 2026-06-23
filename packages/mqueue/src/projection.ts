@@ -1,6 +1,7 @@
 import {
   appendText,
   dedupeMessages,
+  dedupeThinkingSpans,
   dedupeToolCalls,
   dedupeToolResults,
   dedupeTurns,
@@ -13,9 +14,11 @@ import type {
   MessageProjection,
   SessionMessage,
   SessionProjection,
+  ThinkingSpan,
   ToolCall,
   ToolResult,
   Turn,
+  TurnActivityProjection,
 } from "./types";
 
 /**
@@ -29,6 +32,8 @@ export function createProjectionWriter(state: SessionProjection, messageState: M
     markTurnFailed,
     removeTransient,
     setMessageProjection,
+    upsertThinkingSpans,
+    setTurnActivity,
     upsertMessages,
     upsertTools,
     upsertTurns,
@@ -98,6 +103,31 @@ export function createProjectionWriter(state: SessionProjection, messageState: M
     setMessageProjection(sessionId);
   }
 
+  function setTurnActivity(sessionId: string, activity: TurnActivityProjection): boolean {
+    const activities = messageState.turnActivityBySessionId[sessionId] ?? {};
+    const existing = activities[activity.turn_id];
+    if (
+      existing?.state === activity.state &&
+      existing.provider_response_id === activity.provider_response_id
+    ) {
+      return false;
+    }
+    messageState.turnActivityBySessionId[sessionId] = {
+      ...activities,
+      [activity.turn_id]: activity,
+    };
+    setMessageProjection(sessionId);
+    return true;
+  }
+
+  function upsertThinkingSpans(sessionId: string, thinkingSpans: ThinkingSpan[]) {
+    messageState.thinkingSpansBySessionId[sessionId] = dedupeThinkingSpans([
+      ...(messageState.thinkingSpansBySessionId[sessionId] ?? []),
+      ...thinkingSpans,
+    ]);
+    setMessageProjection(sessionId);
+  }
+
   function upsertTools(sessionId: string, calls: ToolCall[], results: ToolResult[]) {
     messageState.toolCallsBySessionId[sessionId] = dedupeToolCalls([
       ...(messageState.toolCallsBySessionId[sessionId] ?? []),
@@ -112,15 +142,17 @@ export function createProjectionWriter(state: SessionProjection, messageState: M
 
   function setMessageProjection(sessionId: string) {
     const messages = state.messagesBySessionId[sessionId] ?? [];
+    const thinkingSpans = messageState.thinkingSpansBySessionId[sessionId] ?? [];
     const calls = messageState.toolCallsBySessionId[sessionId] ?? [];
     const results = messageState.toolResultsBySessionId[sessionId] ?? [];
     messageState.messagesBySessionId[sessionId] = messages;
-    const timeline = timelineItems(sessionId, messages, calls, results);
+    const timeline = timelineItems(sessionId, messages, thinkingSpans, calls, results);
     messageState.timelineBySessionId[sessionId] = timeline;
     messageState.turnTimelineBySessionId[sessionId] = turnGroups(
       sessionId,
       timeline,
       messageState.turnsBySessionId[sessionId] ?? [],
+      messageState.turnActivityBySessionId[sessionId] ?? {},
     );
   }
 }

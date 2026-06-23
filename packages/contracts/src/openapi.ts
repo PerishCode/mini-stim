@@ -62,6 +62,22 @@ export interface HealthResponse {
   service: string;
 }
 
+export type MaterialKind = (typeof MaterialKind)[keyof typeof MaterialKind];
+
+export const MaterialKind = {
+  system_prompt: "system_prompt",
+} as const;
+
+export interface MaterialRequest {
+  kind: MaterialKind;
+}
+
+export interface MaterialUpdated {
+  kind: MaterialKind;
+  session_id: string;
+  updated_at: String;
+}
+
 export type MessagePart =
   | {
       text: string;
@@ -77,11 +93,19 @@ export interface MessageContent {
   parts: MessagePart[];
 }
 
+export type MessageKind = (typeof MessageKind)[keyof typeof MessageKind];
+
+export const MessageKind = {
+  text: "text",
+  santi_system: "santi_system",
+} as const;
+
 export type MessageState = (typeof MessageState)[keyof typeof MessageState];
 
 export const MessageState = {
   pending: "pending",
   fixed: "fixed",
+  aborted: "aborted",
 } as const;
 
 export interface Message {
@@ -91,26 +115,10 @@ export interface Message {
   created_at: String;
   deleted_at?: null | String;
   id: string;
+  message_kind: MessageKind;
   state: MessageState;
   updated_at: String;
   version: number;
-}
-
-export interface SendSessionRequest {
-  content: MessagePart[];
-}
-
-export interface SessionMessageRef {
-  created_at: String;
-  message_id: string;
-  session_id: string;
-  session_seq: number;
-}
-
-export interface SessionMessage {
-  content_text: string;
-  message: Message;
-  relation: SessionMessageRef;
 }
 
 export interface SoulProfile {
@@ -122,6 +130,7 @@ export interface SoulProfile {
   desc?: string | null;
   nickname: string;
   soul_id: string;
+  soul_name: string;
   updated_at: String;
 }
 
@@ -139,23 +148,6 @@ export interface SoulSession {
   session_memory: string;
   soul_id: string;
   updated_at: String;
-}
-
-export interface ToolCall {
-  arguments: unknown;
-  created_at: String;
-  id: string;
-  tool_name: string;
-  turn_id: string;
-}
-
-export interface ToolResult {
-  created_at: String;
-  /** @nullable */
-  error_text?: string | null;
-  id: string;
-  output?: unknown;
-  tool_call_id: string;
 }
 
 export type TurnStatus = (typeof TurnStatus)[keyof typeof TurnStatus];
@@ -192,15 +184,29 @@ export interface Turn {
   updated_at: String;
 }
 
-export interface SendSessionResponse {
-  assistant_message: SessionMessage;
+export interface SessionMessageRef {
+  created_at: String;
+  message_id: string;
+  session_id: string;
+  session_seq: number;
+}
+
+export interface SessionMessage {
+  content_text: string;
+  message: Message;
+  relation: SessionMessageRef;
+}
+
+export interface SendSessionAcceptedResponse {
   session: SessionSummary;
   soul_profile: SoulProfile;
   soul_session: SoulSession;
-  tool_calls: ToolCall[];
-  tool_results: ToolResult[];
   turn: Turn;
   user_message: SessionMessage;
+}
+
+export interface SendSessionRequest {
+  content: MessagePart[];
 }
 
 export interface SessionDetail {
@@ -225,6 +231,65 @@ export interface SessionEffect {
   updated_at: String;
 }
 
+export interface SessionMaterial {
+  content_type: string;
+  kind: MaterialKind;
+  session_id: string;
+  text: string;
+  updated_at: String;
+}
+
+export type ThinkingCompletionReason =
+  (typeof ThinkingCompletionReason)[keyof typeof ThinkingCompletionReason];
+
+export const ThinkingCompletionReason = {
+  first_text_delta: "first_text_delta",
+  tool_call_requested: "tool_call_requested",
+  provider_completed: "provider_completed",
+} as const;
+
+export type ThinkingSpanState =
+  (typeof ThinkingSpanState)[keyof typeof ThinkingSpanState];
+
+export const ThinkingSpanState = {
+  running: "running",
+  completed: "completed",
+  failed: "failed",
+} as const;
+
+export interface ThinkingSpan {
+  completion_reason?: null | ThinkingCompletionReason;
+  created_at: String;
+  /** @nullable */
+  error_text?: string | null;
+  finished_at?: null | String;
+  id: string;
+  /** @nullable */
+  provider_response_id?: string | null;
+  state: ThinkingSpanState;
+  /** @nullable */
+  summary?: string | null;
+  turn_id: string;
+  updated_at: String;
+}
+
+export interface ToolCall {
+  arguments: unknown;
+  created_at: String;
+  id: string;
+  tool_name: string;
+  turn_id: string;
+}
+
+export interface ToolResult {
+  created_at: String;
+  /** @nullable */
+  error_text?: string | null;
+  id: string;
+  output?: unknown;
+  tool_call_id: string;
+}
+
 export interface SessionRuntimeSnapshot {
   compacts: Compact[];
   effects: SessionEffect[];
@@ -233,9 +298,28 @@ export interface SessionRuntimeSnapshot {
   session: Session;
   soul_profile?: null | SoulProfile;
   soul_session?: null | SoulSession;
+  thinking_spans: ThinkingSpan[];
   tool_calls: ToolCall[];
   tool_results: ToolResult[];
   turns: Turn[];
+}
+
+export type TurnActivityState =
+  (typeof TurnActivityState)[keyof typeof TurnActivityState];
+
+export const TurnActivityState = {
+  requesting: "requesting",
+  thinking: "thinking",
+  generating: "generating",
+  calling_tool: "calling_tool",
+  running_tool: "running_tool",
+} as const;
+
+export interface TurnActivity {
+  /** @nullable */
+  provider_response_id?: string | null;
+  state: TurnActivityState;
+  turn_id: string;
 }
 
 export interface UpdateSessionRequest {
@@ -528,6 +612,61 @@ export const updateSession = async (
   } as updateSessionResponse;
 };
 
+export type sessionMaterialResponse200 = {
+  data: SessionMaterial;
+  status: 200;
+};
+
+export type sessionMaterialResponse404 = {
+  data: ErrorResponse;
+  status: 404;
+};
+
+export type sessionMaterialResponse500 = {
+  data: ErrorResponse;
+  status: 500;
+};
+
+export type sessionMaterialResponseSuccess = sessionMaterialResponse200 & {
+  headers: Headers;
+};
+export type sessionMaterialResponseError = (
+  | sessionMaterialResponse404
+  | sessionMaterialResponse500
+) & {
+  headers: Headers;
+};
+
+export type sessionMaterialResponse =
+  | sessionMaterialResponseSuccess
+  | sessionMaterialResponseError;
+
+export const getSessionMaterialUrl = (sessionId: string) => {
+  return `/api/v1/sessions/${sessionId}/materials`;
+};
+
+export const sessionMaterial = async (
+  sessionId: string,
+  materialRequest: MaterialRequest,
+  options?: RequestInit,
+): Promise<sessionMaterialResponse> => {
+  const res = await fetch(getSessionMaterialUrl(sessionId), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(materialRequest),
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: sessionMaterialResponse["data"] = body ? JSON.parse(body) : {};
+  return {
+    data,
+    status: res.status,
+    headers: res.headers,
+  } as sessionMaterialResponse;
+};
+
 export type listMessagesResponse200 = {
   data: SessionMessage[];
   status: 200;
@@ -633,7 +772,7 @@ export const runtimeSnapshot = async (
 };
 
 export type sendSessionResponse200 = {
-  data: SendSessionResponse;
+  data: SendSessionAcceptedResponse;
   status: 200;
 };
 

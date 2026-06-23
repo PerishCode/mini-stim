@@ -128,9 +128,10 @@ jobs:
 
       - name: Start API
         env:
-          OPENAI_API_KEY: ci-placeholder
-          OPENAI_MODEL: ci-placeholder
-          OPENAI_RESPONSES_BASE_URL: https://api.openai.com/v1
+          SANTI_CONFIG: santi.example.toml
+          SANTI_PROVIDERS_OPENAI_API_KEY: ci-placeholder
+          SANTI_PROVIDERS_OPENAI_MODEL: ci-placeholder
+          SANTI_PROVIDERS_OPENAI_BASE_URL: https://api.openai.com/v1
           SANTI_HOST: 127.0.0.1
           SANTI_DB: .tmp/ci.sqlite
           SANTI_PORT: 43307

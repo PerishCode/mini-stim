@@ -35,7 +35,8 @@ export function MessageInspectPanel(props: { messageId: string; runtime: Session
           <Stack gap="sm">
             <Inline justify="between" align="center" wrap gap="sm">
               <Text size="xs" tone="subtle">
-                {message.message.actor_type} seq {message.relation.session_seq}
+                {message.message.actor_type} · {message.message.message_kind} · seq{" "}
+                {message.relation.session_seq}
               </Text>
               <Timestamp value={message.message.created_at} size="xs" tone="subtle" />
             </Inline>

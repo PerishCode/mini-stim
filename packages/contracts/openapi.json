@@ -261,6 +261,64 @@
         }
       }
     },
+    "/api/v1/sessions/{session_id}/materials": {
+      "post": {
+        "tags": [],
+        "operationId": "session_material",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MaterialRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionMaterial"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/sessions/{session_id}/messages": {
       "get": {
         "tags": [],
@@ -390,7 +448,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SendSessionResponse"
+                  "$ref": "#/components/schemas/SendSessionAcceptedResponse"
                 }
               }
             }
@@ -503,12 +561,49 @@
           }
         }
       },
+      "MaterialKind": {
+        "type": "string",
+        "enum": [
+          "system_prompt"
+        ]
+      },
+      "MaterialRequest": {
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/MaterialKind"
+          }
+        }
+      },
+      "MaterialUpdated": {
+        "type": "object",
+        "required": [
+          "session_id",
+          "kind",
+          "updated_at"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/MaterialKind"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/String"
+          }
+        }
+      },
       "Message": {
         "type": "object",
         "required": [
           "id",
           "actor_type",
           "actor_id",
+          "message_kind",
           "content",
           "state",
           "version",
@@ -541,6 +636,9 @@
           "id": {
             "type": "string"
           },
+          "message_kind": {
+            "$ref": "#/components/schemas/MessageKind"
+          },
           "state": {
             "$ref": "#/components/schemas/MessageState"
           },
@@ -566,6 +664,13 @@
             }
           }
         }
+      },
+      "MessageKind": {
+        "type": "string",
+        "enum": [
+          "text",
+          "santi_system"
+        ]
       },
       "MessagePart": {
         "oneOf": [
@@ -615,8 +720,36 @@
         "type": "string",
         "enum": [
           "pending",
-          "fixed"
+          "fixed",
+          "aborted"
         ]
+      },
+      "SendSessionAcceptedResponse": {
+        "type": "object",
+        "required": [
+          "session",
+          "soul_session",
+          "soul_profile",
+          "turn",
+          "user_message"
+        ],
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/SessionSummary"
+          },
+          "soul_profile": {
+            "$ref": "#/components/schemas/SoulProfile"
+          },
+          "soul_session": {
+            "$ref": "#/components/schemas/SoulSession"
+          },
+          "turn": {
+            "$ref": "#/components/schemas/Turn"
+          },
+          "user_message": {
+            "$ref": "#/components/schemas/SessionMessage"
+          }
+        }
       },
       "SendSessionRequest": {
         "type": "object",
@@ -629,51 +762,6 @@
             "items": {
               "$ref": "#/components/schemas/MessagePart"
             }
-          }
-        }
-      },
-      "SendSessionResponse": {
-        "type": "object",
-        "required": [
-          "session",
-          "soul_session",
-          "soul_profile",
-          "turn",
-          "user_message",
-          "assistant_message",
-          "tool_calls",
-          "tool_results"
-        ],
-        "properties": {
-          "assistant_message": {
-            "$ref": "#/components/schemas/SessionMessage"
-          },
-          "session": {
-            "$ref": "#/components/schemas/SessionSummary"
-          },
-          "soul_profile": {
-            "$ref": "#/components/schemas/SoulProfile"
-          },
-          "soul_session": {
-            "$ref": "#/components/schemas/SoulSession"
-          },
-          "tool_calls": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ToolCall"
-            }
-          },
-          "tool_results": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ToolResult"
-            }
-          },
-          "turn": {
-            "$ref": "#/components/schemas/Turn"
-          },
-          "user_message": {
-            "$ref": "#/components/schemas/SessionMessage"
           }
         }
       },
@@ -786,6 +874,33 @@
           }
         }
       },
+      "SessionMaterial": {
+        "type": "object",
+        "required": [
+          "session_id",
+          "kind",
+          "content_type",
+          "text",
+          "updated_at"
+        ],
+        "properties": {
+          "content_type": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MaterialKind"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/String"
+          }
+        }
+      },
       "SessionMessage": {
         "type": "object",
         "required": [
@@ -867,6 +982,7 @@
           "profile",
           "messages",
           "turns",
+          "thinking_spans",
           "tool_calls",
           "tool_results",
           "compacts",
@@ -917,6 +1033,12 @@
               }
             ]
           },
+          "thinking_spans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ThinkingSpan"
+            }
+          },
           "tool_calls": {
             "type": "array",
             "items": {
@@ -956,6 +1078,7 @@
         "type": "object",
         "required": [
           "soul_id",
+          "soul_name",
           "nickname",
           "avatar_seed",
           "created_at",
@@ -984,6 +1107,9 @@
             "type": "string"
           },
           "soul_id": {
+            "type": "string"
+          },
+          "soul_name": {
             "type": "string"
           },
           "updated_at": {
@@ -1048,6 +1174,87 @@
       },
       "String": {
         "type": "string"
+      },
+      "ThinkingCompletionReason": {
+        "type": "string",
+        "enum": [
+          "first_text_delta",
+          "tool_call_requested",
+          "provider_completed"
+        ]
+      },
+      "ThinkingSpan": {
+        "type": "object",
+        "required": [
+          "id",
+          "turn_id",
+          "state",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "completion_reason": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ThinkingCompletionReason"
+              }
+            ]
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/String"
+          },
+          "error_text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finished_at": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/String"
+              }
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "provider_response_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "$ref": "#/components/schemas/ThinkingSpanState"
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "turn_id": {
+            "type": "string"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/String"
+          }
+        }
+      },
+      "ThinkingSpanState": {
+        "type": "string",
+        "enum": [
+          "running",
+          "completed",
+          "failed"
+        ]
       },
       "ToolCall": {
         "type": "object",
@@ -1169,6 +1376,37 @@
             "$ref": "#/components/schemas/String"
           }
         }
+      },
+      "TurnActivity": {
+        "type": "object",
+        "required": [
+          "turn_id",
+          "state"
+        ],
+        "properties": {
+          "provider_response_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "$ref": "#/components/schemas/TurnActivityState"
+          },
+          "turn_id": {
+            "type": "string"
+          }
+        }
+      },
+      "TurnActivityState": {
+        "type": "string",
+        "enum": [
+          "requesting",
+          "thinking",
+          "generating",
+          "calling_tool",
+          "running_tool"
+        ]
       },
       "TurnStatus": {
         "type": "string",

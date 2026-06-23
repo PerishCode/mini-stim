@@ -1,13 +1,13 @@
 import {
   AnchoredContentGroup,
   AnchoredContentGroupDivider,
-  Notice,
   Stack,
   Text,
   Timestamp,
   useAppComponentRef,
 } from "@mini-stim/components";
 import type { TurnGroup } from "@mini-stim/hooks";
+import type { Ref } from "react";
 import { Fragment } from "react";
 
 import { STIM_APP_NAMESPACE } from "../appNamespace";
@@ -20,7 +20,11 @@ export interface SoulIdentity {
   name: string;
 }
 
-export function Transcript(props: { soulIdentity: SoulIdentity; timeline: TurnGroup[] }) {
+export function Transcript(props: {
+  contentRef?: Ref<HTMLDivElement>;
+  soulIdentity: SoulIdentity;
+  timeline: TurnGroup[];
+}) {
   const items = flattenTimelineItems(props.timeline);
   const groups = buildTranscriptGroups(items);
   const empty = !props.timeline.some((group) => group.items.length || group.turn);
@@ -35,7 +39,7 @@ export function Transcript(props: { soulIdentity: SoulIdentity; timeline: TurnGr
   });
 
   return (
-    <Stack ref={transcriptRef} gap="sm" grow={empty}>
+    <Stack ref={mergeRefs(transcriptRef, props.contentRef)} gap="sm" grow={empty}>
       {groups.map((group) => (
         <TranscriptGroupView
           key={group.id}
@@ -44,10 +48,25 @@ export function Transcript(props: { soulIdentity: SoulIdentity; timeline: TurnGr
           soulIdentity={props.soulIdentity}
         />
       ))}
-      <TurnStateNotices timeline={props.timeline} />
+      <RunningTurnNotices timeline={props.timeline} />
       {empty ? <TranscriptEmpty /> : null}
     </Stack>
   );
+}
+
+function mergeRefs<T>(...refs: Array<Ref<T> | undefined>) {
+  return (element: T | null) => {
+    for (const ref of refs) {
+      if (!ref) {
+        continue;
+      }
+      if (typeof ref === "function") {
+        ref(element);
+      } else {
+        ref.current = element;
+      }
+    }
+  };
 }
 
 function TranscriptEmpty() {
@@ -100,27 +119,15 @@ function TranscriptGroupView(props: {
   );
 }
 
-function TurnStateNotices(props: { timeline: TurnGroup[] }) {
+function RunningTurnNotices(props: { timeline: TurnGroup[] }) {
   return (
     <>
       {props.timeline.map((group) => {
         const turn = group.turn;
-        if (turn?.status === "failed") {
-          return (
-            <Notice key={`${group.id}:failed`} tone="danger">
-              <Stack gap="xs">
-                <Text size="xs" tone="subtle">
-                  TURN FAILED
-                </Text>
-                <Text>{turn.error_text ?? "The turn failed without an error message."}</Text>
-              </Stack>
-            </Notice>
-          );
-        }
-        if (turn?.status === "running" && !group.items.length) {
+        if (turn?.status === "running" && !hasRuntimeFeedback(group)) {
           return (
             <Text key={`${group.id}:running`} size="sm" tone="subtle">
-              Working…
+              {runningTurnLabel(group)}
             </Text>
           );
         }
@@ -128,6 +135,32 @@ function TurnStateNotices(props: { timeline: TurnGroup[] }) {
       })}
     </>
   );
+}
+
+function hasRuntimeFeedback(group: TurnGroup) {
+  return group.items.some((item) => {
+    if (item.kind !== "message") {
+      return true;
+    }
+    return item.message.message.actor_type !== "account";
+  });
+}
+
+function runningTurnLabel(group: TurnGroup) {
+  switch (group.activity?.state) {
+    case "requesting":
+      return "waiting for model…";
+    case "thinking":
+      return "thinking…";
+    case "generating":
+      return "generating…";
+    case "calling_tool":
+      return "calling tool…";
+    case "running_tool":
+      return "running tool…";
+    default:
+      return "working…";
+  }
 }
 
 function identityForGroup(

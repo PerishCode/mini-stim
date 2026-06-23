@@ -1,4 +1,4 @@
-import type { ComponentPropsWithoutRef, ComponentPropsWithRef } from "react";
+import type { ComponentPropsWithoutRef, ComponentPropsWithRef, Ref } from "react";
 
 import { cx } from "../../internal/cx";
 import "./Panel.scss";
@@ -7,6 +7,7 @@ type PanelRootProps = ComponentPropsWithRef<"section">;
 type PanelSlotProps = ComponentPropsWithoutRef<"div">;
 
 type PanelBodyProps = PanelSlotProps & {
+  innerRef?: Ref<HTMLDivElement>;
   scroll?: boolean;
   tone?: "default" | "inset";
 };
@@ -19,7 +20,7 @@ function Header({ className, ...props }: PanelSlotProps) {
   return <div {...props} className={cx("msPanel__header", className)} />;
 }
 
-function Body({ className, scroll = false, tone = "default", ...props }: PanelBodyProps) {
+function Body({ className, innerRef, scroll = false, tone = "default", ...props }: PanelBodyProps) {
   return (
     <div
       {...props}
@@ -29,6 +30,7 @@ function Body({ className, scroll = false, tone = "default", ...props }: PanelBo
         scroll && "msPanel__body--scroll",
         className,
       )}
+      ref={innerRef}
     />
   );
 }

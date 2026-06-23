@@ -6,10 +6,11 @@ use std::{
 use rusqlite::{Connection, params};
 
 use crate::{
-    ActorType, MessageContent, MessageState, Session, SessionMessage, SessionSummary, SoulSession,
-    SoulSessionEntry, SoulSessionTargetType, Turn, prefixed_id, timestamp_now,
+    ActorType, MessageContent, MessageKind, MessageState, Session, SessionMessage, SessionSummary,
+    SoulSession, SoulSessionEntry, SoulSessionTargetType, Turn, prefixed_id, timestamp_now,
 };
 
+mod assembly;
 mod db;
 mod rows;
 mod runtime;
@@ -19,9 +20,10 @@ use db::*;
 use rows::{actor_type_db, collect_rows, map_session_summary_row, message_state_db};
 use schema::SCHEMA;
 
-const SANTI_SCHEMA_VERSION: u32 = 4;
+const SANTI_SCHEMA_VERSION: u32 = 9;
 const DEFAULT_ACCOUNT_ID: &str = "account_local";
 const DEFAULT_SOUL_ID: &str = "soul_default";
+const SANTI_SYSTEM_ACTOR_ID: &str = "santi";
 
 #[derive(Clone)]
 pub struct SantiStore {
@@ -71,6 +73,7 @@ impl SantiStore {
                 DROP TABLE IF EXISTS conversations;
                 DROP TABLE IF EXISTS r_soul_session_messages;
                 DROP TABLE IF EXISTS compacts;
+                DROP TABLE IF EXISTS thinking_spans;
                 DROP TABLE IF EXISTS tool_results;
                 DROP TABLE IF EXISTS tool_calls;
                 DROP TABLE IF EXISTS turns;
@@ -117,9 +120,9 @@ impl SantiStore {
         conn.execute(
             r#"
             INSERT OR IGNORE INTO soul_profiles (
-              soul_id, nickname, avatar_ref, avatar_seed, desc, created_at, updated_at
+              soul_id, soul_name, nickname, avatar_ref, avatar_seed, desc, created_at, updated_at
             )
-            VALUES (?1, 'Santi', NULL, ?1, NULL, ?2, ?2)
+            VALUES (?1, 'Liberte', 'Santi', NULL, ?1, NULL, ?2, ?2)
             "#,
             params![DEFAULT_SOUL_ID, now],
         )
@@ -237,6 +240,11 @@ impl SantiStore {
             } else {
                 Vec::new()
             },
+            thinking_spans: if let Some(soul_session) = &soul_session {
+                soul_thinking_spans(&conn, &soul_session.id)?
+            } else {
+                Vec::new()
+            },
             tool_calls: if let Some(soul_session) = &soul_session {
                 soul_tool_calls(&conn, &soul_session.id)?
             } else {
@@ -264,6 +272,40 @@ impl SantiStore {
         content: MessageContent,
         state: MessageState,
     ) -> Result<AppendedMessage, String> {
+        self.append_message_with_kind(
+            session_id,
+            actor_type,
+            actor_id,
+            MessageKind::Text,
+            content,
+            state,
+        )
+    }
+
+    pub fn append_santi_system_message(
+        &self,
+        session_id: &str,
+        content: MessageContent,
+    ) -> Result<AppendedMessage, String> {
+        self.append_message_with_kind(
+            session_id,
+            ActorType::System,
+            SANTI_SYSTEM_ACTOR_ID,
+            MessageKind::SantiSystem,
+            content,
+            MessageState::Fixed,
+        )
+    }
+
+    fn append_message_with_kind(
+        &self,
+        session_id: &str,
+        actor_type: ActorType,
+        actor_id: &str,
+        message_kind: MessageKind,
+        content: MessageContent,
+        state: MessageState,
+    ) -> Result<AppendedMessage, String> {
         let mut conn = self.conn.lock().unwrap();
         let tx = conn.transaction().map_err(|error| error.to_string())?;
         ensure_session(&tx, session_id)?;
@@ -274,14 +316,16 @@ impl SantiStore {
         tx.execute(
             r#"
             INSERT INTO messages (
-              id, actor_type, actor_id, content, state, version, deleted_at, created_at, updated_at
+              id, actor_type, actor_id, message_kind, content, state, version, deleted_at,
+              created_at, updated_at
             )
-            VALUES (?1, ?2, ?3, ?4, ?5, 1, NULL, ?6, ?6)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, NULL, ?7, ?7)
             "#,
             params![
                 message_id,
                 actor_type_db(&actor_type),
                 actor_id,
+                rows::message_kind_db(&message_kind),
                 content_json,
                 message_state_db(&state),
                 now

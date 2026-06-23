@@ -1,6 +1,7 @@
 .DS_Store
 .env
 .env.local
+santi.toml
 .local/
 .task/
 .playwright-cli/

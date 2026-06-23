@@ -16,6 +16,7 @@ export function Composer(props: {
   error?: string | null;
   onChange: (value: string) => void;
   onSubmit: () => void;
+  submitting?: boolean;
   value: string;
 }) {
   const composerRef = useAppComponentRef({
@@ -48,7 +49,7 @@ export function Composer(props: {
               type="submit"
               tone="accent"
               size="lg"
-              disabled={props.disabled || !props.value.trim()}
+              disabled={props.disabled || props.submitting || !props.value.trim()}
             >
               <SendIcon size="sm" />
               Send
@@ -69,7 +70,7 @@ export function Composer(props: {
                   return;
                 }
                 event.preventDefault();
-                if (!props.disabled && props.value.trim()) {
+                if (!props.disabled && !props.submitting && props.value.trim()) {
                   props.onSubmit();
                 }
               }}

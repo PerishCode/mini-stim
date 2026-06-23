@@ -1,14 +1,19 @@
 use async_trait::async_trait;
 use futures_util::stream;
 use santi_core::{
-    MessagePart, ObjectBucket, ObjectUri, SantiService, SantiServiceConfig, SendSessionRequest,
+    MessagePart, ObjectBucket, ObjectUri, SESSION_WORKSPACE_URI, SOUL_WORKSPACE_URI, SantiService,
+    SantiServiceConfig, SendSessionRequest, session_memory_uri, soul_memory_uri,
 };
 use santi_provider::{
     ProviderClient, ProviderEvent, ProviderFunctionCall, ProviderMetadata, ProviderRequest,
     ProviderStream,
 };
 use serde_json::json;
-use std::sync::{Arc, Mutex};
+use std::{
+    path::Path,
+    sync::{Arc, Mutex},
+};
+use tokio::time::{Duration, sleep};
 
 #[derive(Clone, Default)]
 struct FakeProvider {
@@ -41,13 +46,15 @@ impl ProviderClient for FakeProvider {
                         "id": "item_tool",
                         "call_id": "call_shell",
                         "name": "shell",
-                        "arguments": r#"{"command":"printf \"$SANTI_SESSION_MEMORY_DIR\""}"#,
+                        "arguments": r#"{"command":"pwd && printf \"\\n$SANTI_SESSION_MEMORY_DIR\"","cwd":"session://"}"#,
                     }),
                     call_id: "call_shell".to_string(),
                     name: "shell".to_string(),
-                    arguments_raw: r#"{"command":"printf \"$SANTI_SESSION_MEMORY_DIR\""}"#
-                        .to_string(),
-                    arguments: json!({ "command": "printf \"$SANTI_SESSION_MEMORY_DIR\"" }),
+                    arguments_raw: r#"{"command":"pwd && printf \"\\n$SANTI_SESSION_MEMORY_DIR\"","cwd":"session://"}"#.to_string(),
+                    arguments: json!({
+                        "command": "pwd && printf \"\\n$SANTI_SESSION_MEMORY_DIR\"",
+                        "cwd": SESSION_WORKSPACE_URI
+                    }),
                 })),
                 Ok(ProviderEvent::Completed {
                     provider_response_id: Some("resp_tool".to_string()),
@@ -92,8 +99,14 @@ async fn sends_with_runtime() {
         .expect("send session");
 
     assert_eq!(response.user_message.content_text, "hello provider");
-    assert_eq!(response.assistant_message.content_text, "hi from runtime");
-    assert_eq!(response.turn.status, santi_core::TurnStatus::Completed);
+    assert_eq!(response.turn.status, santi_core::TurnStatus::Running);
+    let runtime = wait_for_completed_turn(&service, &session.session.id, &response.turn.id).await;
+    assert!(
+        runtime
+            .messages
+            .iter()
+            .any(|message| message.content_text == "hi from runtime")
+    );
 
     let requests = provider.requests.lock().unwrap();
     assert_eq!(requests.len(), 1);
@@ -105,32 +118,68 @@ async fn sends_with_runtime() {
         .instructions
         .as_deref()
         .expect("runtime instructions");
-    assert!(instructions.contains("You are santi"));
-    assert!(instructions.contains("<santi-runtime>"));
-    assert!(instructions.contains("<santi-tools>"));
-    let tool_names = requests[0]
-        .tools
-        .as_ref()
-        .expect("tools")
+    assert!(instructions.contains("You are a distinct soul running inside this Santi instance."));
+    assert!(instructions.contains("[santi-meta]"));
+    assert!(instructions.contains("channel: mini-stim"));
+    assert!(instructions.contains("soul_name: Liberte"));
+    assert!(instructions.contains("[santi-soul]"));
+    assert!(instructions.contains("[santi-session]"));
+    assert!(instructions.contains(&format!(
+        "{} will always be displayed in [santi-soul].",
+        soul_memory_uri()
+    )));
+    assert!(instructions.contains(&format!(
+        "{} will always be displayed in [santi-session].",
+        session_memory_uri()
+    )));
+    assert!(instructions.contains(&format!(
+        "These files have no internal version history; save backups into {SOUL_WORKSPACE_URI} or {SESSION_WORKSPACE_URI} if needed."
+    )));
+    assert!(
+        instructions
+            .contains("<santi-system> blocks describe Santi runtime facts in this session.")
+    );
+    assert!(instructions.contains(
+        "They are part of your context, not user speech or your natural-language reply."
+    ));
+    assert!(
+        instructions
+            .contains("Read them as session facts about the workspace, runtime, or provider flow.")
+    );
+    assert!(instructions.contains(&format!("source: {}", soul_memory_uri())));
+    assert!(instructions.contains(&format!("source: {}", session_memory_uri())));
+    assert!(!instructions.contains("hint:"));
+    assert!(!instructions.contains("@soul"));
+    assert!(!instructions.contains("@session"));
+    assert!(!instructions.contains("<santi-runtime>"));
+    assert!(!instructions.contains("<santi-tools>"));
+    let tools = requests[0].tools.as_ref().expect("tools");
+    let tool_names = tools
         .iter()
         .map(|tool| match tool {
             santi_provider::ProviderTool::Function(tool) => tool.name.as_str(),
         })
         .collect::<Vec<_>>();
-    assert_eq!(
-        tool_names,
-        vec!["write_soul_memory", "write_session_memory", "shell"]
-    );
+    assert_eq!(tool_names, vec!["shell"]);
+    let tool_descriptions = tools
+        .iter()
+        .map(|tool| match tool {
+            santi_provider::ProviderTool::Function(tool) => {
+                format!("{} {}", tool.description, tool.parameters)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(tool_descriptions.contains(&soul_memory_uri()));
+    assert!(tool_descriptions.contains(&session_memory_uri()));
+    assert!(!tool_descriptions.contains("@soul"));
+    assert!(!tool_descriptions.contains("@session"));
 
     let detail = service
         .session(&session.session.id)
         .expect("load detail")
         .expect("session");
     assert_eq!(detail.messages.len(), 2);
-    let runtime = service
-        .runtime_snapshot(&session.session.id)
-        .expect("runtime snapshot")
-        .expect("session runtime");
     assert_eq!(runtime.turns.len(), 1);
 }
 
@@ -165,23 +214,63 @@ async fn dispatches_tools() {
         .await
         .expect("send session");
 
-    assert_eq!(response.assistant_message.content_text, "hi from runtime");
-    assert_eq!(response.tool_calls.len(), 1);
-    assert_eq!(response.tool_calls[0].tool_name, "shell");
-    assert_eq!(response.tool_results.len(), 1);
-    assert!(response.tool_results[0].error_text.is_none());
-    let stdout = response.tool_results[0]
+    assert_eq!(response.turn.status, santi_core::TurnStatus::Running);
+    let runtime = wait_for_completed_turn(&service, &session.session.id, &response.turn.id).await;
+    assert!(
+        runtime
+            .messages
+            .iter()
+            .any(|message| message.content_text == "hi from runtime")
+    );
+    assert_eq!(runtime.tool_calls.len(), 1);
+    assert_eq!(runtime.tool_calls[0].tool_name, "shell");
+    assert_eq!(runtime.tool_results.len(), 1);
+    assert!(runtime.tool_results[0].error_text.is_none());
+    let output = runtime.tool_results[0]
         .output
         .as_ref()
-        .and_then(|output| output.get("stdout"))
+        .expect("tool output");
+    let stdout = output
+        .get("stdout")
         .and_then(|value| value.as_str())
         .expect("shell stdout");
-    assert!(stdout.ends_with(&format!("runtime/sessions/{}/memory", session.session.id)));
+    let session_memory_dir = Path::new("runtime")
+        .join("sessions")
+        .join(&session.session.id)
+        .join("memory");
+    assert!(stdout.contains(&session_memory_dir.display().to_string()));
+    let cwd = output
+        .get("cwd")
+        .and_then(|value| value.as_str())
+        .expect("shell cwd");
+    assert!(Path::new(cwd).ends_with(&session_memory_dir));
 
     let requests = provider.requests.lock().unwrap();
     assert_eq!(requests.len(), 2);
     assert!(requests[1].previous_response_id.is_none());
     assert!(requests[1].function_call_outputs.is_some());
+}
+
+async fn wait_for_completed_turn(
+    service: &SantiService,
+    session_id: &str,
+    turn_id: &str,
+) -> santi_core::SessionRuntimeSnapshot {
+    for _ in 0..50 {
+        let runtime = service
+            .runtime_snapshot(session_id)
+            .expect("runtime snapshot")
+            .expect("session runtime");
+        if runtime
+            .turns
+            .iter()
+            .any(|turn| turn.id == turn_id && turn.status == santi_core::TurnStatus::Completed)
+        {
+            return runtime;
+        }
+        sleep(Duration::from_millis(20)).await;
+    }
+    panic!("turn did not complete");
 }
 
 #[tokio::test]

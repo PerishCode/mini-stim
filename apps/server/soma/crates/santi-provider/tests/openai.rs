@@ -8,7 +8,7 @@ use std::{
 use futures_util::StreamExt;
 use santi_provider::{
     OpenAIProvider, OpenAIProviderConfig, ProviderClient, ProviderEvent, ProviderFunctionTool,
-    ProviderMessage, ProviderRequest, ProviderTool,
+    ProviderMessage, ProviderRequest, ProviderStreamTrace, ProviderTool,
 };
 use serde_json::Value;
 
@@ -19,11 +19,13 @@ async fn optional_params_sent() {
         model: "gpt-5.5".to_string(),
         base_url: String::new(),
         reasoning_effort: Some("medium".to_string()),
+        reasoning_summary: Some("auto".to_string()),
         max_output_tokens: Some(4096),
     })
     .await;
 
     assert_eq!(body["reasoning"]["effort"], "medium");
+    assert_eq!(body["reasoning"]["summary"], "auto");
     assert_eq!(body["max_output_tokens"], 4096);
     assert_eq!(body["stream"], true);
     assert_eq!(body["store"], false);
@@ -40,6 +42,7 @@ async fn optional_params_omitted() {
         model: "gpt-4.1".to_string(),
         base_url: String::new(),
         reasoning_effort: None,
+        reasoning_summary: None,
         max_output_tokens: None,
     })
     .await;
@@ -56,6 +59,7 @@ async fn plain_requests_unstored() {
         model: "gpt-4.1".to_string(),
         base_url: String::new(),
         reasoning_effort: None,
+        reasoning_summary: None,
         max_output_tokens: None,
     })
     .await;
@@ -73,11 +77,77 @@ async fn parses_call_response_id() {
 
     assert!(matches!(
         events.as_slice(),
-        [ProviderEvent::FunctionCallRequested(call)]
-            if call.response_id == "resp_tool"
+        [
+            ProviderEvent::ResponseStarted {
+                provider_response_id: Some(response_id),
+            },
+            ProviderEvent::FunctionCallRequested(call),
+        ]
+            if response_id == "resp_tool"
+                && call.response_id == "resp_tool"
                 && call.call_id == "call_shell"
                 && call.name == "shell"
     ));
+}
+
+#[tokio::test]
+async fn parses_summary_stream() {
+    let events = capture_events(vec![
+        r#"data: {"type":"response.created","response":{"id":"resp_reasoning"}}"#,
+        r#"data: {"type":"response.reasoning_summary_text.delta","delta":"looking "}"#,
+        r#"data: {"type":"response.reasoning_summary_text.delta","delta":"closely"}"#,
+        r#"data: {"type":"response.reasoning_summary_text.done","text":"looking closely"}"#,
+    ])
+    .await;
+
+    assert!(matches!(
+        events.as_slice(),
+        [
+            ProviderEvent::ResponseStarted { .. },
+            ProviderEvent::ReasoningSummaryDelta(first),
+            ProviderEvent::ReasoningSummaryDelta(second),
+            ProviderEvent::ReasoningSummaryDone(done),
+        ] if first == "looking " && second == "closely" && done == "looking closely"
+    ));
+}
+
+#[tokio::test]
+async fn parses_summary_item_done() {
+    let events = capture_events(vec![
+        r#"data: {"type":"response.output_item.done","item":{"type":"reasoning","id":"rs_1","summary":[{"type":"summary_text","text":"First. "},{"type":"summary_text","text":"Second."}]}}"#,
+    ])
+    .await;
+
+    assert!(matches!(
+        events.as_slice(),
+        [ProviderEvent::ReasoningSummaryDone(summary)] if summary == "First. Second."
+    ));
+}
+
+#[tokio::test]
+async fn emits_stream_trace_events() {
+    let events = capture_all_events(vec![
+        r#"data: {"type":"response.created","response":{"id":"resp_trace"}}"#,
+        r#"data: {"type":"response.output_text.delta","delta":"ok"}"#,
+    ])
+    .await;
+
+    assert!(events.iter().any(|event| {
+        matches!(
+            event,
+            ProviderEvent::StreamTrace(ProviderStreamTrace::Chunk { .. })
+        )
+    }));
+    assert!(events.iter().any(|event| {
+        matches!(
+            event,
+            ProviderEvent::StreamTrace(ProviderStreamTrace::RawEvent {
+                raw_type,
+                mapped_events,
+            }) if raw_type == "response.created"
+                && mapped_events == &vec!["response_started".to_string()]
+        )
+    }));
 }
 
 async fn capture_body(mut config: OpenAIProviderConfig) -> Value {
@@ -120,8 +190,8 @@ async fn capture_body(mut config: OpenAIProviderConfig) -> Value {
         .await
         .expect("stream response");
     assert!(matches!(
-        stream.next().await,
-        Some(Ok(ProviderEvent::Completed { .. }))
+        next_business_event(&mut stream).await,
+        Some(ProviderEvent::Completed { .. })
     ));
 
     let body = rx.recv().expect("receive request body");
@@ -165,8 +235,8 @@ async fn capture_body_without_tools(mut config: OpenAIProviderConfig) -> Value {
         .await
         .expect("stream response");
     assert!(matches!(
-        stream.next().await,
-        Some(Ok(ProviderEvent::Completed { .. }))
+        next_business_event(&mut stream).await,
+        Some(ProviderEvent::Completed { .. })
     ));
 
     let body = rx.recv().expect("receive request body");
@@ -175,12 +245,21 @@ async fn capture_body_without_tools(mut config: OpenAIProviderConfig) -> Value {
 }
 
 async fn capture_events(lines: Vec<&'static str>) -> Vec<ProviderEvent> {
+    capture_all_events(lines)
+        .await
+        .into_iter()
+        .filter(|event| !matches!(event, ProviderEvent::StreamTrace(_)))
+        .collect()
+}
+
+async fn capture_all_events(lines: Vec<&'static str>) -> Vec<ProviderEvent> {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
     let config = OpenAIProviderConfig {
         api_key: "test-key".to_string(),
         model: "gpt-5.5".to_string(),
         base_url: format!("http://{}", listener.local_addr().expect("local address")),
         reasoning_effort: None,
+        reasoning_summary: None,
         max_output_tokens: None,
     };
     let server = thread::spawn(move || {
@@ -218,6 +297,16 @@ async fn capture_events(lines: Vec<&'static str>) -> Vec<ProviderEvent> {
     }
     server.join().expect("server thread");
     events
+}
+
+async fn next_business_event(stream: &mut santi_provider::ProviderStream) -> Option<ProviderEvent> {
+    while let Some(event) = stream.next().await {
+        let event = event.expect("provider event");
+        if !matches!(event, ProviderEvent::StreamTrace(_)) {
+            return Some(event);
+        }
+    }
+    None
 }
 
 fn read_body(stream: &mut impl Read) -> Vec<u8> {

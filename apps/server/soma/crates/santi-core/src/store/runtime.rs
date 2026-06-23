@@ -2,66 +2,115 @@ use rusqlite::params;
 use serde_json::{Value, json};
 
 use super::{
-    DEFAULT_SOUL_ID, SantiStore,
+    SantiStore,
     db::{
-        append_entry_in_tx, call_soul_id, compact_by_id, session_message_to_provider, soul_by_id,
-        soul_session_by_id, tool_call_by_id, tool_calls_for_turn, tool_result_by_id,
-        tool_results_for_turn, turn_by_id, turn_soul_session_id,
+        append_entry_in_tx, call_soul_id, thinking_span_by_id, thinking_spans_for_turn,
+        tool_call_by_id, tool_calls_for_turn, tool_result_by_id, tool_results_for_turn, turn_by_id,
+        turn_soul_session_id,
     },
 };
 use crate::{
-    Soul, SoulSession, SoulSessionEntry, SoulSessionTargetType, ToolCall, ToolResult, Turn,
-    prefixed_id, timestamp_now,
+    SoulSessionEntry, SoulSessionTargetType, ThinkingCompletionReason, ThinkingSpan,
+    ThinkingSpanState, ToolCall, ToolResult, Turn, prefixed_id, timestamp_now,
 };
 
 impl SantiStore {
-    pub fn assembly_input(
+    pub fn append_thinking_span(
         &self,
-        soul_session_id: &str,
-    ) -> Result<Vec<crate::ProviderInputMessage>, String> {
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn
-            .prepare(
-                r#"
-                SELECT target_type, target_id
-                FROM r_soul_session_messages
-                WHERE soul_session_id = ?1
-                ORDER BY soul_session_seq ASC
-                "#,
+        turn_id: &str,
+        provider_response_id: Option<String>,
+    ) -> Result<ThinkingSpan, String> {
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction().map_err(|error| error.to_string())?;
+        let thinking_id = prefixed_id("thinking");
+        let now = timestamp_now();
+        let soul_session_id = turn_soul_session_id(&tx, turn_id)?;
+        tx.execute(
+            r#"
+            INSERT INTO thinking_spans (
+              id, turn_id, provider_response_id, state, summary, completion_reason,
+              error_text, created_at, updated_at, finished_at
             )
-            .map_err(|error| error.to_string())?;
-        let rows = stmt
-            .query_map(params![soul_session_id], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-            })
-            .map_err(|error| error.to_string())?;
-        let mut input = Vec::new();
-        for row in rows {
-            let (target_type, target_id) = row.map_err(|error| error.to_string())?;
-            match target_type.as_str() {
-                "message" => {
-                    if let Some(message) = super::db::message_by_id(&conn, &target_id)?
-                        && let Some(provider_message) = session_message_to_provider(&message)
-                    {
-                        input.push(provider_message);
-                    }
-                }
-                "compact" => {
-                    if let Some(compact) = compact_by_id(&conn, &target_id)? {
-                        input.push(crate::ProviderInputMessage {
-                            role: "system".to_string(),
-                            content: format!(
-                                "[compact {}-{}]\n{}",
-                                compact.start_session_seq, compact.end_session_seq, compact.summary
-                            ),
-                        });
-                    }
-                }
-                "tool_call" | "tool_result" => {}
-                _ => {}
-            }
-        }
-        Ok(input)
+            VALUES (?1, ?2, ?3, 'running', NULL, NULL, NULL, ?4, ?4, NULL)
+            "#,
+            params![thinking_id, turn_id, provider_response_id, now],
+        )
+        .map_err(|error| error.to_string())?;
+        append_entry_in_tx(
+            &tx,
+            &soul_session_id,
+            SoulSessionTargetType::Thinking,
+            &thinking_id,
+        )?;
+        tx.commit().map_err(|error| error.to_string())?;
+        thinking_span_by_id(&conn, &thinking_id)?
+            .ok_or_else(|| "created thinking_span missing".to_string())
+    }
+
+    pub fn update_thinking_span_response(
+        &self,
+        thinking_span_id: &str,
+        provider_response_id: Option<String>,
+    ) -> Result<Option<ThinkingSpan>, String> {
+        let conn = self.conn.lock().unwrap();
+        let now = timestamp_now();
+        conn.execute(
+            r#"
+            UPDATE thinking_spans
+            SET provider_response_id = COALESCE(?2, provider_response_id),
+                updated_at = ?3
+            WHERE id = ?1 AND state = 'running'
+            "#,
+            params![thinking_span_id, provider_response_id, now],
+        )
+        .map_err(|error| error.to_string())?;
+        thinking_span_by_id(&conn, thinking_span_id)
+    }
+
+    pub fn update_thinking_span_summary(
+        &self,
+        thinking_span_id: &str,
+        summary: String,
+    ) -> Result<Option<ThinkingSpan>, String> {
+        let conn = self.conn.lock().unwrap();
+        let now = timestamp_now();
+        conn.execute(
+            r#"
+            UPDATE thinking_spans
+            SET summary = ?2,
+                updated_at = ?3
+            WHERE id = ?1 AND state <> 'failed'
+            "#,
+            params![thinking_span_id, summary, now],
+        )
+        .map_err(|error| error.to_string())?;
+        thinking_span_by_id(&conn, thinking_span_id)
+    }
+
+    pub fn complete_thinking_span(
+        &self,
+        thinking_span_id: &str,
+        completion_reason: ThinkingCompletionReason,
+    ) -> Result<Option<ThinkingSpan>, String> {
+        self.finish_thinking_span(
+            thinking_span_id,
+            ThinkingSpanState::Completed,
+            Some(completion_reason),
+            None,
+        )
+    }
+
+    pub fn fail_thinking_span(
+        &self,
+        thinking_span_id: &str,
+        error_text: String,
+    ) -> Result<Option<ThinkingSpan>, String> {
+        self.finish_thinking_span(
+            thinking_span_id,
+            ThinkingSpanState::Failed,
+            None,
+            Some(error_text),
+        )
     }
 
     pub fn append_tool_call(
@@ -134,33 +183,6 @@ impl SantiStore {
             .ok_or_else(|| "created tool_result missing".to_string())
     }
 
-    pub fn write_soul_memory(&self, text: &str) -> Result<Soul, String> {
-        let conn = self.conn.lock().unwrap();
-        let now = timestamp_now();
-        conn.execute(
-            "UPDATE souls SET memory = ?2, updated_at = ?3 WHERE id = ?1",
-            params![DEFAULT_SOUL_ID, text, now],
-        )
-        .map_err(|error| error.to_string())?;
-        soul_by_id(&conn, DEFAULT_SOUL_ID)?.ok_or_else(|| "default soul missing".to_string())
-    }
-
-    pub fn write_session_memory(
-        &self,
-        soul_session_id: &str,
-        text: &str,
-    ) -> Result<SoulSession, String> {
-        let conn = self.conn.lock().unwrap();
-        let now = timestamp_now();
-        conn.execute(
-            "UPDATE soul_sessions SET session_memory = ?2, updated_at = ?3 WHERE id = ?1",
-            params![soul_session_id, text, now],
-        )
-        .map_err(|error| error.to_string())?;
-        soul_session_by_id(&conn, soul_session_id)?
-            .ok_or_else(|| "soul_session missing".to_string())
-    }
-
     pub fn complete_turn(
         &self,
         turn_id: &str,
@@ -224,9 +246,49 @@ impl SantiStore {
         turn_by_id(&conn, turn_id)?.ok_or_else(|| "failed turn missing".to_string())
     }
 
+    pub fn finish_failed_turn_context(
+        &self,
+        turn_id: &str,
+        last_seen_session_seq: i64,
+    ) -> Result<Turn, String> {
+        let conn = self.conn.lock().unwrap();
+        let now = timestamp_now();
+        conn.execute(
+            r#"
+            UPDATE turns
+            SET end_soul_session_seq = (
+                  SELECT next_seq - 1 FROM soul_sessions WHERE id = turns.soul_session_id
+                ),
+                updated_at = ?2
+            WHERE id = ?1 AND status = 'failed'
+            "#,
+            params![turn_id, now],
+        )
+        .map_err(|error| error.to_string())?;
+        conn.execute(
+            r#"
+            UPDATE soul_sessions
+            SET last_seen_session_seq = CASE
+                  WHEN last_seen_session_seq > ?2 THEN last_seen_session_seq
+                  ELSE ?2
+                END,
+                updated_at = ?3
+            WHERE id = (SELECT soul_session_id FROM turns WHERE id = ?1)
+            "#,
+            params![turn_id, last_seen_session_seq, now],
+        )
+        .map_err(|error| error.to_string())?;
+        turn_by_id(&conn, turn_id)?.ok_or_else(|| "failed turn missing".to_string())
+    }
+
     pub fn tool_calls_for_turn(&self, turn_id: &str) -> Result<Vec<ToolCall>, String> {
         let conn = self.conn.lock().unwrap();
         tool_calls_for_turn(&conn, turn_id)
+    }
+
+    pub fn thinking_spans_for_turn(&self, turn_id: &str) -> Result<Vec<ThinkingSpan>, String> {
+        let conn = self.conn.lock().unwrap();
+        thinking_spans_for_turn(&conn, turn_id)
     }
 
     pub fn tool_results_for_turn(&self, turn_id: &str) -> Result<Vec<ToolResult>, String> {
@@ -245,5 +307,38 @@ impl SantiStore {
         let entry = append_entry_in_tx(&tx, soul_session_id, target_type, target_id)?;
         tx.commit().map_err(|error| error.to_string())?;
         Ok(entry)
+    }
+
+    fn finish_thinking_span(
+        &self,
+        thinking_span_id: &str,
+        state: ThinkingSpanState,
+        completion_reason: Option<ThinkingCompletionReason>,
+        error_text: Option<String>,
+    ) -> Result<Option<ThinkingSpan>, String> {
+        let conn = self.conn.lock().unwrap();
+        let now = timestamp_now();
+        conn.execute(
+            r#"
+            UPDATE thinking_spans
+            SET state = ?2,
+                completion_reason = ?3,
+                error_text = ?4,
+                updated_at = ?5,
+                finished_at = ?5
+            WHERE id = ?1 AND state = 'running'
+            "#,
+            params![
+                thinking_span_id,
+                super::rows::thinking_span_state_db(&state),
+                completion_reason
+                    .as_ref()
+                    .map(super::rows::thinking_completion_reason_db),
+                error_text,
+                now
+            ],
+        )
+        .map_err(|error| error.to_string())?;
+        thinking_span_by_id(&conn, thinking_span_id)
     }
 }

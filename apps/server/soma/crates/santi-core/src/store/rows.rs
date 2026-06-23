@@ -2,9 +2,10 @@ use rusqlite::Row;
 use serde_json::Value;
 
 use crate::{
-    ActorType, Compact, Message, MessageContent, MessageState, Session, SessionEffect,
+    ActorType, Compact, Message, MessageContent, MessageKind, MessageState, Session, SessionEffect,
     SessionMessage, SessionMessageRef, SessionProfile, SessionSummary, SoulProfile, SoulSession,
-    SoulSessionTargetType, ToolCall, ToolResult, Turn, TurnStatus, TurnTriggerType,
+    SoulSessionTargetType, ThinkingCompletionReason, ThinkingSpan, ThinkingSpanState, ToolCall,
+    ToolResult, Turn, TurnStatus, TurnTriggerType,
 };
 
 pub(super) fn map_session_row(row: &Row<'_>) -> rusqlite::Result<Session> {
@@ -49,12 +50,13 @@ pub(super) fn map_session_summary_row(row: &Row<'_>) -> rusqlite::Result<Session
 pub(super) fn map_soul_profile_row(row: &Row<'_>) -> rusqlite::Result<SoulProfile> {
     Ok(SoulProfile {
         soul_id: row.get(0)?,
-        nickname: row.get(1)?,
-        avatar_ref: row.get(2)?,
-        avatar_seed: row.get(3)?,
-        desc: row.get(4)?,
-        created_at: row.get(5)?,
-        updated_at: row.get(6)?,
+        soul_name: row.get(1)?,
+        nickname: row.get(2)?,
+        avatar_ref: row.get(3)?,
+        avatar_seed: row.get(4)?,
+        desc: row.get(5)?,
+        created_at: row.get(6)?,
+        updated_at: row.get(7)?,
     })
 }
 
@@ -76,22 +78,24 @@ pub(super) fn map_soul_session_row(row: &Row<'_>) -> rusqlite::Result<SoulSessio
 }
 
 pub(super) fn map_session_message_row(row: &Row<'_>) -> rusqlite::Result<SessionMessage> {
-    let content_json: String = row.get(7)?;
+    let content_json: String = row.get(8)?;
     let content = serde_json::from_str::<MessageContent>(&content_json).map_err(|error| {
-        rusqlite::Error::FromSqlConversionFailure(7, rusqlite::types::Type::Text, Box::new(error))
+        rusqlite::Error::FromSqlConversionFailure(8, rusqlite::types::Type::Text, Box::new(error))
     })?;
     let actor_type = actor_type_from_db(row.get::<_, String>(5)?.as_str());
-    let state = message_state_from_db(row.get::<_, String>(8)?.as_str());
+    let message_kind = message_kind_from_db(row.get::<_, String>(7)?.as_str());
+    let state = message_state_from_db(row.get::<_, String>(9)?.as_str());
     let message = Message {
         id: row.get(4)?,
         actor_type,
         actor_id: row.get(6)?,
+        message_kind,
         content,
         state,
-        version: row.get(9)?,
-        deleted_at: row.get(10)?,
-        created_at: row.get(11)?,
-        updated_at: row.get(12)?,
+        version: row.get(10)?,
+        deleted_at: row.get(11)?,
+        created_at: row.get(12)?,
+        updated_at: row.get(13)?,
     };
     let content_text = message.content.content_text();
     Ok(SessionMessage {
@@ -145,6 +149,24 @@ pub(super) fn map_tool_result_row(row: &Row<'_>) -> rusqlite::Result<ToolResult>
         output: output_text.and_then(|value| serde_json::from_str(&value).ok()),
         error_text: row.get(3)?,
         created_at: row.get(4)?,
+    })
+}
+
+pub(super) fn map_thinking_span_row(row: &Row<'_>) -> rusqlite::Result<ThinkingSpan> {
+    Ok(ThinkingSpan {
+        id: row.get(0)?,
+        turn_id: row.get(1)?,
+        provider_response_id: row.get(2)?,
+        state: thinking_state_from_db(row.get::<_, String>(3)?.as_str()),
+        summary: row.get(4)?,
+        completion_reason: row
+            .get::<_, Option<String>>(5)?
+            .as_deref()
+            .map(completion_reason_from_db),
+        error_text: row.get(6)?,
+        created_at: row.get(7)?,
+        updated_at: row.get(8)?,
+        finished_at: row.get(9)?,
     })
 }
 
@@ -206,6 +228,22 @@ pub(super) fn message_state_db(value: &MessageState) -> &'static str {
     match value {
         MessageState::Pending => "pending",
         MessageState::Fixed => "fixed",
+        MessageState::Aborted => "aborted",
+    }
+}
+
+pub(super) fn message_kind_db(value: &MessageKind) -> &'static str {
+    match value {
+        MessageKind::Text => "text",
+        MessageKind::SantiSystem => "santi_system",
+    }
+}
+
+fn message_kind_from_db(value: &str) -> MessageKind {
+    match value {
+        "text" => MessageKind::Text,
+        "santi_system" => MessageKind::SantiSystem,
+        _ => MessageKind::Text,
     }
 }
 
@@ -213,6 +251,7 @@ fn message_state_from_db(value: &str) -> MessageState {
     match value {
         "pending" => MessageState::Pending,
         "fixed" => MessageState::Fixed,
+        "aborted" => MessageState::Aborted,
         _ => MessageState::Fixed,
     }
 }
@@ -234,10 +273,45 @@ fn turn_status_from_db(value: &str) -> TurnStatus {
     }
 }
 
+pub(super) fn thinking_span_state_db(value: &ThinkingSpanState) -> &'static str {
+    match value {
+        ThinkingSpanState::Running => "running",
+        ThinkingSpanState::Completed => "completed",
+        ThinkingSpanState::Failed => "failed",
+    }
+}
+
+pub(super) fn thinking_completion_reason_db(value: &ThinkingCompletionReason) -> &'static str {
+    match value {
+        ThinkingCompletionReason::FirstTextDelta => "first_text_delta",
+        ThinkingCompletionReason::ToolCallRequested => "tool_call_requested",
+        ThinkingCompletionReason::ProviderCompleted => "provider_completed",
+    }
+}
+
+fn completion_reason_from_db(value: &str) -> ThinkingCompletionReason {
+    match value {
+        "first_text_delta" => ThinkingCompletionReason::FirstTextDelta,
+        "tool_call_requested" => ThinkingCompletionReason::ToolCallRequested,
+        "provider_completed" => ThinkingCompletionReason::ProviderCompleted,
+        _ => ThinkingCompletionReason::ProviderCompleted,
+    }
+}
+
+fn thinking_state_from_db(value: &str) -> ThinkingSpanState {
+    match value {
+        "running" => ThinkingSpanState::Running,
+        "completed" => ThinkingSpanState::Completed,
+        "failed" => ThinkingSpanState::Failed,
+        _ => ThinkingSpanState::Failed,
+    }
+}
+
 pub(super) fn entry_type_db(value: &SoulSessionTargetType) -> &'static str {
     match value {
         SoulSessionTargetType::Message => "message",
         SoulSessionTargetType::Compact => "compact",
+        SoulSessionTargetType::Thinking => "thinking",
         SoulSessionTargetType::ToolCall => "tool_call",
         SoulSessionTargetType::ToolResult => "tool_result",
     }

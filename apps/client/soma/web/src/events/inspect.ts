@@ -2,6 +2,7 @@ export type InspectTarget =
   | { kind: "session"; sessionId: string }
   | { kind: "turn"; sessionId: string; turnId: string }
   | { kind: "message"; sessionId: string; messageId: string }
+  | { kind: "thinking"; sessionId: string; thinkingId: string }
   | { kind: "tool_call"; sessionId: string; toolCallId: string }
   | { kind: "tool_result"; sessionId: string; toolResultId: string };
 
@@ -113,6 +114,8 @@ function isInspectTarget(value: unknown): value is InspectTarget {
       return typeof target.sessionId === "string" && typeof target.turnId === "string";
     case "message":
       return typeof target.sessionId === "string" && typeof target.messageId === "string";
+    case "thinking":
+      return typeof target.sessionId === "string" && typeof target.thinkingId === "string";
     case "tool_call":
       return typeof target.sessionId === "string" && typeof target.toolCallId === "string";
     case "tool_result":

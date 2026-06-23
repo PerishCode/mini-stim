@@ -1,14 +1,13 @@
 import type {
   ErrorResponse,
-  MessageState,
   SessionMessage,
+  ThinkingSpan,
   ToolCall,
   ToolResult,
   Turn,
 } from "@mini-stim/contracts";
-
+import { DEFAULT_ACTOR_ID } from "./lib/helpers/message";
 import type {
-  MessageDeltaPayload,
   MessageEvent,
   MessagePhase,
   MessageProjection,
@@ -20,10 +19,11 @@ import type {
   SessionProjection,
   StreamEvent,
   TimelineItem,
+  TurnActivityProjection,
   TurnGroup,
 } from "./types";
 
-const DEFAULT_ACTOR_ID = "account_local";
+export { appendText, dedupeMessages, transientMessage } from "./lib/helpers/message";
 
 export function sessionEvent<Action extends SessionAction | "projection", Payload>(
   action: Action,
@@ -85,10 +85,14 @@ export function validateSessionPayload<Action extends SessionAction>(
 ) {
   switch (action) {
     case "get":
+    case "material":
     case "messages":
     case "runtime":
       if (!(payload as { sessionId?: unknown })?.sessionId) {
         throw new Error(`session.${action} requires sessionId`);
+      }
+      if (action === "material" && !(payload as { kind?: unknown })?.kind) {
+        throw new Error("session.material requires kind");
       }
       return;
     case "select":
@@ -117,58 +121,17 @@ export function parseStreamEvent(raw: Event): StreamEvent | null {
   }
 }
 
-export function transientMessage(sessionId: string, payload: MessageDeltaPayload): SessionMessage {
-  const createdAt = new Date().toISOString();
-  return {
-    relation: {
-      session_id: sessionId,
-      message_id: payload.message_id,
-      session_seq: Number.MAX_SAFE_INTEGER,
-      created_at: createdAt,
-    },
-    message: {
-      id: payload.message_id,
-      actor_type: payload.role,
-      actor_id: payload.role === "soul" ? "soul_default" : "account_local",
-      content: { parts: [{ type: "text", text: payload.text }] },
-      state: "pending" as MessageState,
-      version: 1,
-      deleted_at: null,
-      created_at: createdAt,
-      updated_at: createdAt,
-    },
-    content_text: payload.text,
-  };
-}
-
-export function appendText(message: SessionMessage, text: string): SessionMessage {
-  const contentText = `${message.content_text}${text}`;
-  return {
-    ...message,
-    content_text: contentText,
-    message: {
-      ...message.message,
-      content: { parts: [{ type: "text", text: contentText }] },
-      updated_at: new Date().toISOString(),
-    },
-  };
-}
-
-export function dedupeMessages(messages: SessionMessage[]): SessionMessage[] {
-  const byId = new Map<string, SessionMessage>();
-  for (const message of messages) {
-    byId.set(message.message.id, message);
-  }
-  return [...byId.values()].sort(
-    (left, right) => left.relation.session_seq - right.relation.session_seq,
-  );
-}
-
 export function cloneProjection(value: SessionProjection): SessionProjection {
   return {
     sessions: [...value.sessions],
     selectedSessionId: value.selectedSessionId,
     messages: [...value.messages],
+    materialsBySessionId: Object.fromEntries(
+      Object.entries(value.materialsBySessionId ?? {}).map(([sessionId, materials]) => [
+        sessionId,
+        { ...materials },
+      ]),
+    ),
     messagesBySessionId: Object.fromEntries(
       Object.entries(value.messagesBySessionId).map(([sessionId, messages]) => [
         sessionId,
@@ -183,36 +146,51 @@ export function cloneProjection(value: SessionProjection): SessionProjection {
 
 export function cloneMessageProjection(value: MessageProjection): MessageProjection {
   return {
-    connectionBySessionId: { ...value.connectionBySessionId },
+    connectionBySessionId: { ...(value.connectionBySessionId ?? {}) },
     messagesBySessionId: Object.fromEntries(
-      Object.entries(value.messagesBySessionId).map(([sessionId, messages]) => [
+      Object.entries(value.messagesBySessionId ?? {}).map(([sessionId, messages]) => [
         sessionId,
         [...messages],
       ]),
     ),
     timelineBySessionId: Object.fromEntries(
-      Object.entries(value.timelineBySessionId).map(([sessionId, items]) => [
+      Object.entries(value.timelineBySessionId ?? {}).map(([sessionId, items]) => [
         sessionId,
         [...items],
       ]),
     ),
     turnTimelineBySessionId: Object.fromEntries(
-      Object.entries(value.turnTimelineBySessionId).map(([sessionId, groups]) => [
+      Object.entries(value.turnTimelineBySessionId ?? {}).map(([sessionId, groups]) => [
         sessionId,
         groups.map((group) => ({ ...group, items: [...group.items] })),
       ]),
     ),
+    turnActivityBySessionId: Object.fromEntries(
+      Object.entries(value.turnActivityBySessionId ?? {}).map(([sessionId, activities]) => [
+        sessionId,
+        { ...activities },
+      ]),
+    ),
+    thinkingSpansBySessionId: Object.fromEntries(
+      Object.entries(value.thinkingSpansBySessionId ?? {}).map(([sessionId, thinkingSpans]) => [
+        sessionId,
+        [...thinkingSpans],
+      ]),
+    ),
     turnsBySessionId: Object.fromEntries(
-      Object.entries(value.turnsBySessionId).map(([sessionId, turns]) => [sessionId, [...turns]]),
+      Object.entries(value.turnsBySessionId ?? {}).map(([sessionId, turns]) => [
+        sessionId,
+        [...turns],
+      ]),
     ),
     toolCallsBySessionId: Object.fromEntries(
-      Object.entries(value.toolCallsBySessionId).map(([sessionId, calls]) => [
+      Object.entries(value.toolCallsBySessionId ?? {}).map(([sessionId, calls]) => [
         sessionId,
         [...calls],
       ]),
     ),
     toolResultsBySessionId: Object.fromEntries(
-      Object.entries(value.toolResultsBySessionId).map(([sessionId, results]) => [
+      Object.entries(value.toolResultsBySessionId ?? {}).map(([sessionId, results]) => [
         sessionId,
         [...results],
       ]),
@@ -241,6 +219,7 @@ const STREAM_MESSAGE_PREFIX = "stream_";
  * Group a flat, time-sorted timeline into turn envelopes.
  *
  * Attribution rules, strongest first:
+ * - thinking: `turn_id` on the thinking span.
  * - tool_call / paired tool_result: `turn_id` on the call.
  * - transient streaming message: its id is `stream_<turn_id>` (core emits
  *   MessageDelta with that synthetic id).
@@ -255,7 +234,12 @@ const STREAM_MESSAGE_PREFIX = "stream_";
  * items (just-started turns) still produce an empty group so the UI can
  * show a running envelope immediately.
  */
-export function turnGroups(sessionId: string, items: TimelineItem[], turns: Turn[]): TurnGroup[] {
+export function turnGroups(
+  sessionId: string,
+  items: TimelineItem[],
+  turns: Turn[],
+  activities: Record<string, TurnActivityProjection> = {},
+): TurnGroup[] {
   const sortedTurns = dedupeTurns(turns);
   const turnsById = new Map(sortedTurns.map((turn) => [turn.id, turn]));
   const groupsByTurnId = new Map<string, TurnGroup>();
@@ -270,6 +254,7 @@ export function turnGroups(sessionId: string, items: TimelineItem[], turns: Turn
         sessionId,
         createdAt: turn.created_at,
         turn,
+        activity: activities[turn.id],
         items: [],
       };
       groupsByTurnId.set(turn.id, group);
@@ -316,6 +301,9 @@ function attributeItem(
   if (item.kind === "tool_call") {
     return turnsById.get(item.toolCall.turn_id);
   }
+  if (item.kind === "thinking") {
+    return turnsById.get(item.thinking.turn_id);
+  }
   if (item.kind === "tool_result") {
     return item.toolCall ? turnsById.get(item.toolCall.turn_id) : undefined;
   }
@@ -354,9 +342,16 @@ export function dedupeToolResults(results: ToolResult[]): ToolResult[] {
   );
 }
 
+export function dedupeThinkingSpans(thinkingSpans: ThinkingSpan[]): ThinkingSpan[] {
+  return [...new Map(thinkingSpans.map((thinking) => [thinking.id, thinking])).values()].sort(
+    (left, right) => left.created_at.localeCompare(right.created_at),
+  );
+}
+
 export function timelineItems(
   sessionId: string,
   messages: SessionMessage[],
+  thinkingSpans: ThinkingSpan[],
   calls: ToolCall[],
   results: ToolResult[],
 ): TimelineItem[] {
@@ -386,7 +381,14 @@ export function timelineItems(
     createdAt: message.relation.created_at,
     message,
   }));
-  return [...messageItems, ...callItems, ...orphanResults].sort((left, right) =>
+  const thinkingItems: TimelineItem[] = thinkingSpans.map((thinking) => ({
+    kind: "thinking",
+    id: thinking.id,
+    sessionId,
+    createdAt: thinking.created_at,
+    thinking,
+  }));
+  return [...messageItems, ...thinkingItems, ...callItems, ...orphanResults].sort((left, right) =>
     left.createdAt.localeCompare(right.createdAt),
   );
 }

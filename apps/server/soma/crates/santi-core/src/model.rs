@@ -4,6 +4,9 @@ use utoipa::ToSchema;
 
 pub type Timestamp = String;
 
+mod message;
+pub use message::*;
+
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct HealthResponse {
     pub ok: bool,
@@ -14,6 +17,33 @@ pub struct HealthResponse {
 pub struct ErrorResponse {
     pub code: String,
     pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum MaterialKind {
+    SystemPrompt,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct MaterialRequest {
+    pub kind: MaterialKind,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct SessionMaterial {
+    pub session_id: String,
+    pub kind: MaterialKind,
+    pub content_type: String,
+    pub text: String,
+    pub updated_at: Timestamp,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct MaterialUpdated {
+    pub session_id: String,
+    pub kind: MaterialKind,
+    pub updated_at: Timestamp,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -59,103 +89,13 @@ pub struct Soul {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SoulProfile {
     pub soul_id: String,
+    pub soul_name: String,
     pub nickname: String,
     pub avatar_ref: Option<String>,
     pub avatar_seed: String,
     pub desc: Option<String>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum ActorType {
-    Account,
-    Soul,
-    System,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum MessageState {
-    Pending,
-    Fixed,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct MessageContent {
-    pub parts: Vec<MessagePart>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum MessagePart {
-    Text {
-        text: String,
-    },
-    Image {
-        mime_type: String,
-        data_base64: String,
-    },
-}
-
-impl MessageContent {
-    pub fn text(text: impl Into<String>) -> Self {
-        Self {
-            parts: vec![MessagePart::Text { text: text.into() }],
-        }
-    }
-
-    pub fn content_text(&self) -> String {
-        self.parts
-            .iter()
-            .filter_map(|part| match part {
-                MessagePart::Text { text } => Some(text.as_str()),
-                MessagePart::Image { .. } => None,
-            })
-            .collect::<Vec<_>>()
-            .join("\n\n")
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct Message {
-    pub id: String,
-    pub actor_type: ActorType,
-    pub actor_id: String,
-    pub content: MessageContent,
-    pub state: MessageState,
-    pub version: i64,
-    pub deleted_at: Option<Timestamp>,
-    pub created_at: Timestamp,
-    pub updated_at: Timestamp,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct SessionMessageRef {
-    pub session_id: String,
-    pub message_id: String,
-    pub session_seq: i64,
-    pub created_at: Timestamp,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct SessionMessage {
-    pub relation: SessionMessageRef,
-    pub message: Message,
-    pub content_text: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct MessageEvent {
-    pub id: String,
-    pub message_id: String,
-    pub action: String,
-    pub actor_type: ActorType,
-    pub actor_id: String,
-    pub base_version: i64,
-    pub payload: Value,
-    pub created_at: Timestamp,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -222,6 +162,36 @@ pub struct ToolResult {
     pub created_at: Timestamp,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ThinkingSpanState {
+    Running,
+    Completed,
+    Failed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ThinkingCompletionReason {
+    FirstTextDelta,
+    ToolCallRequested,
+    ProviderCompleted,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ThinkingSpan {
+    pub id: String,
+    pub turn_id: String,
+    pub provider_response_id: Option<String>,
+    pub state: ThinkingSpanState,
+    pub summary: Option<String>,
+    pub completion_reason: Option<ThinkingCompletionReason>,
+    pub error_text: Option<String>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+    pub finished_at: Option<Timestamp>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Compact {
     pub id: String,
@@ -252,6 +222,7 @@ pub struct SessionEffect {
 pub enum SoulSessionTargetType {
     Message,
     Compact,
+    Thinking,
     ToolCall,
     ToolResult,
 }
@@ -303,15 +274,12 @@ impl SendSessionRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct SendSessionResponse {
+pub struct SendSessionAcceptedResponse {
     pub session: SessionSummary,
     pub soul_session: SoulSession,
     pub soul_profile: SoulProfile,
     pub turn: Turn,
     pub user_message: SessionMessage,
-    pub assistant_message: SessionMessage,
-    pub tool_calls: Vec<ToolCall>,
-    pub tool_results: Vec<ToolResult>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -320,6 +288,23 @@ pub struct SantiStreamEvent {
     pub session_id: String,
     pub created_at: Timestamp,
     pub payload: SantiStreamPayload,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum TurnActivityState {
+    Requesting,
+    Thinking,
+    Generating,
+    CallingTool,
+    RunningTool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct TurnActivity {
+    pub turn_id: String,
+    pub state: TurnActivityState,
+    pub provider_response_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -345,8 +330,23 @@ pub enum SantiStreamPayload {
     ToolResultCreated {
         tool_result: ToolResult,
     },
+    ThinkingCreated {
+        thinking: ThinkingSpan,
+    },
+    ThinkingUpdated {
+        thinking: ThinkingSpan,
+    },
+    ThinkingCompleted {
+        thinking: ThinkingSpan,
+    },
+    MaterialUpdated {
+        material: MaterialUpdated,
+    },
     TurnStarted {
         turn: Turn,
+    },
+    TurnActivity {
+        activity: TurnActivity,
     },
     TurnFailed {
         turn_id: String,
@@ -362,6 +362,7 @@ pub struct SessionRuntimeSnapshot {
     pub soul_profile: Option<SoulProfile>,
     pub messages: Vec<SessionMessage>,
     pub turns: Vec<Turn>,
+    pub thinking_spans: Vec<ThinkingSpan>,
     pub tool_calls: Vec<ToolCall>,
     pub tool_results: Vec<ToolResult>,
     pub compacts: Vec<Compact>,
@@ -383,6 +384,20 @@ pub fn timestamp_now() -> Timestamp {
         .print_timestamp(&now, &mut buf)
         .expect("formatting a timestamp into a String cannot fail");
     buf
+}
+
+pub(crate) fn timestamp_from_system_time(
+    system_time: std::time::SystemTime,
+) -> Result<Timestamp, String> {
+    use jiff::fmt::temporal::DateTimePrinter;
+
+    let timestamp = jiff::Timestamp::try_from(system_time).map_err(|error| error.to_string())?;
+    let mut buf = String::new();
+    DateTimePrinter::new()
+        .precision(Some(3))
+        .print_timestamp(&timestamp, &mut buf)
+        .expect("formatting a timestamp into a String cannot fail");
+    Ok(buf)
 }
 
 pub fn prefixed_id(prefix: &str) -> String {

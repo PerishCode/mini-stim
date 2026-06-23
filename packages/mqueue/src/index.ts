@@ -4,13 +4,16 @@ import {
   getSession,
   listMessages,
   listSessions,
+  type MaterialKind,
   runtimeSnapshot,
-  type SendSessionResponse,
+  type SendSessionAcceptedResponse,
   type SessionDetail,
+  type SessionMaterial,
   type SessionMessage,
   type SessionRuntimeSnapshot,
   type SessionSummary,
   sendSession,
+  sessionMaterial,
   updateSession,
 } from "@mini-stim/contracts";
 
@@ -45,41 +48,7 @@ import type {
   SessionSubOptions,
 } from "./types";
 
-export type {
-  Compact,
-  MessageConnectionState,
-  MessageDeltaPayload,
-  MessageEvent,
-  MessageMqueue,
-  MessagePart,
-  MessagePhase,
-  MessageProjection,
-  MqueueError,
-  PubAck,
-  SantiMqueue,
-  SantiWindow,
-  Session,
-  SessionAction,
-  SessionEffect,
-  SessionEvent,
-  SessionMessage,
-  SessionMqueue,
-  SessionPayloads,
-  SessionPhase,
-  SessionProfile,
-  SessionProjection,
-  SessionRuntimeSnapshot,
-  SessionSubOptions,
-  SessionSummary,
-  SoulProfile,
-  SoulSession,
-  TimelineItem,
-  ToolCall,
-  ToolResult,
-  Turn,
-  TurnGroup,
-  TurnStatus,
-} from "./types";
+export type * from "./types";
 
 declare global {
   interface Window {
@@ -107,6 +76,7 @@ function createMqueueCore(target: Window): SantiMqueue {
     sessions: [],
     selectedSessionId: null,
     messages: [],
+    materialsBySessionId: {},
     messagesBySessionId: {},
     runtimeBySessionId: {},
     pending: 0,
@@ -117,6 +87,8 @@ function createMqueueCore(target: Window): SantiMqueue {
     timelineBySessionId: {},
     turnTimelineBySessionId: {},
     turnsBySessionId: {},
+    turnActivityBySessionId: {},
+    thinkingSpansBySessionId: {},
     toolCallsBySessionId: {},
     toolResultsBySessionId: {},
     connectionBySessionId: {},
@@ -128,7 +100,9 @@ function createMqueueCore(target: Window): SantiMqueue {
     markTurnFailed,
     removeTransient,
     setMessageProjection,
+    setTurnActivity,
     upsertMessages,
+    upsertThinkingSpans,
     upsertTools,
     upsertTurns,
   } = createProjectionWriter(state, messageState);
@@ -255,6 +229,7 @@ function createMqueueCore(target: Window): SantiMqueue {
         state.selectedSessionId = summarySessionId(session);
         state.messages = state.messagesBySessionId[summarySessionId(session)] ?? [];
         connectSessionEvents(summarySessionId(session));
+        await ensureMaterial(summarySessionId(session), "system_prompt");
         dispatchSession(target, sessionEvent(action, "committed", { session }, "http"));
         return;
       }
@@ -267,6 +242,7 @@ function createMqueueCore(target: Window): SantiMqueue {
         state.messages = detail.messages;
         setMessageProjection(detail.session.id);
         connectSessionEvents(detail.session.id);
+        await ensureMaterial(detail.session.id, "system_prompt");
         emitMessageProjection(detail.session.id);
         dispatchSession(target, sessionEvent(action, "committed", detail, "http"));
         return;
@@ -282,6 +258,12 @@ function createMqueueCore(target: Window): SantiMqueue {
           state.messages = state.messagesBySessionId[summarySessionId(session)] ?? [];
         }
         dispatchSession(target, sessionEvent(action, "committed", { session }, "http"));
+        return;
+      }
+      case "material": {
+        const materialPayload = payload as SessionPayloads["material"];
+        const material = await ensureMaterial(materialPayload.sessionId, materialPayload.kind);
+        dispatchSession(target, sessionEvent(action, "committed", { material }, "http"));
         return;
       }
       case "messages": {
@@ -307,7 +289,9 @@ function createMqueueCore(target: Window): SantiMqueue {
         ) as SessionRuntimeSnapshot;
         state.runtimeBySessionId[runtimePayload.sessionId] = runtime;
         upsertTurns(runtimePayload.sessionId, runtime.turns);
+        upsertThinkingSpans(runtimePayload.sessionId, runtime.thinking_spans);
         upsertTools(runtimePayload.sessionId, runtime.tool_calls, runtime.tool_results);
+        await ensureMaterial(runtimePayload.sessionId, "system_prompt");
         emitMessageProjection(runtimePayload.sessionId);
         dispatchSession(target, sessionEvent(action, "committed", runtime, "http"));
         return;
@@ -344,15 +328,11 @@ function createMqueueCore(target: Window): SantiMqueue {
     const response = expectStatus(
       await sendSession(sessionId, { content: sendPayload.content }),
       200,
-    ) as SendSessionResponse;
+    ) as SendSessionAcceptedResponse;
     upsertSession(response.session);
     state.selectedSessionId = summarySessionId(response.session);
-    upsertMessages(summarySessionId(response.session), [
-      response.user_message,
-      response.assistant_message,
-    ]);
+    upsertMessages(summarySessionId(response.session), [response.user_message]);
     upsertTurns(summarySessionId(response.session), [response.turn]);
-    upsertTools(summarySessionId(response.session), response.tool_calls, response.tool_results);
     state.messages = state.messagesBySessionId[summarySessionId(response.session)];
     emitMessageProjection(summarySessionId(response.session));
     return response;
@@ -402,6 +382,21 @@ function createMqueueCore(target: Window): SantiMqueue {
         emitProjection();
         emitMessageProjection(sessionId);
       },
+      thinkingCreated: (payload) => {
+        upsertThinkingSpans(sessionId, [payload.thinking]);
+        dispatchMessage(target, messageEvent("thinking_created", sessionId, payload, "sse"));
+        emitMessageProjection(sessionId);
+      },
+      thinkingUpdated: (payload) => {
+        upsertThinkingSpans(sessionId, [payload.thinking]);
+        dispatchMessage(target, messageEvent("thinking_updated", sessionId, payload, "sse"));
+        emitMessageProjection(sessionId);
+      },
+      thinkingCompleted: (payload) => {
+        upsertThinkingSpans(sessionId, [payload.thinking]);
+        dispatchMessage(target, messageEvent("thinking_completed", sessionId, payload, "sse"));
+        emitMessageProjection(sessionId);
+      },
       toolCall: (payload) => {
         upsertTools(sessionId, [payload.tool_call], []);
         dispatchMessage(target, messageEvent("tool_call", sessionId, payload, "sse"));
@@ -417,7 +412,19 @@ function createMqueueCore(target: Window): SantiMqueue {
         dispatchMessage(target, messageEvent("turn_started", sessionId, payload, "sse"));
         emitMessageProjection(sessionId);
       },
+      turnActivity: (payload, createdAt) => {
+        const activity = { ...payload.activity, created_at: createdAt };
+        const changed = setTurnActivity(sessionId, activity);
+        dispatchMessage(target, messageEvent("turn_activity", sessionId, activity, "sse"));
+        if (changed) {
+          emitMessageProjection(sessionId);
+        }
+      },
+      materialUpdated: (payload) => {
+        void ensureMaterial(sessionId, payload.material.kind);
+      },
       turnFailed: (payload) => {
+        removeTransient(sessionId, payload.turn_id);
         markTurnFailed(sessionId, payload.turn_id, payload.error);
         dispatchMessage(
           target,
@@ -442,6 +449,19 @@ function createMqueueCore(target: Window): SantiMqueue {
     if (sessionId) {
       setConnection(sessionId, "closed");
     }
+  }
+
+  async function ensureMaterial(sessionId: string, kind: MaterialKind): Promise<SessionMaterial> {
+    const material = expectStatus(
+      await sessionMaterial(sessionId, { kind }),
+      200,
+    ) as SessionMaterial;
+    state.materialsBySessionId[sessionId] = {
+      ...(state.materialsBySessionId[sessionId] ?? {}),
+      [kind]: material,
+    };
+    emitProjection();
+    return material;
   }
 
   function setConnection(sessionId: string, connection: MessageConnectionState) {

@@ -1,12 +1,15 @@
 import {
   installSantiMqueue,
+  type MaterialKind,
   type MessageConnectionState,
+  type MessageEvent,
   type MessagePart,
   type MessageProjection,
   type MqueueError,
   type PubAck,
   type SantiMqueue,
   type SantiWindow,
+  type SessionMaterial,
   type SessionMessage,
   type SessionProjection,
   type SessionRuntimeSnapshot,
@@ -26,6 +29,8 @@ import {
 
 export type {
   Compact,
+  MaterialKind,
+  MaterialUpdated,
   MessageConnectionState,
   MessagePart,
   MqueueError,
@@ -33,13 +38,20 @@ export type {
   SantiMqueue,
   Session,
   SessionEffect,
+  SessionMaterial,
   SessionMessage,
   SessionProjection,
   SessionRuntimeSnapshot,
   SessionSummary,
   SoulSession,
+  ThinkingCompletionReason,
+  ThinkingSpan,
+  ThinkingSpanState,
   TimelineItem,
   Turn,
+  TurnActivity,
+  TurnActivityProjection,
+  TurnActivityState,
   TurnGroup,
   TurnStatus,
 } from "@mini-stim/mqueue";
@@ -55,6 +67,7 @@ interface SessionActions {
   create(): PubAck;
   get(sessionId: string): PubAck;
   list(): PubAck;
+  refreshMaterial(sessionId: string, kind: MaterialKind): PubAck;
   refreshRuntime(sessionId: string): PubAck;
   select(sessionId: string | null): PubAck;
   selectAndGet(sessionId: string): PubAck[];
@@ -119,7 +132,7 @@ export function useSessionMessages(sessionId?: string | null): SessionMessage[] 
 export function useSessionTurnTimeline(sessionId?: string | null): TurnGroup[] {
   const mqueue = useSantiMqueue();
   const selectedSessionId = useSelectedSessionId();
-  const store = useMemo(() => createMessageStore(mqueue), [mqueue]);
+  const store = useMemo(() => createMessageStore(mqueue, isProjectionEvent), [mqueue]);
   const resolvedSessionId = sessionId ?? selectedSessionId;
   const projection = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   if (!resolvedSessionId) {
@@ -158,6 +171,17 @@ export function useSessionRuntime(sessionId?: string | null): SessionRuntimeSnap
   return projection.runtimeBySessionId[resolvedSessionId] ?? null;
 }
 
+export function useSessionMaterial(
+  sessionId: string | null | undefined,
+  kind: MaterialKind,
+): SessionMaterial | null {
+  const projection = useSessionProjection();
+  if (!sessionId) {
+    return null;
+  }
+  return projection.materialsBySessionId[sessionId]?.[kind] ?? null;
+}
+
 export function useSessionPending(): number {
   return useSessionProjection().pending;
 }
@@ -194,7 +218,7 @@ export function useDebouncedValue<T>(
 export function useMessageConnection(sessionId?: string | null): MessageConnectionState {
   const mqueue = useSantiMqueue();
   const selectedSessionId = useSelectedSessionId();
-  const store = useMemo(() => createMessageStore(mqueue), [mqueue]);
+  const store = useMemo(() => createMessageStore(mqueue, isConnectionEvent), [mqueue]);
   const resolvedSessionId = sessionId ?? selectedSessionId;
   const projection = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   if (!resolvedSessionId) {
@@ -215,16 +239,32 @@ function createSessionStore(mqueue: SantiMqueue) {
   };
 }
 
-function createMessageStore(mqueue: SantiMqueue) {
+function createMessageStore(mqueue: SantiMqueue, shouldUpdate: (event: MessageEvent) => boolean) {
   let snapshot: MessageProjection = mqueue.message.snapshot();
   return {
     getSnapshot: () => snapshot,
     subscribe: (onStoreChange: () => void) =>
-      mqueue.message.sub(() => {
+      mqueue.message.sub((event) => {
+        if (!shouldUpdate(event)) {
+          return;
+        }
         snapshot = mqueue.message.snapshot();
         onStoreChange();
       }),
   };
+}
+
+function isProjectionEvent(event: MessageEvent) {
+  return event.phase === "projection";
+}
+
+function isConnectionEvent(event: MessageEvent) {
+  return (
+    event.phase === "connecting" ||
+    event.phase === "open" ||
+    event.phase === "closed" ||
+    event.phase === "error"
+  );
 }
 
 export function useSessionActions(): SessionActions {
@@ -234,6 +274,8 @@ export function useSessionActions(): SessionActions {
       create: () => mqueue.session.pub("create"),
       get: (sessionId: string) => mqueue.session.pub("get", { sessionId }),
       list: () => mqueue.session.pub("list"),
+      refreshMaterial: (sessionId: string, kind: MaterialKind) =>
+        mqueue.session.pub("material", { sessionId, kind }),
       refreshRuntime: (sessionId: string) => mqueue.session.pub("runtime", { sessionId }),
       select: (sessionId: string | null) => mqueue.session.pub("select", { sessionId }),
       selectAndGet: (sessionId: string) => [

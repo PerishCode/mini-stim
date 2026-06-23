@@ -8,7 +8,9 @@ import {
   useAppComponentRef,
 } from "@mini-stim/components";
 import type { SessionRuntimeSnapshot } from "@mini-stim/hooks";
+import { useSessionActions, useSessionMaterial } from "@mini-stim/hooks";
 import type { ReactNode } from "react";
+import { useEffect } from "react";
 
 import { STIM_APP_NAMESPACE } from "../appNamespace";
 import { closeInspectPanel, type InspectTarget } from "../events/inspect";
@@ -19,6 +21,7 @@ import { ToolCallInspectPanel } from "./domains/tool-call/InspectPanel/ToolCallI
 type InspectDomain = "session" | "message" | "tool-call";
 
 type InspectDomainPanelProps = {
+  systemPrompt: ReturnType<typeof useSessionMaterial>;
   runtime: SessionRuntimeSnapshot;
   target: InspectTarget | null;
 };
@@ -36,6 +39,8 @@ export function InspectPanel(props: {
   target: InspectTarget | null;
 }) {
   const { runtime, target } = props;
+  const actions = useSessionActions();
+  const systemPrompt = useSessionMaterial(runtime?.session.id, "system_prompt");
   const panelRef = useAppComponentRef({
     domain: "inspect",
     id: "inspect-panel",
@@ -48,6 +53,12 @@ export function InspectPanel(props: {
 
   const domain = resolveInspectDomain(target);
   const DomainPanel = inspectDomainRegistry[domain];
+
+  useEffect(() => {
+    if (runtime?.session.id && !systemPrompt) {
+      actions.refreshMaterial(runtime.session.id, "system_prompt");
+    }
+  }, [actions, runtime?.session.id, systemPrompt]);
 
   return (
     <Panel.Root ref={panelRef}>
@@ -68,7 +79,7 @@ export function InspectPanel(props: {
       </Panel.Header>
       <Panel.Body tone="inset" scroll>
         {runtime ? (
-          <DomainPanel runtime={runtime} target={target} />
+          <DomainPanel runtime={runtime} systemPrompt={systemPrompt} target={target} />
         ) : (
           <Pane padding="lg">
             <Text tone="muted">No runtime snapshot loaded for this session yet.</Text>
@@ -80,7 +91,7 @@ export function InspectPanel(props: {
 }
 
 function SessionInspectDomain(props: InspectDomainPanelProps) {
-  return <SessionInspectPanel runtime={props.runtime} />;
+  return <SessionInspectPanel runtime={props.runtime} systemPrompt={props.systemPrompt} />;
 }
 
 function MessageInspectDomain(props: InspectDomainPanelProps) {
@@ -89,10 +100,11 @@ function MessageInspectDomain(props: InspectDomainPanelProps) {
       return <MessageInspectPanel runtime={props.runtime} messageId={props.target.messageId} />;
     case "session":
     case "turn":
+    case "thinking":
     case "tool_call":
     case "tool_result":
     case undefined:
-      return <SessionInspectPanel runtime={props.runtime} />;
+      return <SessionInspectPanel runtime={props.runtime} systemPrompt={props.systemPrompt} />;
   }
 }
 
@@ -103,9 +115,10 @@ function ToolCallInspectDomain(props: InspectDomainPanelProps) {
       return <ToolCallInspectPanel runtime={props.runtime} target={props.target} />;
     case "message":
     case "session":
+    case "thinking":
     case "turn":
     case undefined:
-      return <SessionInspectPanel runtime={props.runtime} />;
+      return <SessionInspectPanel runtime={props.runtime} systemPrompt={props.systemPrompt} />;
   }
 }
 
@@ -117,6 +130,7 @@ function resolveInspectDomain(target: InspectTarget | null): InspectDomain {
     case "tool_result":
       return "tool-call";
     case "session":
+    case "thinking":
     case "turn":
     case undefined:
       return "session";

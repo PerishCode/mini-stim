@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS souls (
 
 CREATE TABLE IF NOT EXISTS soul_profiles (
     soul_id TEXT PRIMARY KEY,
+    soul_name TEXT NOT NULL,
     nickname TEXT NOT NULL,
     avatar_ref TEXT,
     avatar_seed TEXT NOT NULL,
@@ -43,8 +44,9 @@ CREATE TABLE IF NOT EXISTS messages (
     id TEXT PRIMARY KEY,
     actor_type TEXT NOT NULL CHECK (actor_type IN ('account', 'soul', 'system')),
     actor_id TEXT NOT NULL,
+    message_kind TEXT NOT NULL DEFAULT 'text' CHECK (message_kind IN ('text', 'santi_system')),
     content TEXT NOT NULL,
-    state TEXT NOT NULL CHECK (state IN ('pending', 'fixed')),
+    state TEXT NOT NULL CHECK (state IN ('pending', 'fixed', 'aborted')),
     version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
     deleted_at TEXT,
     created_at TEXT NOT NULL,
@@ -137,6 +139,26 @@ CREATE TABLE IF NOT EXISTS tool_results (
     )
 );
 
+CREATE TABLE IF NOT EXISTS thinking_spans (
+    id TEXT PRIMARY KEY,
+    turn_id TEXT NOT NULL,
+    provider_response_id TEXT,
+    state TEXT NOT NULL CHECK (state IN ('running', 'completed', 'failed')),
+    summary TEXT,
+    completion_reason TEXT CHECK (
+        completion_reason IS NULL OR
+        completion_reason IN ('first_text_delta', 'tool_call_requested', 'provider_completed')
+    ),
+    error_text TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    finished_at TEXT,
+    CHECK (
+        (state = 'failed' AND error_text IS NOT NULL) OR
+        (state <> 'failed' AND error_text IS NULL)
+    )
+);
+
 CREATE TABLE IF NOT EXISTS compacts (
     id TEXT PRIMARY KEY,
     turn_id TEXT NOT NULL,
@@ -149,7 +171,7 @@ CREATE TABLE IF NOT EXISTS compacts (
 
 CREATE TABLE IF NOT EXISTS r_soul_session_messages (
     soul_session_id TEXT NOT NULL,
-    target_type TEXT NOT NULL CHECK (target_type IN ('message', 'compact', 'tool_call', 'tool_result')),
+    target_type TEXT NOT NULL CHECK (target_type IN ('message', 'compact', 'thinking', 'tool_call', 'tool_result')),
     target_id TEXT NOT NULL,
     soul_session_seq INTEGER NOT NULL CHECK (soul_session_seq > 0),
     created_at TEXT NOT NULL,
@@ -173,6 +195,7 @@ CREATE INDEX IF NOT EXISTS idx_turns_soul_session_created_at ON turns (soul_sess
 CREATE INDEX IF NOT EXISTS idx_turns_soul_session_status_created_at ON turns (soul_session_id, status, created_at);
 CREATE INDEX IF NOT EXISTS idx_tool_calls_turn_id_created_at ON tool_calls (turn_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_tool_results_tool_call_id ON tool_results (tool_call_id);
+CREATE INDEX IF NOT EXISTS idx_thinking_spans_turn_id_created_at ON thinking_spans (turn_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_compacts_turn_id_created_at ON compacts (turn_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_r_soul_session_messages_target_lookup ON r_soul_session_messages (target_type, target_id);
 CREATE INDEX IF NOT EXISTS idx_r_soul_session_messages_seq ON r_soul_session_messages (soul_session_id, soul_session_seq);
